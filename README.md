@@ -48,18 +48,19 @@ Every LLM output is anchored back to the detection evidence in the IR. Fabricate
 ## Architecture
 
 ```mermaid
-flowchart TD
-    A["Image + question"] --> B["L1 · Detector and spatial compiler"]
-    B --> C["Structured IR: objects, boxes, relations"]
-    C --> D["L2 · Validate IR and route intent"]
-    D --> E{"Needs visual verification?"}
-    E -- Yes --> F["L1.5 · Verify uncertain detections"]
-    E -- No --> G["L3 · LLM reasons over IR"]
-    F --> G
-    G --> H{"Evidence anchor: are claims supported?"}
-    H -- Yes --> I["Answer + traceable evidence"]
-    H -- No --> J["Veto · bounded retry or human review"]
-    J -- Retry --> G
+flowchart TB
+    R(("SVSG")) --- A(("Evidence"))
+    A --- A1(("Image + question"))
+    A1 --- A2(("L1 Detector"))
+    A2 --- A3(("Structured IR"))
+    R --- B(("Reasoning"))
+    B --- B1(("L2 State machine"))
+    B1 --- B2(("L1.5 Verify if needed"))
+    B2 --- B3(("L3 Text LLM"))
+    R --- C(("Review"))
+    C --- C1(("Evidence anchor"))
+    C1 --- C2(("Supported answer"))
+    C1 --- C3(("Retry or human review"))
 ```
 
 **What changes:** the detector produces inspectable evidence first; the LLM reasons over that evidence, and the runtime checks its structured claims before delivery. Unresolved cases can require human review. The natural-language claim coverage check currently logs a warning; it does not guarantee that every sentence is grounded.
