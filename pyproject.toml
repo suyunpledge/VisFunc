@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "motionspec"
+version = "0.1.0"
+description = "Turn UI motion in a video into a spec an AI can read: timing, transforms, easing curves and annotated key frames."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["animation", "motion", "easing", "video", "ui", "llm", "computer-vision"]
+dependencies = [
+    "numpy>=1.24",
+    "opencv-python>=4.8",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+motionspec = "motionspec.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["motionspec*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
