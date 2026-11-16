@@ -1,0 +1,141 @@
+"""命令行入口。
+
+    motionspec analyze clip.mp4 -o out/        分析视频，写出 spec.json / summary.md / 标注图
+    motionspec check out/spec.json claims.json 用规格校验一组结构化断言
+    motionspec demo -o demo/                   生成合成动效并分析，用来快速看输出长什么样
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from .analyze import analyze
+from .claims import check
+from .spec import summarize
+
+
+def _seconds(value: float | None) -> float | None:
+    return None if value is None else value * 1000.0
+
+
+def _reject_constant(value: str):
+    raise ValueError(f"invalid JSON numeric constant {value}")
+
+
+def _load_json(filename: str):
+    return json.loads(Path(filename).read_text(encoding="utf-8"), parse_constant=_reject_constant)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="motionspec", description="Turn UI motion in a video into a spec an AI can read.")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    a = sub.add_parser("analyze", help="analyse a video file or a directory of frames")
+    a.add_argument("source")
+    a.add_argument("-o", "--out", default="motionspec-out")
+    a.add_argument("--start", type=float, help="start time in seconds")
+    a.add_argument("--end", type=float, help="end time in seconds")
+    a.add_argument("--fps", type=float, help="override frame rate (required for image directories)")
+    a.add_argument("--max-dim", type=int, default=960, help="analysis resolution, longest side")
+    a.add_argument("--max-segments", type=int, default=12)
+    a.add_argument("--min-area", type=float, default=120.0, help="ignore changes smaller than this (analysis px^2)")
+    a.add_argument("--threshold", type=int, default=12, help="per-pixel change threshold, 0-255")
+    a.add_argument("--no-sheets", action="store_true")
+    a.add_argument("--no-raw-frames", action="store_true", help="omit original-resolution evidence PNGs")
+    a.add_argument("--functions", action="store_true", help="also export shared SVSG image/time functions")
+    a.add_argument("--sequence-id", help="identity used to bind SVSG per-frame recognition")
+    a.add_argument("--function-max-frames", type=int, default=64)
+    a.add_argument("--evidence-every-ms", type=float, help="also retain periodic source frames")
+    a.add_argument("--max-frames", type=int, default=1_000_000, help="maximum frames in the selected range")
+    a.add_argument("--max-crop-mb", type=int, default=150, help="shared crop cache budget in decimal MB")
+    a.add_argument("--ambient-ms", type=float, default=3000.0,
+                   help="treat cells that keep changing for this long as an animated backdrop; 0 disables")
+
+    c = sub.add_parser("check", help="verify structured claims against a spec")
+    c.add_argument("spec")
+    c.add_argument("claims")
+
+    f = sub.add_parser("functions", help="export shared functions from an existing spec and evidence")
+    f.add_argument("spec")
+    f.add_argument("-o", "--out", required=True)
+    f.add_argument("--sequence-id")
+    f.add_argument("--max-frames", type=int, default=64)
+
+    q = sub.add_parser("query", help="evaluate a data-only query against shared functions")
+    q.add_argument("manifest")
+    q.add_argument("parameters", help="JSON file containing one function call")
+
+    d = sub.add_parser("demo", help="analyse built-in synthetic clips")
+    d.add_argument("-o", "--out", default="motionspec-demo")
+
+    args = parser.parse_args(argv)
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+    if args.command == "analyze":
+        try:
+            spec = analyze(
+                args.source, args.out, fps=args.fps, max_dim=args.max_dim,
+                start_ms=_seconds(args.start), end_ms=_seconds(args.end), max_segments=args.max_segments,
+                min_area=args.min_area, threshold=args.threshold, sheets=not args.no_sheets,
+                raw_frames=not args.no_raw_frames, max_frames=args.max_frames, max_crop_bytes=args.max_crop_mb * 1_000_000,
+                ambient_ms=args.ambient_ms,
+                functions=args.functions, sequence_id=args.sequence_id,
+                function_max_frames=args.function_max_frames, evidence_every_ms=args.evidence_every_ms,
+            )
+        except (OSError, ValueError) as exc:
+            a.exit(2, f"motionspec analyze: {exc}\n")
+        print(summarize(spec))
+        print(f"written to {Path(args.out).resolve()}")
+        return 0
+
+    if args.command == "functions":
+        from .functions import export_functions
+
+        try:
+            result = export_functions(_load_json(args.spec), Path(args.spec).parent, args.out,
+                                      sequence_id=args.sequence_id, max_frames=args.max_frames)
+        except (OSError, ValueError) as exc:
+            f.exit(2, f"motionspec functions: {exc}\n")
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.command == "query":
+        from .functions import require_svsg
+
+        try:
+            require_svsg()
+            from svsg.video_functions import VideoRuntime
+
+            result = VideoRuntime.load(args.manifest).call(_load_json(args.parameters))
+        except (OSError, ValueError) as exc:
+            q.exit(2, f"motionspec query: {exc}\n")
+        print(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False))
+        return 0
+
+    if args.command == "check":
+        try:
+            verdict = check(_load_json(args.spec), _load_json(args.claims))
+        except (OSError, ValueError) as exc:
+            verdict = {"passed": False, "invalid_input": str(exc)}
+        print(json.dumps(verdict, ensure_ascii=False, indent=2, allow_nan=False))
+        if any(field in verdict for field in ("invalid_spec", "invalid_claims", "invalid_input")):
+            return 2
+        return {"passed": 0, "failed": 1, "insufficient_evidence": 3}[verdict["verdict"]]
+
+    from .synth import CASES
+
+    for name, make in CASES.items():
+        frames, _ = make()
+        spec = analyze(frames, Path(args.out) / name, fps=60.0)
+        print(f"## {name}\n")
+        print(summarize(spec))
+    print(f"written to {Path(args.out).resolve()}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
