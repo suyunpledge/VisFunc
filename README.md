@@ -1,7 +1,31 @@
-# SVSG — 给 LLM 视觉问答加一道证据校验闸门
+# SVSG + MotionSpec — 可复算的图像与视频证据
 
 SVSG 的函数路径把输入图像编译为可求值的像素函数和可核验的几何参数。
 后端负责测量，模型可以只读取结构化证据来作答。
+
+MotionSpec 与 SVSG 现位于同一仓库，共用图像和时间函数实现；两个 Python 包保留各自的
+安装元数据和命令入口，依赖方向为 MotionSpec → SVSG，不重复维护函数编译器。
+
+| 目录 | 内容 |
+|---|---|
+| `svsg/` | 图像函数、识别复核、共享视频函数和 HTTP 服务 |
+| `packages/motionspec/motionspec/` | 视频读取、运动测量、曲线拟合及函数导出 CLI |
+| `tests/` | SVSG 回归测试 |
+| `packages/motionspec/tests/` | 视频与跨项目接入测试 |
+| `packages/motionspec/tools/` | 控制视频生成及函数复算验证 |
+
+在仓库根目录统一安装和运行测试（Python 3.11+）：
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest
+python -m motionspec analyze clip.mp4 -o out --functions --sequence-id clip-001
+```
+
+只需图像服务时仍可安装 `.[api,llm]`；只需视频测量时可单独安装 `./packages/motionspec`。
+视频的共享函数导出需要同时安装 SVSG 的 `[functions]` 扩展。
+详见 [MotionSpec 使用说明](packages/motionspec/README.md)、[统一函数协议](docs/video-functions.md)
+和 [仓库结构与历史](docs/monorepo.md)。
 
 ## 多模态物体识别与视频帧准备
 

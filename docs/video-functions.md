@@ -1,8 +1,8 @@
 # SVSG 与 MotionSpec 的统一函数表达
 
 `svsg.video-functions/1` 将视频证据组织为逐帧函数、帧间差分、时间函数与可选的物体观察。
-实现位于 SVSG，MotionSpec 只提供适配入口。两个包可放在同一仓库分别安装，避免复制编译器
-和求值器；SVSG 不导入 MotionSpec，MotionSpec 仅在请求函数导出时导入 SVSG。
+实现位于 SVSG，MotionSpec 适配入口位于同仓库的 `packages/motionspec`。两个包分别安装，
+复用编译器和求值器；SVSG 不导入 MotionSpec，MotionSpec 仅在请求函数导出时导入 SVSG。
 
 ```mermaid
 flowchart LR
@@ -38,10 +38,10 @@ MotionSpec 隐藏部分的外推、下界、低置信和截短标记继续保留
 
 ## 导出和求值
 
-本地安装两个包（将路径替换为各自源码目录）：
+从仓库根目录安装图像函数和视频包：
 
 ```bash
-python -m pip install -e "<svsg目录>[functions]" -e "<motionspec目录>"
+python -m pip install -e ".[functions]" -e "./packages/motionspec"
 python -m motionspec analyze clip.mp4 -o out --functions --sequence-id clip-001 --evidence-every-ms 500
 ```
 
@@ -128,7 +128,7 @@ bundle = attach_recognition(bundle, result)
 SVSG 189 项测试通过；MotionSpec 54 项测试通过。新测试覆盖非均匀时间轴、贝塞尔 x 逆解、
 弹簧秒单位、RGB/透明度差分、无变化帧复用、错误哈希/帧引用、预算和原子发布。
 
-`motionspec/tools/validate_functions.py` 对 4 段 MPEG-4 压缩控制视频验证：共 28 个保留帧，
+`packages/motionspec/tools/validate_functions.py` 对 4 段 MPEG-4 压缩控制视频验证：共 28 个保留帧，
 逐像素还原误差均为 0；470 个原运动采样值误差均为 0；24 组差分与直接像素计算一致。
 33 个拟合求值与 MotionSpec 原求值器的最大差约 2.46e-6（贝塞尔数值求解方式不同）。
 素材包括合成平移、弹簧，以及真实照片生成的受控平移和静止片段。照片片段不是自然视频

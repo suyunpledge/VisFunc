@@ -2,6 +2,10 @@
 
 从录屏测量 2D 界面动效，输出时间、坐标、曲线和可追溯的原始关键帧。
 
+本项目位于 SVSG + MotionSpec 单仓库的 `packages/motionspec/`。
+仓库总览和统一安装见 [根 README](../../README.md)，共享协议见
+[视频函数说明](../../docs/video-functions.md)。以下未注明位置的独立项目命令在本目录运行。
+
 数值规格可以和原始画面一起交给模型，用于回答与时间和运动有关的问题。
 
 ```
@@ -192,10 +196,10 @@ tools/
 
 ## 与 SVSG 共用图像和时间函数
 
-可选安装本机 SVSG 源码的 `[functions]` 扩展后，启用统一函数导出：
+在仓库根目录安装 SVSG 的 `[functions]` 扩展和本包后，启用统一函数导出：
 
 ```bash
-python -m pip install -e "<svsg目录>[functions]" -e "<motionspec目录>"
+python -m pip install -e ".[functions]" -e "./packages/motionspec"
 motionspec analyze clip.mp4 -o out --functions --sequence-id clip-001 --evidence-every-ms 500
 motionspec functions out/spec.json -o functions --sequence-id clip-001
 ```
@@ -227,7 +231,7 @@ Python 入口为 `svsg.video_functions.VideoRuntime`；现有识别结果可用 
 
 像素函数精确复现保留帧的解码图像；采样点之间的运动是插值，拟合值带 RMSE，不外推到
 片段范围之外。运动片段不是物体轨迹，帧差不代表物体身份或动作。自然视频的跟踪和切镜
-语义仍需后续验证。详细协议说明维护在 SVSG 的 `docs/video-functions.md`。
+语义仍需后续验证。详细协议说明见 [共享视频函数](../../docs/video-functions.md)。
 
 本地无网络验证可运行 `python tools/validate_functions.py --out checks`；可选 `--photo`
 添加真实照片生成的受控平移/静止视频。测试只验证编码与函数复算，不代表自然视频识别准确率。

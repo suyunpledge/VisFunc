@@ -1,0 +1,3 @@
+# Run from the repository root; both distributions use the same checkout.
+-e .[api,llm,dev]
+-e ./packages/motionspec[dev]

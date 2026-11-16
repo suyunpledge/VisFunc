@@ -52,8 +52,9 @@ include = ["svsg*"]
 svsg = ["py.typed"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-addopts = "-q"
+testpaths = ["tests", "packages/motionspec/tests"]
+pythonpath = [".", "packages/motionspec"]
+addopts = "-q --import-mode=importlib"
 
 [tool.ruff]
 line-length = 100

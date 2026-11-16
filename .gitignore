@@ -14,6 +14,11 @@ build/
 dist/
 .venv/
 
+# Video outputs from commands launched at the monorepo root
+/motionspec-out/
+/motionspec-demo/
+/out/
+
 # 模型权重
 *.pt
 

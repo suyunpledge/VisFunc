@@ -1,5 +1,21 @@
 # 项目结构图谱 / Project Tree Map
 
+当前仓库已合并 SVSG 与 MotionSpec。下方两张图片描述原有 SVSG 分层；最新目录见本节及
+[单仓库说明](monorepo.md)。
+
+```text
+SVSG + MotionSpec
+├── svsg/                         图像识别、函数编译和共享视频函数
+├── packages/motionspec/
+│   ├── motionspec/               视频分析与 CLI
+│   ├── tests/                    视频及跨项目测试
+│   └── tools/                    控制视频和复算验证
+├── tests/                        图像与服务测试
+├── docs/                         共用协议与评测记录
+├── scripts/                      服务启动与评测入口
+└── requirements-dev.txt          两个包的统一开发安装入口
+```
+
 ![项目结构图谱（中文）](project-tree.zh.png)
 
 ![Project tree map (English)](project-tree.en.png)
@@ -30,4 +46,4 @@ SVSG — Structured Visual Semantic Gateway
 └── Deployment & Ops ── Dockerfile · docker-compose.yml · self-healing watchdog
 ```
 
-> 图谱由脚本按仓库真实目录生成，随代码结构变化重新生成即可。
+> 图片保留原有分层说明，单仓库目录以本文顶部及根 README 为准。
