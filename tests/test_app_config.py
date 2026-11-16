@@ -1,8 +1,8 @@
 """应用化装配测试：集中配置 + 图片上传端到端 + 可选鉴权。
 
 覆盖「如何让系统应用化」的机器可执行验收：
-- Settings ?????????? 127.0.0.1:3002?
-- ??? AI Platform 3001 ???openai ? base_url ??????
+- Settings 默认绑定 127.0.0.1:3002；
+- llm_provider=openai 时必须显式提供 base_url，防止误打生产端点；
 - POST /v1/analyze-image 走 image → L1 编译 → 编排 → 答案 完整闭环；
 - 可选 X-API-Key 鉴权与不可读图片的 422。
 """
@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import io
+from hashlib import sha256
 
 import pytest
 from fastapi.testclient import TestClient
@@ -96,6 +97,13 @@ def test_blank_api_key_is_treated_as_disabled_auth():
     assert s.api_key is None
 
 
+def test_settings_reject_invalid_network_and_timeout_values():
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, port=70000)
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, llm_timeout_s=0)
+
+
 # ------------------------------------------------------------------ 图片上传
 
 
@@ -108,10 +116,25 @@ def test_analyze_image_delivers():
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["status"] == "delivered"
-    assert body["final_answer"] == "检测到 1 个螺丝和 1 个垫圈"
+    assert body["status"] == "demo"
+    assert body["evidence_mode"] == "demo"
+    assert body["image_sha256"] == sha256(_png_bytes()).hexdigest()
+    assert "2 个有效实例" in body["final_answer"]
     assert body["trace_id"]
     assert resp.headers["X-SVSG-Trace-Id"] == body["trace_id"]
+
+
+def test_default_service_requires_explicit_image_detector():
+    with TestClient(create_app(settings=Settings(detector="disabled", _env_file=None))) as client:
+        resp = client.post(
+            "/v1/analyze-image", files={"file": ("x.png", _png_bytes())}, data={"query": "q"}
+        )
+    assert resp.status_code == 503
+
+
+def test_visual_verifier_requires_explicit_provider_credentials():
+    with pytest.raises(ValidationError, match="SVSG_L15_BASE_URL"):
+        Settings(l15_provider="openai", _env_file=None)
 
 
 def test_analyze_image_unreadable_returns_422():

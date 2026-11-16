@@ -143,9 +143,6 @@ def build_nearest_relations(
     result: dict[int, list[Relation]] = {iid: [] for iid in instance_ids}
     if not distance_relations_allowed(scene_type, has_intrinsics):
         return result
-    metric_type = (
-        MetricType.PHYSICAL_UNIT if has_intrinsics else MetricType.IMAGE_PLANE_PX
-    )
     for i, iid in enumerate(instance_ids):
         nb = nearest_neighbor(i, bboxes)
         if nb is None:
@@ -157,7 +154,7 @@ def build_nearest_relations(
                 target_id=instance_ids[j],
                 spatial_consistency=1.0,
                 metric_accuracy=override_metric_accuracy,
-                metric_type=metric_type,
+                metric_type=MetricType.IMAGE_PLANE_PX,
                 distance_px=dist,
             )
         )

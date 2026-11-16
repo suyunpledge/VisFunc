@@ -24,6 +24,7 @@ import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -62,14 +63,17 @@ def verify_password(password: str, stored: str) -> bool:
     """按存储格式校验口令；格式异常一律视为不匹配（恒时比较）。"""
     try:
         algo, iters_s, salt_hex, digest_hex = stored.split("$")
-    except ValueError:
+        iters = int(iters_s)
+        salt = bytes.fromhex(salt_hex)
+        expected = bytes.fromhex(digest_hex)
+        if iters <= 0 or not salt or not expected:
+            return False
+        digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iters)
+    except (AttributeError, TypeError, ValueError, OverflowError):
         return False
     if algo != "pbkdf2_sha256":
         return False
-    digest = hashlib.pbkdf2_hmac(
-        "sha256", password.encode("utf-8"), bytes.fromhex(salt_hex), int(iters_s)
-    )
-    return hmac.compare_digest(digest.hex(), digest_hex)
+    return hmac.compare_digest(digest, expected)
 
 
 def _token_digest(token: str) -> str:
@@ -88,7 +92,11 @@ class AuthStore:
     """SQLite 用户/令牌存储（每次操作独立短连接，事务自动提交）。"""
 
     def __init__(self, db_path: str) -> None:
-        self.db_path = db_path
+        # SQLite 不会自动创建父目录；服务从 Trae/容器等不同 cwd 启动时，
+        # 绝对路径和嵌套相对路径都应能直接工作。
+        self.db_path = str(Path(db_path).expanduser())
+        if self.db_path != ":memory:":
+            Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self._init_schema()
 
     @contextmanager

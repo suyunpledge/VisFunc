@@ -112,6 +112,18 @@ def _run(coro):
     return asyncio.run(coro)
 
 
+def test_llm_retries_share_one_deadline():
+    wrong = _answer([{"field": "count", "value": 999}])
+    valid = _answer([{"field": "count", "value": 3}])
+    orch, llm = _orch(
+        StubVerifierBackend(), [wrong, valid], llm_timeout=0.25, llm_delay=0.17
+    )
+    result = _run(orch.run("计数", _payload(verify2=False)))
+    assert result.status == "aborted"
+    assert result.answer is None
+    assert len(llm.calls) == 2
+
+
 # ------------------------------------------------------------------ 场景 1
 
 
@@ -329,7 +341,7 @@ def test_rebuilder_returning_still_dangling_fails():
 
 
 def test_partial_verification_result_degrades_missing_instances():
-    """L1.5 ?????????????????? E2003 ?????"""
+    """L1.5 部分验证结果缺失时，缺失实例按 E2003 路径降级不阻塞"""
     payload = _payload()
     payload["detections"][0]["verification_required"] = True
     backend = StubVerifierBackend(

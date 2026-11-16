@@ -21,6 +21,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .enums import DISTANCE_RELATIONS, ConfLevel, MetricType, RelationType, SceneType
+from .image_functions import ImageFunctionEvidence
 
 IR_SCHEMA_VERSION: Literal["5.2.1"] = "5.2.1"
 
@@ -125,9 +126,15 @@ class IR(BaseModel):
     detector_model: str = Field(..., min_length=1)
     camera_intrinsics: CameraIntrinsics | None = None
     detections: list[Detection] = Field(default_factory=list)
+    image_functions: ImageFunctionEvidence | None = None
 
     @model_validator(mode="after")
     def _cross_checks(self) -> IR:
+        evidence = self.image_functions
+        if evidence is not None and (
+            evidence.width_px != self.image_width or evidence.height_px != self.image_height
+        ):
+            raise ValueError("function evidence dimensions do not match IR")
         # 1) instance_id 唯一
         ids = [d.instance_id for d in self.detections]
         if len(set(ids)) != len(ids):

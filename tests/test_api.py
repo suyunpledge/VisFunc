@@ -5,6 +5,7 @@ from __future__ import annotations
 import random
 import sys
 
+import pytest
 from fastapi.testclient import TestClient
 
 from svsg.api import create_app
@@ -87,19 +88,86 @@ def _client(answers, backend=None):
 def test_analyze_delivers_with_trace_header():
     claims = [{"instance_id": 1, "field": "class", "value": "screw"},
               {"field": "count", "value": 3}]
-    client, _ = _client([_answer(claims)])
+    client, _ = _client([_answer(claims, text="画面里有 999 颗螺丝。")])
     resp = client.post(
         "/v1/analyze", json={"query": "图里有什么", "ir": _payload(verify2=False)}
     )
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "delivered"
-    assert body["final_answer"] == "答案文本"
+    assert body["evidence_mode"] == "submitted_ir"
+    assert '实例 1 的类别为 "screw"。' in body["final_answer"]
+    assert "3 个有效实例" in body["final_answer"]
+    assert "999" not in body["final_answer"]
     assert body["human_review_required"] is False
     assert body["claims"][0]["value"] == "screw"
     assert body["trace_id"]
     # 响应头回传 trace_id，供调用方关联日志与采样记录
     assert resp.headers["X-SVSG-Trace-Id"] == body["trace_id"]
+
+
+@pytest.mark.parametrize("claims", [
+    [],
+    [{"field": "class", "value": "screw"}],
+    [{"instance_id": 1, "field": "material", "value": "gold"}],
+    [{"instance_id": 1, "field": "relation:unknown", "value": 2}],
+    [{"instance_id": 1, "field": "exists", "value": "true"}],
+    [{"field": "count", "value": True}],
+])
+def test_invalid_claims_go_to_review(claims):
+    client, _ = _client([_answer(claims), _answer(claims)])
+    response = client.post("/v1/analyze", json={"ir": _payload(verify2=False), "query": "q"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "human_review"
+    assert body["final_answer"] is None
+    assert body["anchor_violations"]
+
+
+def test_distance_and_nearest_recompute_pixels_despite_untrusted_draft():
+    claims = [
+        {"instance_id": 2, "field": "relation:distance_to", "value": 3},
+        {"instance_id": 2, "field": "relation:nearest_to", "value": 3},
+    ]
+    client, _ = _client([_answer(claims, "两个物体相距一米")])
+    response = client.post("/v1/analyze", json={"ir": _payload(verify2=False), "query": "q"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "delivered"
+    assert [c["distance_px"] for c in body["claims"]] == [pytest.approx(181.11)] * 2
+    assert "像素" in body["final_answer"] and "一米" not in body["final_answer"]
+
+
+def test_wrong_distance_and_nearest_send_feedback_for_regeneration():
+    bad = [
+        {"instance_id": 2, "field": "relation:distance_to", "value": 3, "distance_px": 12},
+        {"instance_id": 2, "field": "relation:nearest_to", "value": 1},
+    ]
+    good = [{"instance_id": 2, "field": "relation:nearest_to", "value": 3}]
+    client, _ = _client([_answer(bad), _answer(good)])
+    response = client.post("/v1/analyze", json={"ir": _payload(verify2=False), "query": "q"})
+    assert response.status_code == 200
+    assert response.json()["status"] == "delivered"
+    assert response.json()["claims"][0]["value"] == 3
+
+
+def test_rejected_detection_is_excluded_from_count_and_relations():
+    backend = StubVerifierBackend(batches=[{2: {"exists": False}}])
+    invalid = [
+        {"field": "count:screw", "value": 2},
+        {"instance_id": 1, "field": "relation:nearest_to", "value": 2},
+    ]
+    valid = [
+        {"field": "count", "value": 2},
+        {"field": "count:screw", "value": 1},
+        {"instance_id": 2, "field": "exists", "value": False},
+        {"instance_id": 1, "field": "relation:nearest_to", "value": 3},
+    ]
+    client, _ = _client([_answer(invalid), _answer(valid)], backend)
+    body = client.post("/v1/analyze", json={"ir": _payload(), "query": "q"}).json()
+    assert body["status"] == "delivered"
+    assert body["verified_instances"] == [2]
+    assert [claim["value"] for claim in body["claims"]] == [2, 1, False, 3]
 
 
 def test_analyze_rejected_is_business_level_200():

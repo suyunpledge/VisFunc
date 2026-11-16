@@ -32,7 +32,6 @@ from svsg.contracts import (
     IR,
     ErrorCode,
     L3Answer,
-    SceneType,
     StateCode,
     SVSGError,
     VerificationReport,
@@ -45,15 +44,15 @@ from svsg.l2_runtime import (
     RuntimeSession,
     check_dependencies,
     missing_verifications,
-    nl_claims_coverage,
     resolve_conflict,
     run_anchor,
     validate_ir_payload,
 )
-from svsg.l2_runtime.evidence_anchor import AMBIGUOUS_LABEL
+from svsg.l2_runtime.evidence_anchor import AMBIGUOUS_LABEL, evidence_results
 from svsg.l15_verifier import L15Verifier, assert_timeout_budget
 
 from .prompts import build_context, build_system_prompt
+from .render import render_anchored_answer
 
 logger = logging.getLogger("svsg.l3_orchestrator")
 
@@ -114,6 +113,7 @@ class OrchestratorResult:
     class_overrides: dict[int, str] = field(default_factory=dict)
     degraded_instances: set[int] = field(default_factory=set)
     disputed_instances: set[int] = field(default_factory=set)
+    verified_instances: set[int] = field(default_factory=set)
     session_summary: dict = field(default_factory=dict)
     error: dict | None = None
 
@@ -163,6 +163,7 @@ class Orchestrator:
         ir_payload: dict[str, Any] | IR,
         *,
         ir_rebuilder: Callable[[], dict[str, Any] | None] | None = None,
+        image: bytes | None = None,
     ) -> OrchestratorResult:
         """执行完整编排循环。
 
@@ -200,7 +201,7 @@ class Orchestrator:
 
         need = sorted(d.instance_id for d in ir.detections if d.verification_required)
         if need:
-            rnd = await self._verification_round(session, ir, need)
+            rnd = await self._verification_round(session, ir, need, image=image)
             report, executed = rnd.report, rnd.executed
             if rnd.status == "unresolved":
                 return self._result(
@@ -215,6 +216,7 @@ class Orchestrator:
         eff_ir = self._effective_ir(ir, overrides)
         feedback: list[dict] | None = None
         llm_calls = 0
+        deadline = asyncio.get_running_loop().time() + self._config.llm_timeout_s
 
         # ---- 生成 + 锚定循环
         while True:
@@ -229,7 +231,7 @@ class Orchestrator:
             llm_calls += 1
 
             answer = await self._call_llm(
-                query, eff_ir, report, degraded, disputed, feedback, session
+                query, eff_ir, report, degraded, disputed, feedback, session, deadline
             )
             if answer is None:  # L3 超时/故障 → S5（_call_llm 已转移）
                 return self._result(
@@ -237,22 +239,6 @@ class Orchestrator:
                 )
 
             verdict = run_anchor(eff_ir, answer, executed, report, exempt=degraded)
-
-            # V5.2.4 §4.5.2 第5步（Phase 1）：NL-claims 关键词覆盖率告警。
-            # 覆盖率 < 0.8 记 WARNING 日志（不阻断，不触发 S7）——已知风险
-            # 敞口，Phase 2 升级为完整 NL-claims 结构化对齐后关闭。
-            if verdict.passed:
-                try:
-                    coverage = nl_claims_coverage(eff_ir, answer)
-                    if coverage < 0.8:
-                        logger.warning(
-                            "NL-claims 关键词覆盖率 %.2f 低于阈值 0.80 "
-                            "(answer 可能包含 claims 未覆盖的视觉断言) trace=%s",
-                            coverage,
-                            getattr(session, "trace_id", None),
-                        )
-                except Exception:
-                    pass  # 告警失败不影响主流程
 
             if verdict.passed:
                 if not session.is_terminal:
@@ -263,8 +249,11 @@ class Orchestrator:
                     else "delivered"
                 )
                 return self._result(
-                    status, session, answer=answer, overrides=overrides,
+                    status, session,
+                    answer=render_anchored_answer(answer, eff_ir, degraded | disputed),
+                    overrides=overrides,
                     degraded=degraded, disputed=disputed,
+                    verified=set(evidence_results(eff_ir, report)),
                 )
 
             if session.is_terminal:
@@ -289,7 +278,10 @@ class Orchestrator:
                     missing_verifications(eff_ir, executed, exempt=degraded)
                 )
                 if missing:
-                    rnd = await self._verification_round(session, eff_ir, missing)
+                    rnd = await self._verification_round(
+                        session, eff_ir, missing, image=image,
+                        timeout_s=deadline - asyncio.get_running_loop().time(),
+                    )
                     report = self._merge_reports(report, rnd.report)
                     executed |= rnd.executed
                     if rnd.status == "unresolved":
@@ -321,15 +313,29 @@ class Orchestrator:
     # 验证轮
 
     async def _verification_round(
-        self, session: RuntimeSession, ir: IR, ids: list[int]
+        self,
+        session: RuntimeSession,
+        ir: IR,
+        ids: list[int],
+        *,
+        image: bytes | None = None,
+        timeout_s: float | None = None,
     ) -> _VerificationRound:
         """S1 → S4a → L1.5 → (consistent / conflict / timeout)。"""
         session.transition(Event.VERIFICATION_REQUESTED)
-        report = await self._verifier.verify_instances(ir.image_id, ids)
+        id_set = set(ids)
+        regions = {d.instance_id: d.bbox_px for d in ir.detections if d.instance_id in id_set}
+        report = await self._verifier.verify_instances(
+            ir.image_id, ids, image=image, regions=regions, timeout_s=timeout_s
+        )
 
         if report.status != VerificationStatus.SUCCESS:
             # 静默降级：不进 S4，直接 S6；降级实例记录在会话中
-            session.transition(Event.VERIFICATION_TIMEOUT, degraded=set(ids))
+            session.transition(
+                Event.VERIFICATION_TIMEOUT,
+                degraded=set(ids),
+                note=f"L1.5 status={report.status.value}",
+            )
             return _VerificationRound(
                 "timeout", report, set(), {}, set(ids), set()
             )
@@ -337,12 +343,12 @@ class Orchestrator:
         executed = {r.instance_id for r in report.results}
         missing_results = set(ids) - executed
         if missing_results:
-            # "success + ?/?????" ?????????????????
-            # ???????????????????? E2003 ??? S3 ???
-            # ?????????? L1.5 ?????????????????
-            # ??? IR??? lowest?????????
+            # "success + 部分结果" 的组合在这里按超时降级处理：
+            # 验证后端报 success 但结果集不含全部实例，视同 E2003 打回 S3 的路径，
+            # 与整体超时一致，避免单个实例卡住 L1.5 整个轮次。
+            # 降级实例在 IR 里标 lowest，不阻塞整体。
             logger.warning(
-                "L1.5 ??????????????=%s??????",
+                "L1.5 验证结果缺失，实例=%s 按超时降级",
                 sorted(missing_results),
             )
             session.transition(Event.VERIFICATION_TIMEOUT, degraded=missing_results)
@@ -356,6 +362,7 @@ class Orchestrator:
             det = by_id.get(r.instance_id)
             if (
                 det is not None
+                and r.exists is not False
                 and r.class_label is not None
                 and r.class_label != AMBIGUOUS_LABEL
                 and r.class_label != det.object_class
@@ -398,13 +405,10 @@ class Orchestrator:
         disputed: set[int],
         feedback: list[dict] | None,
         session: RuntimeSession,
+        deadline: float,
     ) -> L3Answer | None:
         """调用 L3（受总超时约束）；超时/故障 → S5 并返回 None。"""
-        physical_metrics = (
-            eff_ir.scene_type == SceneType.ORTHOGRAPHIC
-            or eff_ir.camera_intrinsics is not None
-        )
-        system = build_system_prompt(physical_metrics)
+        system = build_system_prompt(False, image_functions=eff_ir.image_functions is not None)
         context = build_context(
             query, eff_ir, report,
             degraded=degraded, disputed=disputed,
@@ -413,7 +417,7 @@ class Orchestrator:
         try:
             return await asyncio.wait_for(
                 self._llm.complete(system, context),
-                timeout=self._config.llm_timeout_s,
+                timeout=max(0.0, deadline - asyncio.get_running_loop().time()),
             )
         except TimeoutError:
             if not session.is_terminal:
@@ -493,6 +497,7 @@ class Orchestrator:
         overrides: dict[int, str] | None = None,
         degraded: set[int] | None = None,
         disputed: set[int] | None = None,
+        verified: set[int] | None = None,
         error: dict | None = None,
     ) -> OrchestratorResult:
         return OrchestratorResult(
@@ -504,6 +509,7 @@ class Orchestrator:
             class_overrides=overrides or {},
             degraded_instances=degraded or set(),
             disputed_instances=disputed or set(),
+            verified_instances=verified or set(),
             session_summary=session.summary(),
             error=error,
         )

@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from svsg.api import create_app
+from svsg.auth import verify_password
 from svsg.config import Settings
 
 
@@ -90,3 +91,9 @@ def test_invalid_credentials(tmp_path):
         ).status_code
         == 401
     )
+
+
+def test_malformed_password_hash_is_treated_as_invalid():
+    """损坏的数据库记录不能把登录请求变成 500。"""
+    assert verify_password("secret123", "pbkdf2_sha256$not-an-int$00$00") is False
+    assert verify_password("secret123", "pbkdf2_sha256$1$zz$00") is False

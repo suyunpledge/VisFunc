@@ -1,16 +1,4 @@
-"""L3 主控的 Prompt 资产。
-
-system prompt 将 V5.2.1 的三条强制语义写入 LLM 规则：
-1. 透视免责（修订 #2）：metric_accuracy 不可用时，距离表述必须附带
-   "图像平面内约 X 像素，非物理距离" 的免责声明；
-2. 降级标注（修订 #3）：lowest/degraded 实例的结论必须附带
-   "已降级处理，待人工复审"；
-3. ambiguous 禁令（修订 #1 的前端）：验证结论为 ambiguous 的实例
-   禁止给出具体类别（后端由锚定校验兜底否决）。
-
-claims 双通道词表与 evidence_anchor 的比对规则一一对应——这是
-"断言提取零 NLP 解析"得以成立的前提。
-"""
+"""Instructions and structured evidence for the L3 claim generator."""
 
 from __future__ import annotations
 
@@ -18,54 +6,66 @@ import json
 from collections.abc import Iterable
 
 from svsg.contracts import IR, VerificationReport, VerificationStatus
+from svsg.image_functions.claims import CONTOUR_METRICS, IMAGE_METRICS, REGION_METRICS
+from svsg.image_functions.projection import function_context
+from svsg.image_functions.spatial import RELATIONS
 
 SYSTEM_PROMPT_TEMPLATE = (
     """你是 SVSG 视觉问答主控引擎（L3）。你看不到图像，
 只能基于 L2 提供的结构化证据作答。
 
-硬性规则（违反任何一条，答案会被证据锚定校验无条件否决）：
+断言生成规则：
 1. 只允许使用【结构化证据】中的事实作答；禁止推测、编造或用外部知识补充视觉细节。
-2. 必须以双通道输出：claims（结构化断言数组）与 final_answer（面向用户的自然语言回答）。
-   final_answer 中的所有核心视觉事实必须与 claims 一一对应，不得出现 claims 之外的视觉断言。
+2. 输出 JSON 对象，包含非空 claims 数组和简短 final_answer。
+   交付文本由网关从通过校验的断言生成。把回答所需的全部事实写进 claims。
 3. claims 字段词表（全局断言省略 instance_id）：
    - {{"instance_id": <id>, "field": "class", "value": "<类别>"}}
-   - {{"field": "count", "value": <实例总数>}}
+   - {{"field": "count", "value": <有效实例总数>}}
    - {{"field": "count:<类别>", "value": <该类别实例数>}}
    - {{"instance_id": <id>, "field": "exists", "value": true 或 false}}
    - {{"instance_id": <id>, "field": "attribute:<名称>", "value": <属性值>}}
    - {{"instance_id": <id>, "field": "relation:<类型>", "value": <目标 instance_id>}}
    relation 类型词表：left_of / right_of / above / below / contains /
    overlaps / nearest_to / distance_to。
+   对距离类关系，value 始终是目标实例 ID。可省略 distance_px，由网关从两个框中心计算。
 4. {distance_rule}
-5. conf_level 为 lowest、或列于 degraded_instances 的实例：final_answer 涉及该实例时，
-   必须附带说明"该结论已经降级处理，待人工复审"。
-6. 验证结论（verification_results）中 class 为 ambiguous 的实例：
-   禁止在 claims 和 final_answer 中为其给出具体类别。
+5. verification_results 中 exists=false 的实例不计入计数，也不能用于其他视觉断言。
+   可以用 exists=false 表达该实例的验证结果。
+6. 验证结果为 ambiguous 的实例只能参与总数，不支持其具体类别以及精确分类计数。
 7. class_overrides 中给出的类别是冲突解决后的最终结论，claims 必须采用该类别而非检测器原始类别。
 """
 )
 
 UNSAFE_DISTANCE_RULE = (
-    "涉及距离、远近表述时，必须附带免责声明（如"
-    "\"图像平面内约 200 像素，非物理距离\"）；"
-    "当前场景未标定（metric_accuracy 不可用），严禁将像素距离表述为物理距离。"
+    "距离和最近邻使用图像平面内的像素，不能用像素推断物理距离。"
 )
 
 SAFE_DISTANCE_RULE = (
-    "本场景物理度量已标定：距离按结构化证据中的数值与单位表述，不得改动数值。"
+    "当前断言协议只支持从框中心复算的图像平面像素距离。"
 )
 
 
-def build_system_prompt(physical_metrics_available: bool) -> str:
-    """构建 system prompt。
-
-    physical_metrics_available：正视场景，或透视场景已提供相机内参。
-    """
-    return SYSTEM_PROMPT_TEMPLATE.format(
+def build_system_prompt(physical_metrics_available: bool, *, image_functions: bool = False) -> str:
+    """Build the model instructions for the structured claim protocol."""
+    prompt = SYSTEM_PROMPT_TEMPLATE.format(
         distance_rule=(
             SAFE_DISTANCE_RULE if physical_metrics_available else UNSAFE_DISTANCE_RULE
         )
     )
+    if image_functions:
+        prompt += (
+            "\n函数证据：使用 field=\"function:<参数名>\"，value 为实际参数。"
+            f"全图参数 {', '.join(IMAGE_METRICS)}。"
+            f"区域参数 {', '.join(REGION_METRICS | CONTOUR_METRICS)}，须指定 region_id。"
+            f"空间函数 field=\"function:spatial:<指标>\"，指标 {', '.join(RELATIONS)}，"
+            "须指定 region_id 和 target_region_id。"
+            "量化数据使用 region_basis=quantized，面积、距离和颜色属于量化网格。"
+            "精确区与量化区的 ID 是独立的。outline_preview 是采样轮廓，不能视作完整边界。"
+            "指定位置的测量使用 function:measurement:<query.id> 和原样的 value。"
+            "null 表示未测得。连通区域是像素证据，不能当成物体或语义类别。"
+            "仅有函数证据时只输出 function 断言。"
+        )
+    return prompt
 
 
 def build_context(
@@ -122,6 +122,8 @@ def build_context(
             }
             for r in report.results
         ]
+    if ir.image_functions is not None:
+        payload["image_functions"] = function_context(ir.image_functions)
     if corrective_feedback:
         payload["corrective_feedback"] = {
             "notice": "上一轮答案被证据锚定校验否决，以下断言与结构化证据不一致，必须修正",

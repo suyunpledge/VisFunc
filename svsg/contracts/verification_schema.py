@@ -4,13 +4,14 @@
 - VerificationReport / VerificationResult：L1.5 输出的结构化验证报告
   （structured_report），是 L2 证据锚定校验的比对基准。
 - Claim / L3Answer：L3 的双通道输出。claims 为结构化断言，供锚定校验
-  做确定性 JSON 字段比对（避免对自然语言做模糊解析）；final_answer
-  仅面向人类阅读，不参与校验。
+  做确定性 JSON 字段比对。网关根据通过的断言渲染 final_answer。
 """
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from .enums import ConfLevel, VerificationStatus
 
@@ -25,15 +26,15 @@ class VerificationResult(BaseModel):
 
     model_config = _STRICT
 
-    instance_id: int = Field(..., ge=1)
+    instance_id: StrictInt = Field(..., ge=1)
     # 细粒度分类结论；无法可靠判定时为 "ambiguous"——
     # 此时 L3 若断言具体类别，将被证据锚定校验无条件否决（触发 S4）
-    class_label: str | None = Field(default=None, alias="class")
+    class_label: str | None = Field(default=None, alias="class", min_length=1, max_length=128)
     # 属性描述，如 {"color": "silver", "head_type": "phillips"}
     attributes: dict[str, str] = Field(default_factory=dict)
     # 存在性验证结论；None 表示本次未验证存在性
-    exists: bool | None = None
-    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    exists: bool | None = Field(default=None, strict=True)
+    confidence: float | None = Field(default=None, strict=True, ge=0.0, le=1.0)
     notes: str | None = None
 
 
@@ -60,11 +61,15 @@ class Claim(BaseModel):
     model_config = _STRICT
 
     # 断言关联的实例；全局性断言（如总数）可为 None
-    instance_id: int | None = Field(default=None, ge=1)
+    instance_id: StrictInt | None = Field(default=None, ge=1)
     # 断言字段：class / count / exists / attribute:<name> / relation:<type> ...
     field: str = Field(..., min_length=1)
     value: ClaimValue = None
     confidence: ConfLevel | None = None
+    distance_px: float | None = Field(default=None, strict=True, ge=0, allow_inf_nan=False)
+    region_id: StrictInt | None = Field(default=None, ge=1)
+    region_basis: Literal["exact", "quantized"] | None = None
+    target_region_id: StrictInt | None = Field(default=None, ge=1)
 
 
 class L3Answer(BaseModel):

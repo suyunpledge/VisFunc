@@ -23,6 +23,7 @@ from typing import Protocol
 from uuid import uuid4
 
 from svsg.contracts import VerificationReport, VerificationResult, VerificationStatus
+from svsg.l1_compiler.geometry_engine import BBox
 
 
 class VerifierBackend(Protocol):
@@ -30,6 +31,14 @@ class VerifierBackend(Protocol):
 
     async def verify_batch(
         self, image_id: str, instance_ids: list[int]
+    ) -> list[VerificationResult]: ...
+
+
+class ImageVerifierBackend(Protocol):
+    """Verify only the regions supplied for the current image."""
+
+    async def verify_regions(
+        self, image: bytes, regions: dict[int, BBox]
     ) -> list[VerificationResult]: ...
 
 
@@ -79,14 +88,25 @@ class L15Verifier:
 
     def __init__(
         self,
-        backend: VerifierBackend,
+        backend: VerifierBackend | None = None,
         config: VerifierConfig | None = None,
+        *,
+        image_backend: ImageVerifierBackend | None = None,
     ) -> None:
+        if backend is not None and image_backend is not None:
+            raise ValueError("configure one verification backend")
         self._backend = backend
+        self._image_backend = image_backend
         self.config = config or VerifierConfig()
 
     async def verify_instances(
-        self, image_id: str, instance_ids: list[int]
+        self,
+        image_id: str,
+        instance_ids: list[int],
+        *,
+        image: bytes | None = None,
+        regions: dict[int, BBox] | None = None,
+        timeout_s: float | None = None,
     ) -> VerificationReport:
         """执行一批实例验证；超时/故障 → 非成功状态报告（静默降级入口）。"""
         report_id = f"{self.config.report_id_prefix}_{uuid4().hex[:12]}"
@@ -100,23 +120,33 @@ class L15Verifier:
             )
 
         started = time.perf_counter()
+        timeout = (
+            self.config.timeout_s if timeout_s is None else min(timeout_s, self.config.timeout_s)
+        )
+        if timeout <= 0:
+            return self._report(report_id, image_id, VerificationStatus.TIMEOUT, [], started)
+        if self._image_backend is not None and image and regions:
+            candidates = {iid: regions[iid] for iid in instance_ids if iid in regions}
+            job = self._image_backend.verify_regions(image, candidates)
+        elif self._backend is not None:
+            job = self._backend.verify_batch(image_id, list(instance_ids))
+        else:
+            return self._report(report_id, image_id, VerificationStatus.DEGRADED, [], started)
         try:
-            results = await asyncio.wait_for(
-                self._backend.verify_batch(image_id, list(instance_ids)),
-                timeout=self.config.timeout_s,
-            )
+            results = await asyncio.wait_for(job, timeout=timeout)
         except TimeoutError:
-            return self._report(
-                report_id, image_id, VerificationStatus.TIMEOUT, [], started
-            )
+            return self._report(report_id, image_id, VerificationStatus.TIMEOUT, [], started)
         except Exception:
             # 后端故障与超时同路径处理（保守：不采信任何部分输出）
-            return self._report(
-                report_id, image_id, VerificationStatus.ERROR, [], started
-            )
-        return self._report(
-            report_id, image_id, VerificationStatus.SUCCESS, results, started
-        )
+            return self._report(report_id, image_id, VerificationStatus.ERROR, [], started)
+        requested = set(instance_ids)
+        returned = {r.instance_id for r in results}
+        if len(returned) != len(results) or not returned <= requested:
+            return self._report(report_id, image_id, VerificationStatus.ERROR, [], started)
+        results = [r for r in results if r.class_label or r.exists is not None or r.attributes]
+        if not results:
+            return self._report(report_id, image_id, VerificationStatus.DEGRADED, [], started)
+        return self._report(report_id, image_id, VerificationStatus.SUCCESS, results, started)
 
     @staticmethod
     def _report(

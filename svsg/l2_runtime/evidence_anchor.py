@@ -1,36 +1,15 @@
-"""V5.2.1 强制后置证据锚定校验器（Critical）。
-
-在 L3 生成最终答案后、返回给用户前执行两道硬校验：
-
-1. 工具调用完整性：IR 中所有 verification_required=true 的实例，
-   是否均出现在已执行的 VerifyRegion 集合中。缺失 → E3003
-   （VERIFICATION_SKIPPED），打回 S3 重试。
-2. 证据忠实度锚定：提取 L3 claims（结构化断言，非自然语言解析），
-   与 IR（检测器锚）及 L1.5 structured_report（验证锚）做严格比对。
-   不一致 → E3002（EVIDENCE_MISMATCH），无条件否决，触发 S4。
-
-比对规则（全部确定性，无模糊匹配）：
-- class 断言：必须与 IR 的 object_class 严格相等；若该实例有验证结果，
-  还须与 result.class_label 严格相等，且后者为 "ambiguous" 时一律否决
-  （V5.2.1 示例：报告 ambiguous 而答案写"螺丝"→ 否决）。
-- count 断言：field="count" 比对 IR 总实例数；field="count:<class>"
-  比对该类别实例数。
-- exists 断言：True 断言与 result.exists=False 冲突 → 否决；
-  False 断言与 IR 中实际存在该实例冲突 → 否决。
-- attribute:<name> 断言：验证结果携带同名属性且不等 → 否决。
-- relation:<type> 断言：value 为目标 instance_id，用几何引擎
-  （与 L1 共用的同一裁判）基于 IR bbox 重算，不成立 → 否决。
-- 被静默降级（S5 路径）的实例无验证结果：claims 仅锚定 IR，
-  检测器结论仍可用，但 conf_level 按 lowest 参与表述约束（编排器职责）。
-"""
+"""Validate structured claims against image detections and verification results."""
 
 from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+from math import isclose, isfinite
 
 from svsg.contracts import (
     IR,
+    Claim,
+    Detection,
     ErrorCode,
     L3Answer,
     RelationType,
@@ -38,7 +17,13 @@ from svsg.contracts import (
     VerificationResult,
     VerificationStatus,
 )
-from svsg.l1_compiler.geometry_engine import relation_holds
+from svsg.image_functions.claims import check_function_claim
+from svsg.l1_compiler.geometry_engine import (
+    center_distance_px,
+    distance_relations_allowed,
+    nearest_neighbor,
+    relation_holds,
+)
 
 AMBIGUOUS_LABEL = "ambiguous"
 
@@ -78,9 +63,7 @@ class AnchorVerdict:
         return ErrorCode.EVIDENCE_MISMATCH
 
 
-def missing_verifications(
-    ir: IR, executed: Iterable[int], exempt: Iterable[int] = ()
-) -> set[int]:
+def missing_verifications(ir: IR, executed: Iterable[int], exempt: Iterable[int] = ()) -> set[int]:
     """工具调用完整性：应验证而未验证的实例集合。
 
     exempt：S5 静默降级实例（已请求验证但 L1.5 超时），不参与完整性
@@ -97,184 +80,147 @@ def missing_verifications(
     }
 
 
+def evidence_results(ir: IR, report: VerificationReport | None) -> dict[int, VerificationResult]:
+    if (
+        report is None
+        or report.image_id != ir.image_id
+        or report.status != VerificationStatus.SUCCESS
+    ):
+        return {}
+    return {r.instance_id: r for r in report.results}
+
+
+def _check_relation(
+    claim: Claim, source: Detection, active: dict[int, Detection], ir: IR
+) -> str | None:
+    name = claim.field.partition(":")[2]
+    try:
+        relation = RelationType(name)
+    except ValueError:
+        return f"未知关系类型 {name!r}"
+    target = active.get(claim.value) if type(claim.value) is int else None
+    if target is None or target.instance_id == source.instance_id:
+        return "关系必须引用另一个有存在证据的实际实例"
+    if relation not in (RelationType.DISTANCE_TO, RelationType.NEAREST_TO):
+        if claim.distance_px is not None:
+            return "只有距离类关系可以携带 distance_px"
+        if not relation_holds(relation, source.bbox_px, target.bbox_px):
+            return f"关系断言 {name}(→{target.instance_id}) 未通过几何引擎复核"
+        return None
+
+    if not distance_relations_allowed(ir.scene_type, ir.camera_intrinsics is not None):
+        return "当前场景未启用距离关系"
+    if relation == RelationType.NEAREST_TO:
+        ids = list(active)
+        nearest = nearest_neighbor(
+            ids.index(source.instance_id), [d.bbox_px for d in active.values()]
+        )
+        if nearest is None or not isclose(
+            center_distance_px(source.bbox_px, target.bbox_px), nearest[1], abs_tol=1e-9
+        ):
+            return f"实例 {target.instance_id} 并非最近的有效实例"
+    actual = center_distance_px(source.bbox_px, target.bbox_px)
+    if claim.distance_px is not None and not isclose(
+        claim.distance_px, actual, rel_tol=0.0, abs_tol=0.5
+    ):
+        return f"distance_px 与图像平面实测距离 {actual:.2f} px 不一致"
+    return None
+
+
+def _check_claim(
+    claim: Claim,
+    ir: IR,
+    by_id: dict[int, Detection],
+    active: dict[int, Detection],
+    results: dict[int, VerificationResult],
+) -> str | None:
+    field, value, iid = claim.field, claim.value, claim.instance_id
+    if field.startswith("function:"):
+        return check_function_claim(ir.image_functions, claim)
+    if any(v is not None for v in (claim.region_id, claim.region_basis, claim.target_region_id)):
+        return "区域参数只适用于函数断言"
+    if ir.image_functions is not None and not by_id:
+        return "当前证据描述像素和几何区域，只支持 function 断言"
+    name, _, suffix = field.partition(":")
+    if claim.distance_px is not None and name != "relation":
+        return "distance_px 只适用于距离类关系"
+    if field == "count" or field.startswith("count:"):
+        if (
+            iid is not None
+            or type(value) is not int
+            or value < 0
+            or (field != "count" and not suffix.strip())
+        ):
+            return "count 需要全局范围及非负整数值"
+        if field == "count":
+            actual = len(active)
+            return None if value == actual else f"count 断言 {value} != 有效实例总数 {actual}"
+        if any(
+            r.class_label is not None
+            and (r.class_label == AMBIGUOUS_LABEL or r.class_label != active[rid].object_class)
+            for rid, r in results.items()
+            if rid in active
+        ):
+            return "存在类别未确定的实例，证据不足以确认精确分类计数"
+        actual = sum(d.object_class == suffix for d in active.values())
+        return None if value == actual else f"count:{suffix} 断言 {value} != 有效实例数 {actual}"
+
+    if field not in ("class", "exists") and name not in ("attribute", "relation"):
+        return f"不支持的断言字段 {field!r}"
+    if iid is None:
+        return "实例断言缺少 instance_id"
+    det = by_id.get(iid)
+    if det is None:
+        return f"断言引用了 IR 中不存在的实例 {iid}"
+    result = results.get(iid)
+    if field == "exists":
+        if type(value) is not bool:
+            return "exists 需要布尔值"
+        actual_exists = iid in active
+        return None if value == actual_exists else f"断言与证据的 exists={actual_exists} 冲突"
+    if iid not in active:
+        return "验证报告已判定该实例不存在"
+    if field == "class":
+        if value != det.object_class:
+            return f"class 断言 {value!r} 与 IR 检测结果 {det.object_class!r} 不一致"
+        if result is not None and result.class_label is not None and result.class_label != value:
+            return f"class 断言 {value!r} 与验证报告 {result.class_label!r} 不一致"
+        if value == AMBIGUOUS_LABEL:
+            return "类别仍为 ambiguous"
+        return None
+    if name == "attribute" and suffix.strip():
+        if isinstance(value, float) and not isfinite(value):
+            return "属性值必须为有限数值"
+        if value is None or result is None or suffix not in result.attributes:
+            return f"属性 {suffix!r} 缺少 L1.5 验证证据"
+        if str(value) != result.attributes[suffix]:
+            return f"属性 {suffix}={value!r} 与验证报告 {result.attributes[suffix]!r} 不一致"
+        return None
+    if name == "relation" and suffix:
+        return _check_relation(claim, det, active, ir)
+    return f"断言字段 {field!r} 缺少名称"
+
+
 def anchor_claims(
     ir: IR,
     answer: L3Answer,
     report: VerificationReport | None = None,
 ) -> list[Violation]:
-    """证据忠实度锚定：claims × (IR ∪ structured_report) 严格比对。"""
+    """Return violations for all claims, including unsupported fields and empty sets."""
+    if not answer.claims:
+        return [Violation(ErrorCode.EVIDENCE_MISMATCH, "<claims>", "缺少可校验的结构化断言")]
     by_id = {d.instance_id: d for d in ir.detections}
-    results: dict[int, VerificationResult] = {}
-    if report is not None and report.status == VerificationStatus.SUCCESS:
-        results = {r.instance_id: r for r in report.results}
-
-    violations: list[Violation] = []
+    results = evidence_results(ir, report)
+    active = {
+        iid: d for iid, d in by_id.items() if iid not in results or results[iid].exists is not False
+    }
+    violations = []
     for claim in answer.claims:
-        # 引用不存在的实例 → 直接否决
-        if claim.instance_id is not None and claim.instance_id not in by_id:
+        reason = _check_claim(claim, ir, by_id, active, results)
+        if reason is not None:
             violations.append(
-                Violation(
-                    code=ErrorCode.EVIDENCE_MISMATCH,
-                    field=claim.field,
-                    instance_id=claim.instance_id,
-                    reason=f"断言引用了 IR 中不存在的实例 {claim.instance_id}",
-                )
+                Violation(ErrorCode.EVIDENCE_MISMATCH, claim.field, reason, claim.instance_id)
             )
-            continue
-        det = by_id.get(claim.instance_id) if claim.instance_id is not None else None
-        result = results.get(claim.instance_id) if claim.instance_id is not None else None
-        field = claim.field
-
-        if field == "class":
-            if det is not None:
-                if claim.value != det.object_class:
-                    violations.append(
-                        Violation(
-                            code=ErrorCode.EVIDENCE_MISMATCH,
-                            field=field,
-                            instance_id=claim.instance_id,
-                            reason=(
-                                f"class 断言 {claim.value!r} 与 IR 检测结果 "
-                                f"{det.object_class!r} 不一致"
-                            ),
-                        )
-                    )
-                    continue
-                if result is not None:
-                    label = result.class_label
-                    if label == AMBIGUOUS_LABEL:
-                        violations.append(
-                            Violation(
-                                code=ErrorCode.EVIDENCE_MISMATCH,
-                                field=field,
-                                instance_id=claim.instance_id,
-                                reason="验证报告判定 ambiguous，禁止输出具体类别",
-                            )
-                        )
-                    elif label is not None and label != claim.value:
-                        violations.append(
-                            Violation(
-                                code=ErrorCode.EVIDENCE_MISMATCH,
-                                field=field,
-                                instance_id=claim.instance_id,
-                                reason=(
-                                    f"class 断言 {claim.value!r} 与验证报告 "
-                                    f"{label!r} 不一致"
-                                ),
-                            )
-                        )
-
-        elif field == "count":
-            if claim.value != len(ir.detections):
-                violations.append(
-                    Violation(
-                        code=ErrorCode.EVIDENCE_MISMATCH,
-                        field=field,
-                        reason=f"count 断言 {claim.value} != IR 实例总数 {len(ir.detections)}",
-                    )
-                )
-
-        elif field.startswith("count:"):
-            cls = field.split(":", 1)[1]
-            actual = sum(1 for d in ir.detections if d.object_class == cls)
-            if claim.value != actual:
-                violations.append(
-                    Violation(
-                        code=ErrorCode.EVIDENCE_MISMATCH,
-                        field=field,
-                        reason=f"count:{cls} 断言 {claim.value} != IR 实际 {actual}",
-                    )
-                )
-
-        elif field == "exists":
-            if det is None:
-                continue
-            if claim.value is True and result is not None and result.exists is False:
-                violations.append(
-                    Violation(
-                        code=ErrorCode.EVIDENCE_MISMATCH,
-                        field=field,
-                        instance_id=claim.instance_id,
-                        reason="exists=True 断言与验证报告 exists=False 冲突",
-                    )
-                )
-            elif claim.value is False:
-                violations.append(
-                    Violation(
-                        code=ErrorCode.EVIDENCE_MISMATCH,
-                        field=field,
-                        instance_id=claim.instance_id,
-                        reason="exists=False 断言与 IR 中实际存在的实例冲突",
-                    )
-                )
-
-        elif field.startswith("attribute:"):
-            # V5.2.4 修复1（attribute 验证盲区）：attribute 断言的唯一合法
-            # 证据来源是 L1.5 验证报告（IR 的 attributes 默认为空）。
-            # 无报告 → 证据链断裂，一律否决；不再"无报告即静默放行"。
-            name = field.split(":", 1)[1]
-            if result is None:
-                violations.append(
-                    Violation(
-                        code=ErrorCode.EVIDENCE_MISMATCH,
-                        field=field,
-                        instance_id=claim.instance_id,
-                        reason=(
-                            f"attribute 断言缺少 L1.5 验证报告"
-                            f"（instance {claim.instance_id}），证据链断裂"
-                        ),
-                    )
-                )
-            elif name not in result.attributes:
-                violations.append(
-                    Violation(
-                        code=ErrorCode.EVIDENCE_MISMATCH,
-                        field=field,
-                        instance_id=claim.instance_id,
-                        reason=f"验证报告中不存在属性 {name!r}",
-                    )
-                )
-            elif result.attributes[name] != str(claim.value):
-                violations.append(
-                    Violation(
-                        code=ErrorCode.EVIDENCE_MISMATCH,
-                        field=field,
-                        instance_id=claim.instance_id,
-                        reason=(
-                            f"属性 {name}={claim.value!r} 与验证报告 "
-                            f"{result.attributes[name]!r} 不一致"
-                        ),
-                    )
-                )
-
-        elif field.startswith("relation:"):
-            rel_name = field.split(":", 1)[1]
-            if det is None or not isinstance(claim.value, int):
-                continue
-            try:
-                rel = RelationType(rel_name)
-            except ValueError:
-                continue  # 未知关系类型不参与锚定（L3 词表问题，另行审计）
-            target = by_id.get(claim.value)
-            if target is None:
-                violations.append(
-                    Violation(
-                        code=ErrorCode.EVIDENCE_MISMATCH,
-                        field=field,
-                        instance_id=claim.instance_id,
-                        reason=f"关系断言引用了不存在的目标实例 {claim.value}",
-                    )
-                )
-            elif not relation_holds(rel, det.bbox_px, target.bbox_px):
-                violations.append(
-                    Violation(
-                        code=ErrorCode.EVIDENCE_MISMATCH,
-                        field=field,
-                        instance_id=claim.instance_id,
-                        reason=f"关系断言 {rel_name}(→{claim.value}) 未通过几何引擎复核",
-                    )
-                )
-
     return violations
 
 
@@ -296,9 +242,7 @@ def nl_claims_coverage(
     if not keywords:
         return 1.0  # 无检测实例时无关键词可覆盖
     # claims 值文本（小写化）
-    claim_text = " ".join(
-        str(cl.value).lower() for cl in answer.claims if cl.value is not None
-    )
+    claim_text = " ".join(str(cl.value).lower() for cl in answer.claims if cl.value is not None)
     hit = sum(1 for kw in keywords if kw in claim_text)
     return hit / len(keywords)
 

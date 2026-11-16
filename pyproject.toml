@@ -22,6 +22,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+functions = ["pillow>=10.0"]
 api = [
     "fastapi>=0.110",
     "uvicorn>=0.29",
