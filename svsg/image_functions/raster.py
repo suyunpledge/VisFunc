@@ -62,13 +62,13 @@ class RasterFunction:
 
     @classmethod
     def from_image(cls, image: bytes | Path) -> RasterFunction:
-        from PIL import Image
+        from PIL import Image, ImageOps
 
         with Image.open(BytesIO(image) if isinstance(image, bytes) else image) as source:
             _buffer_size(*source.size)
             if getattr(source, "n_frames", 1) != 1:
                 raise ValueError("the raster compiler requires a single-frame image")
-            with source.convert("RGBA") as rgba:
+            with ImageOps.exif_transpose(source) as oriented, oriented.convert("RGBA") as rgba:
                 return cls(*rgba.size, rgba.tobytes())
 
     @property

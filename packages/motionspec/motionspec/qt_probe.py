@@ -26,11 +26,13 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import time
 
 SCHEMA = "motionspec-trace/0.1"
 FIELDS = ("x", "y", "width", "height", "opacity", "scale", "rotation", "visible", "scene_x", "scene_y")
+LOCAL = 8  # 前 8 个是元素自己的属性，后两个是它在窗口里的绝对位置
 
 
 def _pointer(obj) -> int:
@@ -97,14 +99,19 @@ class Recorder:
     只在值变化时存一行，外加变化前最后一帧和变化后第一帧，所以静止的界面几乎不占空间。
     """
 
-    def __init__(self, roots=None, *, max_elements: int = 20000):
+    def __init__(self, roots=None, *, max_elements: int = 20000, frame_ms: float = 1000.0 / 60):
+        if type(max_elements) is not int or max_elements < 1 or not math.isfinite(frame_ms) or frame_ms <= 0:
+            raise ValueError("invalid recorder element budget or frame interval")
         self._roots = list(roots) if roots is not None else None
         self._max = max_elements
+        self.frame_ms = frame_ms  # 一帧的名义时长，用来识别"隔了很久才来的一帧"
         self._ticks: list[float] = []
         self._elements: dict[int, dict] = {}
+        self._active: dict[int, int] = {}  # Native pointer -> stable recording identity.
         self._clock = None
         self._timer = None
         self._windows: list = []
+        self._quick_windows: list = []
         self._size = (0, 0)
         self._ratio = 1.0
         self._title = ""
@@ -119,9 +126,21 @@ class Recorder:
             from PySide6.QtGui import QGuiApplication as Gui
         except ImportError:
             from PyQt6.QtGui import QGuiApplication as Gui
-        for window in Gui.topLevelWindows():
-            if hasattr(window, "contentItem"):
+        # 不先导入 QtQuick，topLevelWindows() 给回的是基类 QWindow 的包装，拿不到 contentItem
+        for binding in ("PySide6.QtQuick", "PyQt6.QtQuick"):
+            try:
+                __import__(binding)
+                break
+            except ImportError:
+                continue
+        # 窗口的包装要一直留着：它一旦被回收，从它取到的 contentItem 包装会跟着失效
+        if not self._quick_windows:
+            self._quick_windows = [w for w in Gui.topLevelWindows() if hasattr(w, "contentItem")]
+        for window in self._quick_windows:
+            try:
                 roots.append(window.contentItem())
+            except RuntimeError:
+                continue
         if not roots:
             try:
                 from PySide6.QtWidgets import QApplication as Widgets
@@ -129,7 +148,7 @@ class Recorder:
                 from PyQt6.QtWidgets import QApplication as Widgets
             app = Widgets.instance()
             if app is not None and hasattr(app, "topLevelWidgets"):
-                roots = [w for w in app.topLevelWidgets() if w.isVisible() or w.testAttribute(w.attribute_dont_show)] if False else list(app.topLevelWidgets())
+                roots = list(app.topLevelWidgets())
         return roots
 
     def _note_window(self, root) -> None:
@@ -154,12 +173,19 @@ class Recorder:
             if self._clock is None:
                 self._clock = now
             t_ms = (now - self._clock) * 1000.0
+        if type(t_ms) not in (int, float) or not math.isfinite(t_ms) or t_ms < 0 or (self._ticks and t_ms <= self._ticks[-1]):
+            raise ValueError("sample times must be finite, nonnegative and strictly increasing")
+        # 界面空闲时 QML 不渲染帧，也就没有取样点。隔了很久才来的这一帧之前，属性其实一直没变，
+        # 所以在它前面补一个时间点，"变化前最后一帧"的时间才是对的
+        if self._ticks and t_ms - self._ticks[-1] > 2.5 * self.frame_ms:
+            self._ticks.append(float(t_ms) - self.frame_ms)
         tick = len(self._ticks)
         self._ticks.append(float(t_ms))
         roots = self._find_roots()
         if roots and tick == 0:
             self._note_window(roots[0])
         stack = list(roots)
+        seen = set()
         while stack:
             obj = stack.pop()
             values = _snapshot(obj)
@@ -167,15 +193,24 @@ class Recorder:
                 continue
             stack.extend(_children(obj))
             key = _pointer(obj)
-            entry = self._elements.get(key)
+            if key in seen:
+                continue
+            seen.add(key)
+            identity = self._active.get(key)
+            entry = self._elements.get(identity)
             if entry is None:
                 if len(self._elements) >= self._max:
                     self.truncated = True
                     continue
-                entry = self._elements[key] = {"info": None, "obj": obj, "last": values, "last_tick": tick,
-                                               "stored": -1, "settle": False, "rows": []}
+                identity = len(self._elements)
+                self._active[key] = identity
+                entry = self._elements[identity] = {"info": _describe(obj), "last": values, "last_tick": tick,
+                                                   "stored": tick if tick else -1, "settle": False,
+                                                   "rows": [[tick, *values]] if tick else [],
+                                                   "events": [{"tick": tick, "kind": "appeared"}] if tick else []}
                 continue
-            if values != entry["last"]:
+            # 只看元素自己的属性。窗口内的绝对位置会随父级一起变，那是父级的动效，不是它的
+            if values[:LOCAL] != entry["last"][:LOCAL]:
                 if entry["info"] is None:
                     entry["info"] = _describe(obj)
                 if entry["stored"] != tick - 1:  # 补上变化前的最后一帧
@@ -186,18 +221,21 @@ class Recorder:
                 entry["rows"].append([tick, *values])
                 entry["stored"], entry["settle"] = tick, False
             entry["last"], entry["last_tick"] = values, tick
+        for pointer in set(self._active) - seen:
+            entry = self._elements[self._active.pop(pointer)]
+            if not entry["rows"]:
+                entry["rows"].append([entry["last_tick"], *entry["last"]])
+            entry["events"].append({"tick": tick, "kind": "disappeared"})
 
     # ---- 实时驱动 ----
     def start(self, interval_ms: int = 8) -> None:
         """跟着应用运行。QML 窗口按渲染帧取样，其余用定时器。"""
         self.sample()
         hooked = False
-        for root in self._find_roots():
-            window = root.window() if _is_item(root) else None
-            if window is not None and hasattr(window, "afterAnimating"):
-                window.afterAnimating.connect(self._on_frame)
-                self._windows.append(window)
-                hooked = True
+        for window in self._quick_windows:
+            window.afterAnimating.connect(self._on_frame)
+            self._windows.append(window)
+            hooked = True
         if not hooked:
             try:
                 from PySide6.QtCore import Qt, QTimer
@@ -228,7 +266,8 @@ class Recorder:
         elements = []
         for key, entry in self._elements.items():
             if entry["rows"]:
-                elements.append({"id": key, **(entry["info"] or {}), "fields": ["tick", *FIELDS], "rows": entry["rows"]})
+                elements.append({"id": key, **(entry["info"] or {}), "fields": ["tick", *FIELDS],
+                                 "rows": entry["rows"], "events": entry["events"]})
         return {
             "schema": SCHEMA,
             "title": self._title,

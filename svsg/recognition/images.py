@@ -5,21 +5,14 @@ from __future__ import annotations
 from base64 import b64encode
 from io import BytesIO
 
-from PIL import Image, ImageOps
+from PIL import Image
 from PIL.Image import Image as PILImage
 
-from svsg.contracts.image_functions import MAX_RASTER_PIXELS
 from svsg.image_functions.raster import RasterFunction
 
 
 def canonical_raster(data: bytes) -> RasterFunction:
-    with Image.open(BytesIO(data)) as source:
-        if source.width * source.height > MAX_RASTER_PIXELS:
-            raise ValueError("image exceeds the pixel budget")
-        if getattr(source, "n_frames", 1) != 1:
-            raise ValueError("submit one video frame at a time")
-        with ImageOps.exif_transpose(source) as oriented, oriented.convert("RGBA") as rgba:
-            return RasterFunction(*rgba.size, rgba.tobytes())
+    return RasterFunction.from_image(data)
 
 
 def image_part(image: PILImage, max_side: int, *, min_side: int = 0) -> dict:

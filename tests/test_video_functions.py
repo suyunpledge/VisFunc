@@ -149,6 +149,29 @@ def test_corruption_fails_without_publishing_new_manifest(tmp_path):
         VideoRuntime.load(out / "functions.json").pixel(10, 0, 0)
 
 
+@pytest.mark.parametrize("warm", [False, True])
+def test_cached_raster_still_validates_each_frame_identity(tmp_path, warm):
+    spec = source(tmp_path)
+    duplicate_name = f"frame-00000011-{spec['evidence_frames'][0]['sha256']}.png"
+    first_image = tmp_path / spec["evidence_frames"][0]["image"]
+    (tmp_path / duplicate_name).write_bytes(first_image.read_bytes())
+    spec["evidence_frames"][1].update(
+        image=duplicate_name, sha256=spec["evidence_frames"][0]["sha256"]
+    )
+    out = tmp_path / "out"
+    bundle = export_motion_spec(spec, tmp_path, out, sequence_id="test")
+    assert bundle.frames[0].raster_sha256 == bundle.frames[1].raster_sha256
+    bad = bundle.model_copy(deep=True)
+    bad.frames[1].image_functions = bad.frames[1].image_functions.model_copy(
+        update={"pixel_sha256": "0" * 64}
+    )
+    runtime = VideoRuntime(bad, out)
+    if warm:
+        runtime.raster(10)
+    with pytest.raises(ValueError, match="frame manifest"):
+        runtime.raster(11)
+
+
 @pytest.mark.parametrize("mutation", ["duplicate_frame", "duplicate_time", "wrong_size", "path"])
 def test_bad_source_alignment_is_rejected(tmp_path, mutation):
     spec = source(tmp_path)

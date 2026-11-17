@@ -93,6 +93,56 @@ rgba = runtime.pixel(first.frame_index, 0, 0)
 image = runtime.raster(first.frame_index).to_image()
 ```
 
+## 可见变化与估计设计时间（2026-11-17）
+
+运动段新增可选的 `timing` 子协议 `svsg.motion-timing/1`，所有时间都使用源视频时钟、单位毫秒：
+
+```json
+{
+  "version": "svsg.motion-timing/1",
+  "unit": "ms",
+  "clock": "source_timeline",
+  "visible_change": {"t_start_ms": 325, "t_end_ms": 775, "duration_ms": 450},
+  "estimated_design": {
+    "t_start_ms": 250, "t_end_ms": 850, "duration_ms": 600,
+    "easing": "in-out-cubic", "basis_t_start_ms": 325, "start_shift_ms": -75,
+    "rmse": 0.01, "rmse_limit": 0.05,
+    "provenance": "named_curve_alignment", "is_ground_truth": false
+  },
+  "design_unavailable_reason": null,
+  "primary_channel": null,
+  "channels": {}
+}
+```
+
+- `visible_change` 描述检测到变化的时间支持范围，可能遗漏缓动头尾、透明或遮挡部分。
+- `estimated_design` 根据命名曲线对齐估计设计起点与时长。复算关系为
+  `t_start_ms = basis_t_start_ms + start_shift_ms`，`t_end_ms = t_start_ms + duration_ms`。
+  `rmse` 是归一化进度的拟合误差，不是毫秒误差或统计置信区间。
+- `channels` 为每个具有时序数据的通道提供相同的两套时间。`primary_channel` 指明片段采用哪个通道的
+  设计估计；没有匹配通道时为空，起点基准来自片段本身。各通道可以有不同的设计时长。
+- 片段截断、缺少命名拟合/对齐参数、拟合 RMSE 超过 0.05，或设计起点落在时钟零点之前时，
+  `estimated_design=null`，原因写入 `design_unavailable_reason`。不能用可见时长冒充未知的设计时长。
+- `motionspec.timing.motion_timing()` 是唯一的对齐计算入口。像素分析、Qt 轨迹、旧规格升级与文字摘要都使用它；
+  SVSG 只校验并接收结果，不维护第二份拟合选择逻辑，也不反向依赖 MotionSpec。
+- `MotionFunctions.t_start_ms/t_end_ms` 和 `samples/fits` 继续表示原有可见支持范围，保持已有求值行为。
+  设计区间可以比它长，但不会扩大 `motion_value` 的可求值范围，也不会把外推估计变成观察样本。
+
+正常 CLI 分析/导出会自动填充 `timing`。旧 `spec.json` 可通过现有 `motionspec functions` 命令升级；
+它会先校验原始规格，再重算时间协议并更新内容哈希。直接调用 Python 编译器时可明确升级：
+
+```python
+from motionspec.timing import with_timing
+from svsg.video_functions.temporal import compile_motion
+
+enriched = with_timing(spec)  # 不修改输入规格
+functions = [compile_motion(segment) for segment in enriched["segments"]]
+```
+
+新版运行时仍可读取没有 `timing` 的历史函数包。独立 SVSG 编译器收到旧片段时会保留可见区间，
+并标记 `legacy_missing_timing`，不会猜测设计时长。旧版采用严格字段校验的消费者需升级后再读取新导出；
+顶层视频协议版本暂保持 `/1`，新增子协议有自己的版本标识。
+
 ## 文件和预算
 
 - `functions.json`：时间轴、帧函数摘要、轮廓、差分统计、运动函数参数与来源。

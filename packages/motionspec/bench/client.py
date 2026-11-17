@@ -57,14 +57,14 @@ def post(url: str, key: str, body: dict, timeout: float = 300.0) -> tuple[int, d
         data=json.dumps(body).encode("utf-8"),
         headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
     )
-    began = time.time()
+    began = time.perf_counter()
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            return response.status, json.loads(response.read().decode("utf-8")), time.time() - began
+            return response.status, json.loads(response.read().decode("utf-8")), time.perf_counter() - began
     except urllib.error.HTTPError as error:
-        return error.code, error.read().decode("utf-8", "replace")[:600], time.time() - began
+        return error.code, error.read().decode("utf-8", "replace")[:600], time.perf_counter() - began
     except Exception as error:  # 超时、连接中断
-        return 0, f"{type(error).__name__}: {error}"[:300], time.time() - began
+        return 0, f"{type(error).__name__}: {error}"[:300], time.perf_counter() - began
 
 
 def chat(base_url: str, key: str, model: str, parts: list[dict], *, max_tokens: int = 2000, extra: dict | None = None) -> dict:
@@ -77,5 +77,7 @@ def chat(base_url: str, key: str, model: str, parts: list[dict], *, max_tokens: 
     if status == 200 and isinstance(payload, dict):
         message = (payload.get("choices") or [{}])[0].get("message") or {}
         return {"ok": True, "status": status, "text": message.get("content") or "", "usage": payload.get("usage") or {},
-                "seconds": round(seconds, 1), "error": None}
+                "seconds": round(seconds, 3), "error": None, "response_id": payload.get("id"),
+                "served_model": payload.get("model"),
+                "finish_reason": (payload.get("choices") or [{}])[0].get("finish_reason")}
     return {"ok": False, "status": status, "text": "", "usage": {}, "seconds": round(seconds, 1), "error": payload}

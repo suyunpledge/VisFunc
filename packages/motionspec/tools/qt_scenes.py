@@ -120,14 +120,29 @@ def ease(curve: QEasingCurve.Type, t_ms: float, start_ms: float, duration_ms: fl
     return QEasingCurve(curve).valueForProgress(p)
 
 
+def load_probe():
+    """按路径加载探针：它只依赖 Qt，而包的 __init__ 会引入 numpy，这个环境里可能没有。"""
+    import importlib.util
+
+    path = Path(__file__).resolve().parent.parent / "motionspec" / "qt_probe.py"
+    spec = importlib.util.spec_from_file_location("motionspec_qt_probe", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def render(ui: dict, out: Path, name: str, total_ms: float, apply) -> None:
+    """逐帧渲染一个场景：每帧截图，同时让探针取一次样，两者用同一条时间轴。"""
     folder = out / name / "frames"
     folder.mkdir(parents=True, exist_ok=True)
     frames = LEAD + int(round(total_ms * FPS / 1000)) + TAIL
+    recorder = load_probe().Recorder([ui["root"]])
     for i in range(frames):
         apply((i - LEAD) * 1000.0 / FPS)
         QApplication.processEvents()
         ui["root"].grab().save(str(folder / f"{i:04d}.png"))
+        recorder.sample(i * 1000.0 / FPS)
+    recorder.dump(out / name / "trace.json")
 
 
 def main() -> None:

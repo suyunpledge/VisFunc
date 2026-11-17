@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from .spec import validate
+from .timing import with_timing
 
 
 def require_svsg():
@@ -24,7 +25,7 @@ def export_functions(spec: dict, evidence_dir: str | Path, out_dir: str | Path, 
     if problems:
         raise ValueError("invalid MotionSpec input: " + "; ".join(problems))
     # Artifact references are excluded from the source digest to avoid a hash cycle.
-    source = {k: v for k, v in spec.items() if k != "function_evidence"}
+    source = with_timing({k: v for k, v in spec.items() if k != "function_evidence"})
     digest = hashlib.sha256(json.dumps(source, ensure_ascii=False, sort_keys=True,
                                       separators=(",", ":"), allow_nan=False).encode()).hexdigest()
     bundle = require_svsg()(source, evidence_dir, out_dir,

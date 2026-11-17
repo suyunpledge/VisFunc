@@ -186,10 +186,18 @@ motionspec/
   spec.py      规格版本、结构校验、文字摘要
   claims.py    断言校验
   synth.py     合成动效（测试素材和演示）
+  qt_probe.py  Qt 探针的应用内部分：记录控件属性（只依赖 Qt 绑定）
+  trace.py     Qt 探针的离线部分：轨迹转规格
   cli.py       命令行
 tools/
-  qt_scenes.py   用真实 Qt 控件渲染已知真值的动效（需要 PySide6）
-  qt_compare.py  把分析结果和真值并排打印
+  qt_scenes.py      用真实 Qt 控件渲染已知真值的动效，同时让探针取样（需要 PySide6）
+  qt_compare.py     把视觉路径、探针和真值并排打印
+  qml_probe_demo.py 在实时运行的 QML 窗口上试探针（需要 PySide6）
+bench/
+  providers.py   读取本机 Forge 的模型配置
+  client.py      三家模型的调用封装
+  canary.py      确认模型是否真的收到视频
+  run.py         实测；report.py 汇总
 ```
 
 依赖只有 numpy 和 opencv-python。
@@ -236,8 +244,94 @@ Python 入口为 `svsg.video_functions.VideoRuntime`；现有识别结果可用 
 本地无网络验证可运行 `python tools/validate_functions.py --out checks`；可选 `--photo`
 添加真实照片生成的受控平移/静止视频。测试只验证编码与函数复算，不代表自然视频识别准确率。
 
+## Qt 探针
+
+被测程序是自己的 Qt 应用时，不必从像素反推：探针直接读控件属性，输出同一种规格。
+QWidget 和 QML（QQuickItem）界面都支持。
+
+分成两半：
+
+| | 文件 | 依赖 | 做什么 |
+|---|---|---|---|
+| 应用内 | `motionspec/qt_probe.py` | 只要 PySide6 或 PyQt6 | 按帧记录每个元素的 x、y、宽、高、透明度、缩放、旋转、可见性，写成轨迹文件 |
+| 离线 | `motionspec/trace.py` | numpy、OpenCV | 把轨迹切成片段、拟合缓动，输出 `spec.json` 和 `summary.md` |
+
+应用内那一半是单个文件，不引用包内其他模块，可以直接拷进被测应用或按路径加载
+（包的 `__init__` 会引入 numpy，被测应用的环境里未必有）。
+
+```python
+from qt_probe import attach_from_env   # 或按路径加载 motionspec/qt_probe.py
+attach_from_env()                      # 设了 MOTIONSPEC_TRACE=轨迹路径 才生效，应用退出时写出
+```
+
+```bash
+motionspec trace trace.json -o out/
+```
+
+需要自己控制时机时用 `Recorder`：`start()` / `stop()` 跟着应用的帧走（QML 窗口按渲染帧取样，
+其余用定时器），或者每推进一帧调用一次 `sample(t_ms)`。
+
+和视觉路径相比：
+
+| | 视觉路径（看录屏） | Qt 探针（读属性） |
+|---|---|---|
+| 需要什么 | 一段录屏 | 能改被测应用的启动代码 |
+| 位移、透明度 | 测量值，有亚像素到 1px 左右的误差 | 精确值 |
+| 知道是哪个控件 | 不知道，只有区域坐标 | 类名、对象名、文字 |
+| 看不见的部分 | 透明度为 0 时位置靠推算 | 照常读到 |
+| 能看到什么 | 画面上的一切，包括着色器、别人的应用 | 只有控件属性；着色器、自绘内容、自定义属性看不到 |
+| 缓动曲线 | 拟合 | 仍是拟合（探针看不到动画对象本身），但用的是精确进度值 |
+
+规格里 `model` 为 `qt-probe`，每个片段多一个 `element` 字段。位置单位是设备像素（逻辑像素乘屏幕缩放），
+和同一窗口的截图、录屏对得上。
+
+验证：`tools/qt_scenes.py` 逐帧渲染 6 个 QWidget 场景并同时让探针取样，探针给出的片段数量、位移、
+透明度起止、曲线名和设计时长与真值全部一致。`tools/qml_probe_demo.py` 在一个实时运行的 QML 窗口上取样
+（300 逻辑像素的 OutCubic 平移、0.9→1 的缩放加淡入），位移和起止值精确，时长因实时帧抖动有约 ±15ms 的出入。
+
+已知限制：
+
+- 只记录标准几何属性和透明度。QML 里对自定义属性做的动画（例如某个 `hoverAmount`）不会被记录。
+- 父级移动时子元素不单独成段；布局重排引起的大量子元素变化会按影响大小排序，超出 `--max-segments` 的丢弃并计数。
+- 每帧要遍历整棵界面树，元素很多时有可感知的开销，只适合调试时开启。
+- 还没有在 Forge 本体上挂过，只在上面两类测试场景里跑过。
+
+## 模型实测
+
+`bench/` 里是一套对比脚本：同一段界面动效，只给模型看视频，和同时给出 motionspec 的结果，各测得多准。
+密钥从本机 Forge 配置读取，只在进程内使用。
+
+```bash
+python tools/qt_scenes.py out/qt
+```
+
+```bash
+python bench/run.py out/qt bench/results/run1 --repeat 2
+```
+
+```bash
+python bench/report.py bench/results/run1
+```
+
+`bench/canary.py` 先确认模型是否真的收到了视频：视频里放一串只有画面上才有的随机字符，答得出才算。
+
+6 个模型（MiMo v2.6 flash / pro、Seed 2.1 turbo / pro、GPT 6.1 sol / terra）在 6 个 Qt 场景上的逐项正确率：
+
+| 条件 | 第一轮 | 第二轮（摘要加了"设计时序"一列之后） |
+|---|---|---|
+| 只给视频 | 55% | 未重跑 |
+| 视频 + 视觉分析 | 92% | 100% |
+| 视频 + Qt 探针 | 94% | 100% |
+
+GPT 两个模型拿到的不是原生视频：这把密钥所属的组织没有开通视频输入，改传了带时间戳的静帧。
+第二轮是在同样的场景上测的，基准已经饱和。完整结果、判分规则和这些数字的适用范围见
+[bench/results/README.md](bench/results/README.md)。
+
+摘要表里的"measurable change"是看得见在动的区间，"design timing"是对齐命名曲线后的起点和时长，
+后者才是对设计参数的估计。第一轮里模型把前者当成了设计时长，时长一项只有 59%。
+
 ## 还没做
 
 - 增量发布与模型编排，当前 CLI 等分析完成后写规格
-- Qt 探针：直接采样控件属性，跳过视觉反推，输出同一种规格
-- 两份规格的对比（参考动效 vs 自己的实现）
+- 探针记录 QML 自定义属性；在 Forge 本体上实际挂载
+- 两份规格的对比（参考动效 vs 自己的实现；视觉路径 vs 探针）

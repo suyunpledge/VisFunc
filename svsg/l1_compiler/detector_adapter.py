@@ -30,7 +30,7 @@ def image_dimensions(image: ImageSource) -> tuple[int, int]:
     with (
         Image.open(io.BytesIO(image)) if isinstance(image, bytes) else Image.open(image)
     ) as img:
-        return img.width, img.height
+        return (img.height, img.width) if img.getexif().get(274) in (5, 6, 7, 8) else img.size
 
 
 @dataclass(frozen=True)
@@ -134,13 +134,10 @@ class YoloDetector:
     def detect(self, image: ImageSource) -> list[RawDetection]:
         # ultralytics 8.x 不接受 bytes 输入(仅支持路径/PIL/numpy/URL),
         # 这里把 bytes 转成 PIL Image 再送入推理(复用 Pillow,惰性导入)。
-        src: Any
-        if isinstance(image, bytes):
-            from PIL import Image
-            src = Image.open(io.BytesIO(image))
-        else:
-            src = image
-        results = cast(Any, self._model.predict(src, verbose=False))
+        from svsg.image_functions.raster import RasterFunction
+
+        with RasterFunction.from_image(image).to_image() as rgba, rgba.convert("RGB") as src:
+            results = cast(Any, self._model.predict(src, verbose=False))
         raw: list[RawDetection] = []
         for result in results:
             names = result.names
@@ -167,12 +164,10 @@ class YoloDetector:
             import numpy as np  # noqa: PLC0415
         except ImportError:  # pragma: no cover
             return 1.0
-        buf = np.frombuffer(image, dtype=np.uint8) if isinstance(image, bytes) else None
-        img = cv2.imdecode(buf, cv2.IMREAD_GRAYSCALE) if buf is not None else cv2.imread(
-            str(image), cv2.IMREAD_GRAYSCALE
-        )
-        if img is None:  # pragma: no cover
-            return 1.0
+        from svsg.image_functions.raster import RasterFunction
+
+        with RasterFunction.from_image(image).to_image() as rgba, rgba.convert("L") as gray:
+            img = np.array(gray)
         x1, y1, x2, y2 = bbox
         crop = img[y1:y2, x1:x2]
         if crop.size == 0:  # pragma: no cover

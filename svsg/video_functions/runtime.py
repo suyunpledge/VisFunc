@@ -98,11 +98,12 @@ class VideoRuntime:
             raise ValueError("frame was not exported; no intermediate image is inferred")
         ref = self._frames[frame_index]
         if self._cached is not None and self._cached[0] == ref.raster_sha256:
-            return self._cached[1]
-        data = read_artifact(self.root, ref.raster_file)
-        if sha256(data).hexdigest() != ref.raster_sha256:
-            raise ValueError("raster artifact hash mismatch")
-        raster = RasterFunction.from_program(json.loads(data))
+            raster = self._cached[1]
+        else:
+            data = read_artifact(self.root, ref.raster_file)
+            if sha256(data).hexdigest() != ref.raster_sha256:
+                raise ValueError("raster artifact hash mismatch")
+            raster = RasterFunction.from_program(json.loads(data))
         if (raster.width, raster.height) != (
             self.bundle.width_px,
             self.bundle.height_px,

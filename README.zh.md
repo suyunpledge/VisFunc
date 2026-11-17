@@ -28,11 +28,14 @@ pip install -e ".[api,llm]"    # 基础服务
 python -m svsg                 # 启动（默认 127.0.0.1:3002）
 ```
 
+默认 `SVSG_DETECTOR=disabled`。使用可复算图像函数时设置 `SVSG_DETECTOR=functions`；
+这一路径提供像素、颜色与几何证据，物体类别识别需另外配置识别模型或 YOLO。
+
 ```bash
 # 上传图片 + 提问
 curl -X POST http://127.0.0.1:3002/v1/analyze-image \
-  -F "image=@photo.jpg" \
-  -F "question=图里有几个红色的物体？"
+  -F "file=@photo.jpg" \
+  -F "query=图里有几个红色的物体？"
 ```
 
 ## 两个核心能力

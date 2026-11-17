@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from svsg.contracts.video_functions import FittedProgress, MotionFunctions, SampledFunction, Unit
+from svsg.contracts.video_functions import (
+    FittedProgress,
+    MotionFunctions,
+    MotionTiming,
+    SampledFunction,
+    Unit,
+)
 
 UNITS: dict[str, Unit] = {
     "x": "source_px",
@@ -49,12 +55,26 @@ def compile_motion(segment: dict) -> MotionFunctions:
             t_start_ms=channel["t_start_ms"],
             t_end_ms=channel["t_end_ms"],
         )
+    # MotionSpec owns alignment. Consume its materialized calculation rather than
+    # duplicating the heuristic or introducing a reverse dependency on MotionSpec.
+    timing = segment.get("timing")
+    if timing is None:
+        timing = {
+            "visible_change": {
+                "t_start_ms": segment["t_start_ms"],
+                "t_end_ms": segment["t_end_ms"],
+                "duration_ms": segment["t_end_ms"] - segment["t_start_ms"],
+            },
+            "estimated_design": None,
+            "design_unavailable_reason": "legacy_missing_timing",
+        }
     return MotionFunctions(
         segment_id=segment["id"],
         kind=segment["kind"],
         confidence=segment["confidence"],
         t_start_ms=segment["t_start_ms"],
         t_end_ms=segment["t_end_ms"],
+        timing=MotionTiming.model_validate(timing),
         region=segment["region"],
         truncated=segment.get("truncated", False),
         reference=segment.get("transform_reference", {}),

@@ -47,6 +47,8 @@ def test_export_existing_motion_preserves_samples_and_fitted_easing(tmp_path):
     spec = analyze(frames, tmp_path, fps=60, sheets=False, functions=True)
     runtime = VideoRuntime.load(tmp_path / "functions.json")
     for segment in spec["segments"]:
+        exported = next(m for m in runtime.bundle.motions if m.segment_id == segment["id"])
+        assert exported.timing.model_dump(mode="json") == segment["timing"]
         for sample in segment["samples"]:
             for name in ("x", "y", "scale", "rot_deg", "luma", "progress"):
                 if name in sample:
@@ -65,6 +67,16 @@ def test_export_existing_motion_preserves_samples_and_fitted_easing(tmp_path):
                                                      curve["angular_frequency"],
                                                      (t-channel["t_start_ms"])/1000))
                 assert runtime.motion(segment["id"], name+".progress", t, fitted=True)["value"] == pytest.approx(expected, abs=2e-5)
+    changed = copy.deepcopy(spec)
+    changed["segments"][0]["timing"]["visible_change"]["duration_ms"] += 1
+    assert any("timing disagrees" in issue for issue in validate(changed))
+    with pytest.raises(ValueError, match="timing disagrees"):
+        export_functions(changed, tmp_path, tmp_path / "invalid")
+    legacy = copy.deepcopy(spec)
+    for segment in legacy["segments"]:
+        segment.pop("timing")
+    export_functions(legacy, tmp_path, tmp_path / "legacy-upgraded", sequence_id=runtime.bundle.sequence_id)
+    assert VideoRuntime.load(tmp_path / "legacy-upgraded" / "functions.json").bundle == runtime.bundle
 
 
 def test_missing_frames_limits_and_invalid_references(tmp_path):

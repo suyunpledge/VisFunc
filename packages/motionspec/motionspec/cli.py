@@ -71,9 +71,25 @@ def main(argv: list[str] | None = None) -> int:
     d = sub.add_parser("demo", help="analyse built-in synthetic clips")
     d.add_argument("-o", "--out", default="motionspec-demo")
 
+    t = sub.add_parser("trace", help="convert a Qt probe trace (motionspec.qt_probe) into a spec")
+    t.add_argument("trace")
+    t.add_argument("-o", "--out", default="motionspec-out")
+    t.add_argument("--max-segments", type=int, default=40)
+
     args = parser.parse_args(argv)
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+    if args.command == "trace":
+        from .trace import spec_from_trace
+
+        try:
+            spec = spec_from_trace(_load_json(args.trace), args.out, max_segments=args.max_segments)
+        except (OSError, ValueError, KeyError) as exc:
+            t.exit(2, f"motionspec trace: {exc}\n")
+        print(summarize(spec))
+        print(f"written to {Path(args.out).resolve()}")
+        return 0
 
     if args.command == "analyze":
         try:

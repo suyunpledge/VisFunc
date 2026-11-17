@@ -34,7 +34,7 @@ def load() -> list[Provider]:
         name = entry.get("name", "")
         if not name.startswith("provider:") or "baseURL" not in config:
             continue
-        slot = name.split(":", 1)[1]
+        slot = entry.get("id") or name.split(":", 1)[1]
         out.append(
             Provider(slot, config["baseURL"].rstrip("/"), config.get("model", ""), config.get("modelLabel", ""), secrets.get(slot, ""))
         )
@@ -42,11 +42,17 @@ def load() -> list[Provider]:
 
 
 def find(pattern: str) -> Provider:
-    """按模型名或地址的正则找一个提供方。"""
-    for provider in load():
-        if re.search(pattern, provider.model, re.I) or re.search(pattern, provider.base_url, re.I):
-            return provider
-    raise KeyError(pattern)
+    """Select a unique configured slot; never silently choose a billing endpoint."""
+    candidates = [p for p in load() if any(re.search(pattern, value, re.I)
+                  for value in (p.slot, p.model, p.base_url))]
+    if not candidates:
+        raise KeyError(pattern)
+    if len(candidates) != 1:
+        raise ValueError("ambiguous provider selection; use an exact slot via --providers: "
+                         + ", ".join(p.slot for p in candidates))
+    if not candidates[0].key:
+        raise ValueError("selected provider has no credential")
+    return candidates[0]
 
 
 if __name__ == "__main__":

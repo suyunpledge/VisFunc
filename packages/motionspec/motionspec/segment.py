@@ -5,7 +5,10 @@ from __future__ import annotations
 import heapq
 from array import array
 from collections import deque
+from contextlib import nullcontext
 from dataclasses import dataclass, field
+from struct import Struct
+from tempfile import TemporaryFile
 
 import cv2
 import numpy as np
@@ -16,6 +19,8 @@ LAG = 6
 QUIET = 4
 GAP = 3
 ACTIVE = 0.02  # A grid cell counts as changed above this fraction of changed pixels.
+_CANDIDATE_RECORD = Struct("<7q2d")
+MAX_CANDIDATE_BYTES = 64 * 1024 * 1024
 
 
 @dataclass
@@ -147,6 +152,7 @@ class _Components:
         grid_size: tuple[int, int],
         min_area: float,
         limit: int,
+        candidate_store=None,
     ):
         self.w, self.h = size
         self.gw, self.gh = grid_size
@@ -158,13 +164,34 @@ class _Components:
         self.best: list[tuple[float, int, Candidate]] = []
         self.total = 0
         self.next_id = 0
+        self.candidate_store = candidate_store
 
     def _finish(self, cid: int) -> None:
         candidate = self.active.pop(cid)
         self.total += 1
         if candidate.peak_area < self.min_area or self.limit == 0:
             return
-        self.best.append((candidate.mass, -cid, candidate))
+        item = (candidate.mass, -cid, candidate)
+        if len(self.best) < self.limit:
+            heapq.heappush(self.best, item)
+        elif item > self.best[0]:
+            heapq.heapreplace(self.best, item)
+        if self.candidate_store is not None:
+            if self.candidate_store.tell() + _CANDIDATE_RECORD.size > MAX_CANDIDATE_BYTES:
+                raise ValueError("candidate storage budget exceeded; select a smaller interval")
+            self.candidate_store.write(_CANDIDATE_RECORD.pack(
+                candidate.first, candidate.last, *candidate.bbox, cid,
+                candidate.mass, candidate.peak_area,
+            ))
+
+    def _completed(self):
+        if self.candidate_store is None:
+            yield from self.best
+            return
+        self.candidate_store.seek(0)
+        while data := self.candidate_store.read(_CANDIDATE_RECORD.size):
+            first, last, x0, y0, x1, y1, cid, mass, peak = _CANDIDATE_RECORD.unpack(data)
+            yield mass, -cid, Candidate(first, last, (x0, y0, x1, y1), mass, peak)
 
     def add(self, t: int, grid: np.ndarray) -> None:
         for cid, candidate in list(self.active.items()):
@@ -246,7 +273,7 @@ class _Components:
                 clean = (float(part.mean()) if part.size else 0.0) < 0.5
                 return (clean, mass, neg_cid)
 
-            top = heapq.nlargest(self.limit, self.best, key=rank_key)
+            top = heapq.nlargest(self.limit, self._completed(), key=rank_key)
         else:
             top = heapq.nlargest(self.limit, self.best)
         kept = sorted(
@@ -266,6 +293,16 @@ def scan(
     max_frames: int = 1_000_000,
     ambient_ms: float = 3000.0,
 ) -> Scan:
+    # Ambient classification is only final at EOF. Spill candidates rather than
+    # retaining every completed component in memory or prematurely discarding it.
+    with TemporaryFile(mode="w+b") if ambient_ms > 0 else nullcontext(None) as store:
+        return _scan(source, cell=cell, threshold=threshold, min_area=min_area,
+                     max_segments=max_segments, max_frames=max_frames,
+                     ambient_ms=ambient_ms, candidate_store=store)
+
+
+def _scan(source: FrameSource, *, cell: int, threshold: int, min_area: float,
+          max_segments: int, max_frames: int, ambient_ms: float, candidate_store) -> Scan:
     times = array("d")
     ambient = None
     history: deque[np.ndarray] = deque(maxlen=LAG)
@@ -285,7 +322,7 @@ def scan(
             h, w = blurred.shape[:2]
             size = (w, h)
             grid_size = ((w + cell - 1) // cell, (h + cell - 1) // cell)
-            groups = _Components(size, grid_size, min_area, max_segments)
+            groups = _Components(size, grid_size, min_area, max_segments, candidate_store)
             if ambient_ms > 0:
                 ambient = _Ambient((grid_size[1], grid_size[0]), ambient_ms, groups.add)
             ref = blurred.copy()

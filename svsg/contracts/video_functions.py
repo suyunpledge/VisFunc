@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from itertools import pairwise
+from math import isclose
 from typing import Annotated, Literal
 
 from pydantic import Field, StrictFloat, StrictInt, TypeAdapter, model_validator
@@ -82,12 +83,97 @@ class FittedProgress(StrictModel):
         return self
 
 
+class TimeInterval(StrictModel):
+    t_start_ms: Number = Field(ge=0)
+    t_end_ms: Number = Field(ge=0)
+    duration_ms: Number = Field(ge=0)
+
+    @model_validator(mode="after")
+    def consistent(self) -> TimeInterval:
+        if self.t_end_ms < self.t_start_ms or not isclose(
+            self.duration_ms, self.t_end_ms - self.t_start_ms, rel_tol=0, abs_tol=1e-5
+        ):
+            raise ValueError("duration must equal interval end minus start")
+        return self
+
+
+class DesignTiming(TimeInterval):
+    easing: str = Field(min_length=1, max_length=64)
+    basis_t_start_ms: Number = Field(ge=0)
+    start_shift_ms: Number
+    rmse: Number = Field(ge=0)
+    rmse_limit: StrictFloat = Field(default=0.05, ge=0.05, le=0.05)
+    provenance: Literal["named_curve_alignment"] = "named_curve_alignment"
+    is_ground_truth: Literal[False] = False
+
+    @model_validator(mode="after")
+    def aligned(self) -> DesignTiming:
+        if (
+            self.duration_ms <= 0
+            or self.rmse > self.rmse_limit
+            or not isclose(
+                self.t_start_ms,
+                self.basis_t_start_ms + self.start_shift_ms,
+                rel_tol=0,
+                abs_tol=1e-5,
+            )
+        ):
+            raise ValueError("invalid design timing alignment or fit quality")
+        return self
+
+
+class TimingEvidence(StrictModel):
+    visible_change: TimeInterval
+    estimated_design: DesignTiming | None
+    design_unavailable_reason: (
+        Literal[
+            "truncated_segment",
+            "no_named_fit",
+            "invalid_alignment",
+            "poor_named_fit",
+            "estimate_before_timeline",
+            "legacy_missing_timing",
+        ]
+        | None
+    )
+
+    @model_validator(mode="after")
+    def availability(self) -> TimingEvidence:
+        if (self.estimated_design is None) != (self.design_unavailable_reason is not None):
+            raise ValueError("missing design timing requires an explicit reason")
+        return self
+
+
+class MotionTiming(TimingEvidence):
+    version: Literal["svsg.motion-timing/1"] = "svsg.motion-timing/1"
+    unit: Literal["ms"] = "ms"
+    clock: Literal["source_timeline"] = "source_timeline"
+    primary_channel: str | None = Field(default=None, max_length=64)
+    channels: dict[str, TimingEvidence] = Field(default_factory=dict, max_length=16)
+
+    @model_validator(mode="after")
+    def primary(self) -> MotionTiming:
+        if self.primary_channel is not None:
+            if self.primary_channel not in self.channels:
+                raise ValueError("unknown primary timing channel")
+            primary = self.channels[self.primary_channel]
+            if (
+                primary.estimated_design != self.estimated_design
+                or primary.design_unavailable_reason != self.design_unavailable_reason
+            ):
+                raise ValueError("primary channel and segment design timing disagree")
+        return self
+
+
 class MotionFunctions(StrictModel):
     segment_id: str = Field(min_length=1, max_length=128)
     kind: Literal["transform", "fade", "instant", "nonrigid"]
     confidence: Literal["low", "medium", "high"]
     t_start_ms: Number = Field(ge=0)
     t_end_ms: Number = Field(ge=0)
+    # Legacy t_start_ms/t_end_ms keep their visible-support meaning.
+    # Missing timing in older stored bundles must not become a design estimate.
+    timing: MotionTiming | None = None
     region: tuple[StrictInt, StrictInt, StrictInt, StrictInt]
     truncated: bool = False
     reference: dict = Field(default_factory=dict)
@@ -103,6 +189,22 @@ class MotionFunctions(StrictModel):
     def domains(self) -> MotionFunctions:
         if self.t_end_ms < self.t_start_ms:
             raise ValueError("invalid motion interval")
+        if self.timing is not None:
+            visible = self.timing.visible_change
+            if (visible.t_start_ms, visible.t_end_ms) != (self.t_start_ms, self.t_end_ms):
+                raise ValueError("visible timing disagrees with the motion interval")
+            for channel in self.timing.channels.values():
+                interval = channel.visible_change
+                if not self.t_start_ms <= interval.t_start_ms <= interval.t_end_ms <= self.t_end_ms:
+                    raise ValueError("channel visible timing exceeds its segment")
+            if self.truncated and (
+                self.timing.estimated_design is not None
+                or any(
+                    channel.estimated_design is not None
+                    for channel in self.timing.channels.values()
+                )
+            ):
+                raise ValueError("truncated motion cannot claim a complete design timing")
         for curve in self.samples.values():
             if not self.t_start_ms <= curve.knots[0][0] <= curve.knots[-1][0] <= self.t_end_ms:
                 raise ValueError("sample function exceeds its segment")

@@ -6,13 +6,16 @@ import math
 import re
 from itertools import pairwise
 
+from .timing import motion_timing
+
 SCHEMA = "motionspec/0.1"
 KINDS = {"transform", "fade", "nonrigid", "instant"}
 REQUIRED_SEGMENT = ("id", "kind", "confidence", "t_start_ms", "t_end_ms", "duration_ms", "region", "channels", "samples")
 NUMERIC_CHANNELS = {"translate": ("distance_px",), "scale": ("from", "to", "peak"),
                     "rotate": ("from_deg", "to_deg"), "blend": ("mean_abs_delta", "residual"),
                     "change": ("mean_abs_delta",), "appearance": ("luma_min", "luma_max"),
-                    "opacity": ("from", "to")}
+                    "opacity": ("from", "to"),
+                    "size": ("width_from", "width_to", "height_from", "height_to")}
 
 
 def finite(value) -> bool:
@@ -134,6 +137,12 @@ def validate(spec: dict) -> list[str]:
                     problems.append(f"{where} has an invalid {name!r} channel")
         if not _valid_easing(seg.get("easing")):
             problems.append(f"{where} has invalid easing")
+        if "timing" in seg:
+            try:
+                if seg["timing"] != motion_timing(seg):
+                    problems.append(f"{where} timing disagrees with its measurements")
+            except (KeyError, TypeError, ValueError, IndexError):
+                problems.append(f"{where} has invalid timing evidence")
         notes = seg.get("notes", [])
         if not isinstance(notes, list) or not all(isinstance(note, str) for note in notes):
             problems.append(f"{where} notes must be a list of strings")
@@ -195,12 +204,15 @@ def describe_change(seg: dict) -> str:
         elif move.get("extrapolated"):
             text += f" ({move['visible_distance_px']:g} px visible, rest extrapolated)"
         parts.append(text)
-    if "scale" in ch and ch["scale"].get("reference") == "fully_shown_frame":
+    if "scale" in ch and ch["scale"].get("reference") in ("fully_shown_frame", "scale_property"):
         parts.append(f"scale {ch['scale']['from']:g} -> {ch['scale']['to']:g}")
     elif "scale" in ch:
         parts.append(f"scale x{ch['scale']['to']}" + (f" (peak x{ch['scale']['peak']})" if ch["scale"]["peak"] > ch["scale"]["to"] + 0.02 else ""))
     if "rotate" in ch:
         parts.append(f"rotate {ch['rotate']['to_deg']:+g} deg")
+    if "size" in ch:
+        box = ch["size"]
+        parts.append(f"size {box['width_from']:g}x{box['height_from']:g} -> {box['width_to']:g}x{box['height_to']:g}")
     if "opacity" in ch:
         fade = ch["opacity"]
         text = f"opacity {fade['from']:g} -> {fade['to']:g}"
@@ -222,6 +234,36 @@ def describe_change(seg: dict) -> str:
     return "; ".join(parts) or "-"
 
 
+def describe_element(element: dict | None) -> str:
+    """Qt 探针给出的控件身份：类名、对象名、文字。视觉路径没有这项。"""
+    if not element:
+        return ""
+    label = element.get("class", "")
+    if element.get("name"):
+        label += "#" + element["name"]
+    if element.get("text"):
+        label += f" \"{element['text']}\""
+    return f", element {label}" if label else ""
+
+
+def design_timing(seg: dict) -> dict | None:
+    """对齐最贴合的命名曲线之后的起点和时长，也就是对"动效是怎么写的"的最好估计。
+
+    实测的起止只覆盖看得出变化的那一段：缓入的头、缓出的尾每帧变化不到一个像素，会被截掉。
+    命名曲线匹配时允许起点前移、终点后延，这里把对齐结果换算回视频时间轴。
+    没有命名曲线贴合（rmse 大于 0.05）时返回 None。
+    """
+    return motion_timing(seg)["estimated_design"]
+
+
+def describe_design(seg: dict, *, timing: dict | None = None) -> str:
+    timing = motion_timing(seg) if timing is None else timing
+    design = timing["estimated_design"]
+    if design is None:
+        return f"unavailable ({timing['design_unavailable_reason']})"
+    return f"{design['easing']}, {design['t_start_ms']:.0f}-{design['t_end_ms']:.0f} ({design['duration_ms']:.0f} ms)"
+
+
 def summarize(spec: dict) -> str:
     src = spec["source"]
     lines = [
@@ -236,17 +278,28 @@ def summarize(spec: dict) -> str:
         lines.append("No change segments were detected at the selected thresholds.")
     else:
         lines += [
-            "| id | when (ms) | duration | kind | change | easing | confidence |",
+            "| id | visible change (ms) | estimated design timing: easing, start-end (duration) | kind | change | fitted curve | confidence |",
             "|---|---|---|---|---|---|---|",
         ]
         for seg in spec["segments"]:
+            timing = motion_timing(seg)
+            visible = timing["visible_change"]
             lines.append(
-                f"| {seg['id']} | {seg['t_start_ms']:.0f}-{seg['t_end_ms']:.0f} | {seg['duration_ms']:.0f} ms | {seg['kind']} "
+                f"| {seg['id']} | {visible['t_start_ms']:.0f}-{visible['t_end_ms']:.0f} ({visible['duration_ms']:.0f} ms) "
+                f"| {describe_design(seg, timing=timing)} | {seg['kind']} "
                 f"| {describe_change(seg)} | {describe_easing(seg['easing'])} | {seg['confidence']} |"
             )
-        lines.append("")
+        lines += [
+            "",
+            "\"Visible change\" is the detected interval; it may omit slow or invisible parts. "
+            "\"Estimated design timing\" aligns a named easing curve to those measurements and estimates the "
+            "authored start, end and duration. It is not ground truth. Unavailable design timing must remain "
+            "unknown; do not substitute the visible interval. JSON timing uses the same calculation.",
+            "",
+        ]
         for seg in spec["segments"]:
-            lines.append(f"- {seg['id']}: region {seg['region']}" + (f", sheet `{seg['sheet']}`" if seg.get("sheet") else ""))
+            lines.append(f"- {seg['id']}: region {seg['region']}" + (f", sheet `{seg['sheet']}`" if seg.get("sheet") else "")
+                         + describe_element(seg.get("element")))
             for note in seg["notes"]:
                 lines.append(f"  - {note}")
     if spec.get("ambient"):

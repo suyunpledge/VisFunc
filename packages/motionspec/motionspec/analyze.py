@@ -18,6 +18,7 @@ from .frames import FrameSource, InvalidTimestamps, write_image
 from .motion import analyze_window
 from .segment import LAG, Scan, scan
 from .spec import SCHEMA, summarize, validate
+from .timing import with_timing
 
 MARGIN = 12
 MEMORY_BUDGET = 150_000_000  # Shared budget for cached BGR crops in one task.
@@ -378,6 +379,7 @@ def analyze(
             "segments": segments,
             "warnings": warnings,
         }
+        spec = with_timing(spec)
         if stage is not None:
             if functions and len(frame_roles) > function_max_frames:
                 raise ValueError("function evidence frame budget exceeded; increase "

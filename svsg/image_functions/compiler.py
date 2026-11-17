@@ -110,8 +110,8 @@ class FunctionImageCompiler:
         evidence = describe_raster(RasterFunction.from_image(image), queries)
         return IR(
             image_id=meta.image_id,
-            image_width=meta.width,
-            image_height=meta.height,
+            image_width=evidence.width_px,
+            image_height=evidence.height_px,
             timestamp=meta.timestamp,
             scene_type=SceneType.UNKNOWN,
             detector_model=self.detector_model,
