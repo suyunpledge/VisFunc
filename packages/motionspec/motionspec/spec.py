@@ -131,7 +131,12 @@ def validate(spec: dict) -> list[str]:
                         or any(not finite(channel.get(k)) for k in NUMERIC_CHANNELS[name])
                         or (name == "translate" and not all(_vector(channel.get(k), 2) for k in ("from", "to", "delta")))
                         or (name == "translate" and not _number(channel["distance_px"]))
-                        or (name == "scale" and any(channel[k] <= 0 for k in ("from", "to", "peak")))
+                        or (name == "scale" and (
+                            channel["peak"] <= 0
+                            or any(channel[k] < 0 for k in ("from", "to"))
+                            or (channel.get("reference") != "scale_property" and any(channel[k] <= 0 for k in ("from", "to")))
+                            or max(channel["from"], channel["to"]) <= 0
+                        ))
                         or ("t_start_ms" in channel and not _interval(channel))
                         or not _valid_easing(channel.get("easing"))):
                     problems.append(f"{where} has an invalid {name!r} channel")

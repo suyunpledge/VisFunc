@@ -70,3 +70,19 @@ git show 258003a
 
 后续代码统一在此仓库维护，原独立检出目录可留作本地备份。原提交中的路径仍按当时的
 独立仓库布局显示，文件现有位置以当前树为准。
+
+## 多个工作区协作
+
+修改以当前合并仓库为准；从旧独立仓库迁移改动时，逐项审查补丁，避免整目录复制覆盖
+统一时间协议、输入校验和回归测试。旧仓库单独通过测试，不能替代根目录的完整测试。
+
+若从仓库外运行 CLI 时加载了旧副本，在合并仓库根目录重新安装：
+
+```bash
+python -m pip install -e "./packages/motionspec"
+```
+
+随后在不含 `motionspec/` 源码的目录检查 `python -c "import motionspec; print(motionspec.__file__)"`，
+应指向本仓库的 `packages/motionspec/motionspec/`。不要手工修改 site-packages 中的
+editable finder；安装记录和导入路径应由同一次安装生成。在旧仓库内运行 Python 仍可能
+优先导入当前目录源码，因此后续开发、测试和提交都从合并仓库启动。

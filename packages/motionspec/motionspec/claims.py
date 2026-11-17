@@ -100,6 +100,7 @@ def _evaluate(spec: dict, by_id: dict, claim: dict) -> tuple[str, str, object]:
             "rotate",
             "blend",
             "opacity",
+            "size",
         }:
             return "failed", "unknown measurement channel", None
         if name not in channels:

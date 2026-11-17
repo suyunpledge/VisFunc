@@ -116,7 +116,7 @@ motionspec check out/spec.json claims.json
 ```
 
 支持的字段：`count`、`kind`、`duration_ms`、`easing`、`overshoot`、`distance_px`、`direction`、`scale_to`。
-`duration_ms`、`easing`、`overshoot` 可指定 `channel`（`translate`、`scale`、`rotate`、`blend`、`opacity`）。`count` 只表示在当前检测条件下找到的片段数。请求中的 `tol` 会被拒绝，容差由校验器决定。
+`duration_ms`、`easing`、`overshoot` 可指定 `channel`（`translate`、`scale`、`rotate`、`blend`、`opacity`、`size`）。`count` 只表示在当前检测条件下找到的片段数。请求中的 `tol` 会被拒绝，容差由校验器决定。
 退出码 0 表示通过，1 表示断言错误，2 表示输入非法，3 表示证据不足。
 
 ## 实测精度

@@ -115,3 +115,59 @@ def test_bad_trace_is_rejected(tmp_path):
     with pytest.raises(ValueError):
         spec_from_trace({**trace([]), "ticks_ms": [0.0]})
     assert np.isfinite(spec_from_trace(trace([]))["time_resolution_ms"])
+
+
+def test_scale_from_or_to_zero_and_static_origin_have_no_fake_translation():
+    pop_in = lambda p: [300, 300, 220, 44, p, p, 0.0, 1.0, 300, 300]
+    pop_out = lambda p: [300, 300, 220, 44, 1 - p, 1 - p, 0.0, 1.0, 300, 300]
+    for fn, expected in ((pop_in, (0.0, 1.0)), (pop_out, (1.0, 0.0))):
+        spec = spec_from_trace(trace([{"class": "QQuickRectangle", "name": "toast", "rows": rows(15, 12, fn)}]))
+        assert validate(spec) == []
+        (seg,) = spec["segments"]
+        assert "translate" not in seg["channels"]
+        assert seg["dominant"] == "scale"
+        assert (seg["channels"]["scale"]["from"], seg["channels"]["scale"]["to"]) == expected
+
+
+def test_size_channel_can_be_claimed():
+    expand = lambda p: [100, 100, 200 + round(120 * p), 80, 1.0, 1.0, 0.0, 1.0, 100, 100]
+    spec = spec_from_trace(trace([{"class": "QFrame", "name": "panel", "rows": rows(10, 12, expand)}]))
+    assert validate(spec) == []
+    verdict = check(spec, [{"segment": "s1", "field": "duration_ms", "channel": "size", "value": 200}])
+    assert verdict["verdict"] == "passed"
+
+
+@pytest.mark.parametrize("origin", ["top_left", "center"])
+@pytest.mark.parametrize("ratio", [1.0, 1.5])
+def test_scale_preserves_scene_geometry_without_independent_translation(origin, ratio):
+    def zoom(p):
+        scale = 1 + p
+        # mapToScene(0, 0) moves under centre-origin scaling, but the item's
+        # position properties remain fixed for either transform origin.
+        scene_x = 100 if origin == "top_left" else 150 - 50 * scale
+        scene_y = 100 if origin == "top_left" else 125 - 25 * scale
+        return [100, 100, 100, 50, 1, scale, 0, 1, scene_x, scene_y]
+
+    spec = spec_from_trace(trace([{"rows": rows(10, 12, zoom)}], ratio=ratio))
+    assert validate(spec) == []
+    (segment,) = spec["segments"]
+    assert set(segment["channels"]) == {"scale"}
+    expected_region = [100, 100, 300, 200] if origin == "top_left" else [50, 75, 250, 175]
+    assert segment["region"] == [
+        int(np.floor(value * ratio)) if i < 2 else int(np.ceil(value * ratio))
+        for i, value in enumerate(expected_region)
+    ]
+    start, end = segment["samples"][0], segment["samples"][-1]
+    assert [start["x"], start["y"]] == pytest.approx([150 * ratio, 125 * ratio], abs=0.05)
+    expected_end = [200, 150] if origin == "top_left" else [150, 125]
+    assert [end["x"], end["y"]] == pytest.approx([v * ratio for v in expected_end], abs=0.05)
+
+
+def test_resize_updates_bounds_and_center_without_independent_translation():
+    def expand(p):
+        return [100, 100, 100 + 100 * p, 50, 1, 1, 0, 1, 100, 100]
+
+    (segment,) = spec_from_trace(trace([{"rows": rows(10, 12, expand)}]))["segments"]
+    assert set(segment["channels"]) == {"size"}
+    assert segment["region"] == [100, 100, 300, 150]
+    assert [segment["samples"][-1][key] for key in ("x", "y")] == [200, 125]

@@ -83,7 +83,12 @@ def _segment(element: dict, table: np.ndarray, ticks: np.ndarray, ratio: float, 
 
     offset = centre - centre[0]
     reach = float(np.linalg.norm(offset, axis=1).max())
-    if reach >= 0.75:
+    # Classify translation from the item's position properties. A changing size
+    # or scale can move its centre without an independent translation. Keep the
+    # real scaled centre above for samples, endpoints and region geometry.
+    position = v[:, [X, Y]] * ratio
+    position_reach = float(np.linalg.norm(position - position[0], axis=1).max())
+    if reach >= 0.75 and position_reach >= 0.75:
         far = offset[int(np.argmax(np.linalg.norm(offset, axis=1)))]
         net = offset[-1]
         target = net if np.linalg.norm(net) >= 0.3 * reach else far
@@ -113,13 +118,12 @@ def _segment(element: dict, table: np.ndarray, ticks: np.ndarray, ratio: float, 
         effect["scale" if "scale" in channels else "size"] = max(grow_w, grow_h)
 
     scale = v[:, SCALE]
-    if "scale" not in channels and float(np.abs(scale - scale[0]).max()) >= 0.005 and scale[0] > 0:
-        ratio_series = scale / scale[0]
-        fit = _channel(t, ratio_series - 1, 0.004)
+    if "scale" not in channels and float(np.abs(scale - scale[0]).max()) >= 0.005 and float(scale.max()) > 0:
+        fit = _channel(t, scale - scale[0], 0.004)
         fit["data"].update({"from": _r(scale[fit["origin"]], 3), "to": _r(scale[fit["target"]], 3),
                             "peak": _r(scale.max(), 3), "reference": "scale_property"})
         channels["scale"], fitted["scale"] = fit["data"], fit
-        effect["scale"] = float(np.abs(ratio_series - 1).max()) * float(max(own_w[0], own_h[0])) / 2
+        effect["scale"] = float(np.abs(scale - scale[0]).max()) * float(max(own_w[0], own_h[0])) / 2
 
     rotation = v[:, ROTATION]
     if float(np.abs(rotation - rotation[0]).max()) >= 0.5:
@@ -139,7 +143,9 @@ def _segment(element: dict, table: np.ndarray, ticks: np.ndarray, ratio: float, 
     dominant = max(effect, key=effect.get)
     lead = fitted[dominant]
     start, end = min(f["start"] for f in fitted.values()), max(f["end"] for f in fitted.values())
-    left, top = centre[:, 0] - width / 2, centre[:, 1] - height / 2
+    # Preserve the recorded origin directly: subtracting the half-size back
+    # from the centre can round 100 to 99.99999999999999 before floor().
+    left, top = v[:, SCENE_X] * ratio, v[:, SCENE_Y] * ratio
     region = [max(0, int(math.floor(left.min()))), max(0, int(math.floor(top.min()))),
               min(size[0], int(math.ceil((left + width).max()))), min(size[1], int(math.ceil((top + height).max())))]
     if region[2] <= region[0] or region[3] <= region[1]:
