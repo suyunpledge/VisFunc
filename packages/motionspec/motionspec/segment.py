@@ -76,7 +76,7 @@ class _Ambient:
         self.last[active] = index
         self.last_t[active] = t
         self.buffer.append((index, t, grid, np.zeros(grid.shape, bool)))
-        while self.buffer and t - self.buffer[0][1] > self.window_ms:
+        while self.buffer and t - self.buffer[0][1] > self.window_ms + self.pause_ms:
             self._release()
 
     def _release(self) -> None:
@@ -87,15 +87,17 @@ class _Ambient:
             & (index <= self.last)
             & (self.last_t - self.run_start_t >= self.window_ms)
         )
-        mask = (mask | alive) & (grid > ACTIVE)
-        if mask.any():
+        ambient_now = mask | alive
+        if ambient_now.any():
+            core = ambient_now & (grid > ACTIVE)
+            if core.any():
+                self.frames[core] += 1
+                self.first_t[core] = np.minimum(self.first_t[core], t)
+                self.last_seen_t[core] = np.maximum(self.last_seen_t[core], t)
             # Changed cells touching an ambient cell belong to the same restless area.
-            mask = (cv2.dilate(mask.astype(np.uint8), self.kernel) > 0) & (grid > ACTIVE)
-            self.frames[mask] += 1
-            self.first_t[mask] = np.minimum(self.first_t[mask], t)
-            self.last_seen_t[mask] = np.maximum(self.last_seen_t[mask], t)
+            fringe = (cv2.dilate(ambient_now.astype(np.uint8), self.kernel) > 0) & (grid > ACTIVE)
             grid = grid.copy()
-            grid[mask] = 0.0
+            grid[fringe] = 0.0
         self.emit(index, grid)
 
     def finish(self, size: tuple[int, int]) -> list[dict]:
@@ -162,11 +164,7 @@ class _Components:
         self.total += 1
         if candidate.peak_area < self.min_area or self.limit == 0:
             return
-        item = (candidate.mass, -cid, candidate)
-        if len(self.best) < self.limit:
-            heapq.heappush(self.best, item)
-        elif item > self.best[0]:
-            heapq.heapreplace(self.best, item)
+        self.best.append((candidate.mass, -cid, candidate))
 
     def add(self, t: int, grid: np.ndarray) -> None:
         for cid, candidate in list(self.active.items()):
@@ -234,11 +232,25 @@ class _Components:
         group.first = min(group.first, first)
         group.last = max(group.last, last)
 
-    def finish(self) -> tuple[list[Candidate], int]:
+    def finish(self, ambient_cells: np.ndarray | None = None) -> tuple[list[Candidate], int]:
         for cid in list(self.active):
             self._finish(cid)
+        if ambient_cells is not None and ambient_cells.any():
+            def rank_key(item: tuple[float, int, Candidate]) -> tuple[bool, float, int]:
+                mass, neg_cid, cand = item
+                x1, y1, x2, y2 = cand.bbox
+                part = ambient_cells[
+                    y1 * self.gh // self.h : max(y1 * self.gh // self.h + 1, (y2 * self.gh + self.h - 1) // self.h),
+                    x1 * self.gw // self.w : max(x1 * self.gw // self.w + 1, (x2 * self.gw + self.w - 1) // self.w),
+                ]
+                clean = (float(part.mean()) if part.size else 0.0) < 0.5
+                return (clean, mass, neg_cid)
+
+            top = heapq.nlargest(self.limit, self.best, key=rank_key)
+        else:
+            top = heapq.nlargest(self.limit, self.best)
         kept = sorted(
-            (item[2] for item in self.best),
+            (item[2] for item in top),
             key=lambda c: (c.first, c.bbox[1], c.bbox[0]),
         )
         return kept, self.total - len(kept)
@@ -303,6 +315,6 @@ def scan(
         times.append(t)
         history.append(blurred)
     regions = ambient.finish(size) if ambient is not None else []
-    candidates, dropped = groups.finish() if groups is not None else ([], 0)
     cells = ambient.frames > 0 if ambient is not None and regions else None
+    candidates, dropped = groups.finish(cells) if groups is not None else ([], 0)
     return Scan(times, first_id, size, candidates, dropped, regions, cells)

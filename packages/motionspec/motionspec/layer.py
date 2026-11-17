@@ -200,6 +200,8 @@ def _fit_direction(first: np.ndarray, last: np.ndarray, crops: list[np.ndarray],
         power = float((f**2).sum())
         if power > 0:
             plain[k] = float(((f - (float((f * diff).sum()) / energy) * diff) ** 2).sum()) / power
+    if float(np.sort(plain)[-3:].mean()) < 0.06:
+        return None
 
     grown = cv2.dilate(support.astype(np.uint8), np.ones((7, 7), np.uint8))
     count, labels = cv2.connectedComponents(grown, connectivity=8)
@@ -214,7 +216,14 @@ def _fit_direction(first: np.ndarray, last: np.ndarray, crops: list[np.ndarray],
     elements = [_Element(mask, scalar, diff, n) for mask in parts[:MAX_ELEMENTS]]
     for el in elements:
         _fit_element(el, frames, order)
-    _solve_alpha(elements, frames_color, size)
+    elements = [el for el in elements if el.valid.sum() >= 3]
+    if not elements:
+        return None
+    first_res = _solve_alpha(elements, frames_color, size)
+    first_seen = np.any([el.valid for el in elements], axis=0)
+    first_corr = float(np.median(np.concatenate([el.corr[el.valid] for el in elements])))
+    if first_corr < 0.7 or float(first_res[first_seen].mean()) > 0.45:
+        return None
 
     # 运动一致的并成一个元素（没有底板的多行文字会被连通域拆散）
     merged = True

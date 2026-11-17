@@ -154,7 +154,7 @@ motionspec check out/spec.json claims.json
 | 三行依次进入 | 各 24px，OutCubic，200ms，起点 167/217/267ms | 24.7px，out-cubic，183~200ms，起点 167/217/267ms |
 | 卡片平移与另一处淡入同时发生 | 90px InOutCubic 400ms；淡入 Linear 200ms | 89.9px in-out-cubic 400ms；linear 200ms |
 
-同样的 Qt 场景压成 H.264：CRF 23 时结论不变；CRF 30 时"三行依次进入"里有两行的位移读成 21.4px。
+同样的 Qt 场景压成 H.264：CRF 23 和 CRF 30 时三行依次进入的位移均恢复到 24~25px（`follows_opacity: true`）。
 
 这些素材都是逐帧渲染的，帧间隔严格均匀。真实录屏还会有丢帧和录制软件自身的延迟，这部分没有用界面类录屏验证过。
 

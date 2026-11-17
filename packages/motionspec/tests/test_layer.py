@@ -130,3 +130,16 @@ def test_open_fit_recovers_the_hidden_amplitude(curve):
     hidden_end = fit_open(tau[:-2], (120 * p)[:-2], False)
     assert hidden_start["amplitude"] == pytest.approx(24, abs=0.3)
     assert hidden_end["amplitude"] == pytest.approx(120, abs=1.5)
+
+
+def test_coupled_tolerates_single_frame_compression_outlier():
+    from motionspec.motion import _coupled
+
+    alpha = np.array([0.22, 0.42, 0.62, 0.82, 0.90, 0.96, 1.0, 1.0, 1.0])
+    u = 1 - alpha
+    value = 17.0 * u
+    value[3] += 1.6  # 模拟高压缩视频（如 CRF 30）在单帧上的块量化抖动
+    valid = np.ones_like(alpha, dtype=bool)
+    slope = _coupled(value, alpha, valid, 0.3)
+    assert slope is not None
+    assert slope == pytest.approx(17.0, abs=0.8)

@@ -135,7 +135,7 @@ def _analyze_windows(
                     origin=(x1, y1),
                     inv_scale=inv,
                     threshold=threshold,
-                    allow_layer=not w.truncated,
+                    allow_layer=not w.truncated and _ambient_share(scanned, w.roi) < 0.5,
                 )
                 for result in results:
                     # A window can hold several elements; each keeps only the area it sweeps.
@@ -324,7 +324,7 @@ def analyze(
                 "truncated": w.truncated,
             }
             share = _ambient_share(scanned, w.roi)
-            if share >= 0.5 and seg["confidence"] != "high":
+            if share >= 0.5 and (seg["confidence"] != "high" or seg["kind"] == "instant"):
                 seg["notes"].append(
                     f"{share:.0%} of this region keeps changing on its own; the measurement is contaminated"
                 )

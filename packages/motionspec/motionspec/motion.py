@@ -501,10 +501,12 @@ def _coupled(value: np.ndarray, alpha: np.ndarray, valid: np.ndarray, eps: float
     if int(((u > 0.05) & (u < 0.95)).sum()) < 4 or float(u.max()) < 0.5:
         return None
     slope = float((v * u).sum() / (u * u).sum())
-    tolerance = max(eps, 0.04 * abs(slope))
-    if abs(slope) < eps or float(np.abs(v - slope * u).max()) > 2.5 * tolerance:
+    tolerance = max(eps, 0.045 * abs(slope))
+    err = np.abs(v - slope * u)
+    check_err = np.sort(err)[:-1] if len(err) >= 6 else err
+    if abs(slope) < eps or float(check_err.max()) > 2.5 * tolerance:
         return None
-    if float(np.sqrt(np.mean((v - slope * u) ** 2))) > tolerance:
+    if float(np.sqrt(np.mean(check_err**2))) > tolerance:
         return None
     return slope
 
