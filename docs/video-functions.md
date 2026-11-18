@@ -143,6 +143,53 @@ functions = [compile_motion(segment) for segment in enriched["segments"]]
 并标记 `legacy_missing_timing`，不会猜测设计时长。旧版采用严格字段校验的消费者需升级后再读取新导出；
 顶层视频协议版本暂保持 `/1`，新增子协议有自己的版本标识。
 
+## 只查询 Qt 属性，无需录屏
+
+```bash
+motionspec trace trace.json -o probe
+motionspec functions probe/spec.json -o probe/functions
+motionspec query probe/functions/functions.json query.json
+```
+
+导出的 `svsg.probe-functions/1` 使用探针时钟和窗口设备像素坐标，不包含图像帧或差分。
+例如，若清单中 `s1` 的颜色曲线覆盖 220 ms，可提交
+`{"id":"alpha","op":"motion_value","segment_id":"s1","name":"color.a","t_ms":220}`。
+四个颜色分量 `color.r/g/b/a`（查询需写完整名称，例如 `color.r`）取值 0 到 1；
+`property.value` 保留自定义数值的原始单位和符号，属性名在 `reference.property_name`。
+几何样本的 `width` 和 `height` 单位为源像素。只有实际保存了对应样本的片段才提供该函数。
+采样点间线性插值，区间外不外推。录制内的元素 ID 和同步组保存在每段的 `reference`；
+同组元素仍可逐个查询。这些属性值不等于渲染后的像素颜色。
+
+## 查询目录与批量查询（2026-11-18）
+
+完整的 `functions.json` 每帧都带图像函数描述，一段动效就有一百多 KB。发查询之前先读目录：
+
+```bash
+python -m motionspec query functions/functions.json --list
+```
+
+目录只从清单里提取：每个片段的类型、置信度、区域、可见区间与设计时间，每个采样函数的单位、
+时间支持、取值范围、节点数和来源，每个拟合函数的时间支持与 RMSE，以及可做像素查询的帧号和时间。
+不做新的测量。上面这个例子从 132 KB 缩到 4 KB。
+
+参数文件可以是一个调用，也可以是至多 1000 个调用的列表。批量时逐个求值，某个调用出错
+（时间超出支持范围、函数不存在、参数不合法）只在它自己的结果里给出 `error`，不影响其他调用。
+
+各条测量路径现在导出的采样函数：
+
+| 路径 | 位置 `x/y` | 宽高 `width/height` | 透明度 `opacity` | 通道进度 `*.progress` |
+|---|---|---|---|---|
+| 跟踪 | 有（特征锚点） | 无（元素边界未知） | 无 | 有 |
+| 图层（进入/退出） | 有（元素中心） | 有（亚像素外沿；框碰到分析窗口边时不给） | 有 | 有 |
+| 多体（交错移动） | 有（点组中心） | 无 | 无 | 有 |
+| 纯色块（变尺寸） | 有（框中心） | 有 | 无 | 有 |
+| Qt 探针 | 有 | 有 | 有 | 有，另有 `color.*`、`property.value` |
+
+用 `packages/motionspec/tools/function_accuracy.py` 可以把视觉路径导出的函数逐帧求值，和同一次渲染的
+Qt 探针属性对比。第一批 6 个 Qt 场景上，位置误差最大 1.0 px，进入/退出元素的宽高误差最大 1.0 px，
+透明度误差 0.0；第二批 9 个场景中能测的元素位置误差中位 0.5 px，进度条宽度误差最大 2.1 px。
+布局重排（展开推动下方元素、侧栏收起）的位置函数仍会错到一百多像素，原因见 MotionSpec 的已知限制。
+
 ## 文件和预算
 
 - `functions.json`：时间轴、帧函数摘要、轮廓、差分统计、运动函数参数与来源。

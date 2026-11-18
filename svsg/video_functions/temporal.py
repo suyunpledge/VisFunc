@@ -20,6 +20,13 @@ UNITS: dict[str, Unit] = {
     "progress": "ratio",
     "rot_deg": "degrees",
     "luma": "luma_0_255",
+    "width": "source_px",
+    "height": "source_px",
+    "color.r": "ratio",
+    "color.g": "ratio",
+    "color.b": "ratio",
+    "color.a": "ratio",
+    "property.value": "property_units",
 }
 
 
@@ -31,7 +38,16 @@ def compile_motion(segment: dict) -> MotionFunctions:
     samples = {}
     for key, unit in UNITS.items():
         if all(key in row for row in rows):
-            samples[key] = SampledFunction(unit=unit, knots=[(r["t_ms"], r[key]) for r in rows])
+            samples[key] = SampledFunction(
+                unit=unit,
+                knots=[(r["t_ms"], r[key]) for r in rows],
+                provenance=(
+                    "qt_property_sample"
+                    if segment.get("model") == "qt-probe"
+                    and (key.startswith("color.") or key == "property.value")
+                    else "motion_estimate"
+                ),
+            )
     channels = segment["channels"]
     for name in channels:
         if all(name in row.get("channel_progress", {}) for row in rows):
@@ -68,6 +84,14 @@ def compile_motion(segment: dict) -> MotionFunctions:
             "estimated_design": None,
             "design_unavailable_reason": "legacy_missing_timing",
         }
+    reference = dict(segment.get("transform_reference", {}))
+    for key in ("element", "element_id", "motion_group"):
+        if key in segment:
+            reference[key] = segment[key]
+    if "property" in channels:
+        reference["property_name"] = channels["property"]["name"]
+    if "color" in channels:
+        reference["color_components"] = "RGBA components in 0..1; not perceptual distance"
     return MotionFunctions(
         segment_id=segment["id"],
         kind=segment["kind"],
@@ -77,7 +101,7 @@ def compile_motion(segment: dict) -> MotionFunctions:
         timing=MotionTiming.model_validate(timing),
         region=segment["region"],
         truncated=segment.get("truncated", False),
-        reference=segment.get("transform_reference", {}),
+        reference=reference,
         notes=segment.get("notes", []),
         inferred_channels=[
             k for k, v in channels.items() if v.get("extrapolated") or v.get("follows_opacity")

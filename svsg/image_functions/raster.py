@@ -7,8 +7,8 @@ from binascii import Error as Base64Error
 from collections.abc import Iterator
 from dataclasses import dataclass
 from hashlib import sha256
+import re
 from io import BytesIO
-from itertools import groupby
 from pathlib import Path
 from sys import byteorder
 from typing import TYPE_CHECKING
@@ -23,6 +23,9 @@ if TYPE_CHECKING:
 RGBA8 = tuple[int, int, int, int]
 CODEC = "svsg.raster/1"
 MAX_PROGRAM_SPANS = 100_000
+# One run of identical RGBA8 pixels. Matching from offset 0 keeps every run 4-byte aligned, and
+# the regex engine compares pixels in C instead of one Python step per pixel.
+_RUN = re.compile(rb"(....)\1*", re.DOTALL)
 
 
 def _buffer_size(width: int, height: int) -> int:
@@ -93,17 +96,15 @@ class RasterFunction:
 
     def iter_rows(self) -> Iterator[Iterator[tuple[int, int, int]]]:
         """Yield (start, end, color) intervals for the step function on each row."""
-        values = memoryview(self.samples).cast("I")
-        for offset in range(0, len(values), self.width):
-            yield self._intervals(values[offset : offset + self.width])
+        stride = self.width * 4
+        for offset in range(0, len(self.samples), stride):
+            yield self._intervals(self.samples[offset : offset + stride])
 
     @staticmethod
-    def _intervals(row: memoryview) -> Iterator[tuple[int, int, int]]:
-        start = 0
-        for packed, group in groupby(row):
-            end = start + sum(1 for _ in group)
-            yield start, end, packed
-            start = end
+    def _intervals(row: bytes) -> Iterator[tuple[int, int, int]]:
+        # The packed colour is the native-endian uint32 of the pixel bytes, as color_hex expects.
+        for run in _RUN.finditer(row):
+            yield run.start() // 4, run.end() // 4, int.from_bytes(run.group(1), byteorder)
 
     def _interval_program(self) -> list[list[tuple[int, str]]] | None:
         # Keep long interval tables out of JSON for textured images.

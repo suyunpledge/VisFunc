@@ -13,7 +13,7 @@ from .recognition import ModelCall, ObjectObservation, ObjectRelation, StrictMod
 
 Number = StrictFloat | StrictInt
 Digest = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
-Unit = Literal["source_px", "ratio", "degrees", "luma_0_255"]
+Unit = Literal["source_px", "ratio", "degrees", "luma_0_255", "property_units"]
 
 
 class VideoPixelQuery(PixelQuery):
@@ -53,7 +53,7 @@ class SampledFunction(StrictModel):
     op: Literal["piecewise_linear"] = "piecewise_linear"
     unit: Unit
     knots: list[tuple[Number, Number]] = Field(min_length=1, max_length=4096)
-    provenance: Literal["motion_estimate"] = "motion_estimate"
+    provenance: Literal["motion_estimate", "qt_property_sample"] = "motion_estimate"
 
     @model_validator(mode="after")
     def ordered(self) -> SampledFunction:
@@ -249,24 +249,33 @@ class FrameDifference(StrictModel):
 
 
 class VideoFunctions(StrictModel):
-    version: Literal["svsg.video-functions/1"] = "svsg.video-functions/1"
+    version: Literal["svsg.video-functions/1", "svsg.probe-functions/1"] = "svsg.video-functions/1"
     sequence_id: str = Field(min_length=1, max_length=128)
     source_spec_sha256: Digest
     width_px: StrictInt = Field(gt=0)
     height_px: StrictInt = Field(gt=0)
     t_start_ms: Number = Field(ge=0)
     t_end_ms: Number = Field(ge=0)
-    clock: Literal["container", "index"]
+    clock: Literal["container", "index", "probe"]
     time_resolution_ms: Number = Field(gt=0)
-    coordinate_space: Literal["decoded_source_rgba8"] = "decoded_source_rgba8"
-    coverage: Literal["sampled_frames_only"] = "sampled_frames_only"
-    frames: list[FrameFunctions] = Field(min_length=1, max_length=256)
+    coordinate_space: Literal["decoded_source_rgba8", "qt_window_device_px"] = (
+        "decoded_source_rgba8"
+    )
+    coverage: Literal["sampled_frames_only", "qt_properties_only"] = "sampled_frames_only"
+    frames: list[FrameFunctions] = Field(max_length=256)
     differences: list[FrameDifference] = Field(max_length=255)
     motions: list[MotionFunctions] = Field(default_factory=list, max_length=256)
     warnings: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def consistent(self) -> VideoFunctions:
+        if self.version == "svsg.probe-functions/1":
+            if (self.clock != "probe" or self.coverage != "qt_properties_only"
+                    or self.coordinate_space != "qt_window_device_px" or self.frames):
+                raise ValueError("probe functions require a probe clock and no pixel frames")
+        elif (self.clock == "probe" or self.coverage != "sampled_frames_only"
+              or self.coordinate_space != "decoded_source_rgba8" or not self.frames):
+            raise ValueError("video functions require at least one decoded frame")
         if self.t_end_ms < self.t_start_ms:
             raise ValueError("invalid source interval")
         for frame in self.frames:
@@ -280,7 +289,7 @@ class VideoFunctions(StrictModel):
         for a, b in pairwise(self.frames):
             if a.frame_index >= b.frame_index or a.timestamp_ms >= b.timestamp_ms:
                 raise ValueError("frame indices and times must be strictly increasing")
-        if len(self.differences) != len(self.frames) - 1:
+        if len(self.differences) != max(0, len(self.frames) - 1):
             raise ValueError("one difference per adjacent evidence pair is required")
         for d, (a, b) in zip(self.differences, pairwise(self.frames), strict=True):
             if (d.before_frame, d.after_frame) != (a.frame_index, b.frame_index):

@@ -94,7 +94,10 @@ def export_motion_spec(
         raise ValueError("expected motionspec/0.1")
     source = spec["source"]
     refs = TypeAdapter(list[EvidenceFrame]).validate_python(spec.get("evidence_frames", []))
-    if not 1 <= len(refs) <= max_frames:
+    probe_only = source["timestamps"] == "probe"
+    if probe_only and (refs or any(row.get("model") != "qt-probe" for row in spec["segments"])):
+        raise ValueError("probe export requires only Qt property segments and no pixel evidence")
+    if not probe_only and not 1 <= len(refs) <= max_frames:
         raise ValueError("missing evidence frames or frame budget exceeded")
     if source["width"] * source["height"] * len(refs) > max_total_pixels:
         raise ValueError("video function pixel budget exceeded")
@@ -149,6 +152,9 @@ def export_motion_spec(
             packets.append(packet)
             previous = raster
         bundle = VideoFunctions(
+            version="svsg.probe-functions/1" if probe_only else "svsg.video-functions/1",
+            coordinate_space="qt_window_device_px" if probe_only else "decoded_source_rgba8",
+            coverage="qt_properties_only" if probe_only else "sampled_frames_only",
             sequence_id=sequence_id,
             source_spec_sha256=sha256(canonical_json(spec)).hexdigest(),
             width_px=source["width"],
@@ -162,9 +168,11 @@ def export_motion_spec(
             motions=motions,
             warnings=[
                 *spec.get("warnings", []),
-                "Pixels are exact at exported frames; intermediate frames are absent.",
+                *(["Qt property samples; no decoded pixels are present."] if probe_only else [
+                    "Pixels are exact at exported frames; intermediate frames are absent.",
+                    "Pixel differences may include cuts, lighting or camera motion.",
+                ]),
                 "Motion curves are estimates; segment IDs are not object tracks.",
-                "Pixel differences may include cuts, lighting or camera motion.",
             ],
         )
         (stage / "functions.json").write_bytes(canonical_json(bundle.model_dump(mode="json")))
