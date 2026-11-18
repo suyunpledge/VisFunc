@@ -48,7 +48,7 @@ def _runs(rows: list[list[float]], ticks: np.ndarray) -> list[np.ndarray]:
         floor = int(out[i - 1][-1][0]) + 1 if i else 0
         ceiling = int(out[i + 1][0][0]) - 1 if i + 1 < len(out) else last_tick
         first, last = max(floor, int(run[0][0]) - pad), min(ceiling, int(run[-1][0]) + pad)
-        table = np.zeros((last - first + 1, 11))
+        table = np.zeros((last - first + 1, len(run[0])))
         cursor = 0
         for tick in range(first, last + 1):
             while cursor + 1 < len(run) and run[cursor + 1][0] <= tick:
@@ -76,7 +76,9 @@ def _segment(element: dict, table: np.ndarray, ticks: np.ndarray, ratio: float, 
     v = table[:, 1:]
     width, height = v[:, W] * v[:, SCALE] * ratio, v[:, H] * v[:, SCALE] * ratio
     centre = np.stack([v[:, SCENE_X] * ratio + width / 2, v[:, SCENE_Y] * ratio + height / 2], axis=1)
-    alpha = v[:, OPACITY] * v[:, VISIBLE]
+    # 尺寸为 0 时的隐藏只是"零尺寸不画"的写法（展开、进度条从 0 开始），不算透明度变化
+    area = v[:, W] * v[:, H]
+    alpha = v[:, OPACITY] * np.where(area > 0, v[:, VISIBLE], 1.0)
     channels: dict = {}
     fitted: dict[str, dict] = {}
     effect: dict[str, float] = {}
@@ -102,9 +104,11 @@ def _segment(element: dict, table: np.ndarray, ticks: np.ndarray, ratio: float, 
 
     own_w, own_h = v[:, W] * ratio, v[:, H] * ratio
     grow_w, grow_h = float(np.abs(own_w - own_w[0]).max()), float(np.abs(own_h - own_h[0]).max())
-    if max(grow_w, grow_h) >= 0.75 and own_w[0] > 0 and own_h[0] > 0:
-        rw, rh = own_w / own_w[0], own_h / own_h[0]
-        if float(np.abs(rw - rh).max()) < 0.02:  # 等比例变化就是缩放
+    if max(grow_w, grow_h) >= 0.75:
+        positive = own_w[0] > 0 and own_h[0] > 0
+        rw = own_w / own_w[0] if positive else None
+        rh = own_h / own_h[0] if positive else None
+        if positive and float(np.abs(rw - rh).max()) < 0.02:  # 等比例变化就是缩放
             fit = _channel(t, rw - 1, 0.004)
             fit["data"].update({"from": 1.0, "to": _r(rw[fit["target"]], 3), "peak": _r(rw.max(), 3), "reference": "size"})
             channels["scale"], fitted["scale"] = fit["data"], fit
@@ -154,6 +158,7 @@ def _segment(element: dict, table: np.ndarray, ticks: np.ndarray, ratio: float, 
     for k in np.unique(np.linspace(start, end, min(end - start + 1, 40)).round().astype(int)):
         samples.append({"t_ms": _r(t[k], 3), "progress": _r(lead["progress"][k], 3), "x": _r(centre[k][0], 1),
                         "y": _r(centre[k][1], 1), "opacity": _r(alpha[k], 3), "scale": _r(scale[k], 3),
+                        "width": _r(width[k], 3), "height": _r(height[k], 3),
                         "channel_progress": {name: _r(f["progress"][k], 3) for name, f in fitted.items()}})
     t_start, t_end = _r(t[start], 3), _r(t[end], 3)
     seg = {
@@ -179,6 +184,106 @@ def _segment(element: dict, table: np.ndarray, ticks: np.ndarray, ratio: float, 
     return seg
 
 
+def _property_segment(element: dict, name: str, table: np.ndarray, ticks: np.ndarray, ratio: float,
+                      size: tuple[int, int]) -> dict | None:
+    """颜色或自定义属性的一段变化；区域覆盖变化期间记录到的窗口内范围。"""
+    t = ticks[table[:, 0].astype(int)]
+    values = table[:, 1:]
+    if name == "color":
+        distance = np.linalg.norm(values - values[0], axis=1)
+        if float(distance.max()) < 0.02:
+            return None
+        fit = _channel(t, distance, 0.004)
+        fit["data"].update({"from": [_r(v, 4) for v in values[0]], "to": [_r(v, 4) for v in values[fit["target"]]],
+                            "distance": _r(float(distance[fit["target"]]), 4), "reference": "color_property"})
+        channel = "color"
+    else:
+        value = values[:, 0]
+        if float(np.abs(value - value[0]).max()) < 1e-6:
+            return None
+        fit = _channel(t, value - value[0], 0.004)
+        fit["data"].update({"name": name, "from": _r(value[0], 4), "to": _r(value[fit["target"]], 4),
+                            "reference": "custom_property"})
+        channel = "property"
+    rows = element["rows"]
+    start_tick = int(table[fit["start"], 0])
+    end_tick = int(table[fit["end"], 0])
+    initial = next((r for r in reversed(rows) if r[0] <= start_tick), rows[0])
+    geometry = np.asarray([initial, *(r for r in rows if start_tick < r[0] <= end_tick)])[:, 1:]
+    x, y = geometry[:, SCENE_X] * ratio, geometry[:, SCENE_Y] * ratio
+    w = geometry[:, W] * geometry[:, SCALE] * ratio
+    h = geometry[:, H] * geometry[:, SCALE] * ratio
+    region = [max(0, int(math.floor(x.min()))), max(0, int(math.floor(y.min()))),
+              min(size[0], int(math.ceil((x + w).max()))), min(size[1], int(math.ceil((y + h).max())))]
+    if region[2] <= region[0] or region[3] <= region[1]:
+        return None
+    start, end = fit["start"], fit["end"]
+    samples = []
+    for k in np.unique(np.linspace(start, end, min(end - start + 1, 40)).round().astype(int)):
+        row = {"t_ms": _r(t[k], 3), "progress": _r(fit["progress"][k], 3),
+               "channel_progress": {channel: _r(fit["progress"][k], 3)}}
+        if channel == "color":
+            row.update({f"color.{component}": float(value)
+                        for component, value in zip("rgba", values[k], strict=True)})
+        else:
+            row["property.value"] = float(values[k, 0])
+        samples.append(row)
+    seg = {
+        "kind": "fade",
+        "model": "qt-probe",
+        "confidence": "high",
+        "t_start_ms": _r(t[start], 3),
+        "t_end_ms": _r(t[end], 3),
+        "duration_ms": _r(t[end] - t[start], 3),
+        "frames": [int(table[start, 0]), int(table[end, 0])],
+        "region": region,
+        "element": {k: element[k] for k in ("class", "name", "text", "path") if element.get(k)},
+        "dominant": channel,
+        "channels": {channel: fit["data"]},
+        "easing": fit["data"]["easing"],
+        "samples": samples,
+        "truncated": False,
+        "notes": ["read from a live Qt property (" + ("colour" if channel == "color" else name) + "), not from pixels"],
+        "_effect": 0.0,
+    }
+    if fit["peak"] is not None:
+        seg.update(pattern="out-and-back", peak_ms=fit["data"]["peak_ms"])
+    return seg
+
+
+def _motion_signature(segment: dict) -> str:
+    channels = {name: {key: value for key, value in channel.items()
+                       if not (name == "translate" and key in ("from", "to"))}
+                for name, channel in segment["channels"].items()}
+    samples = []
+    first = segment["samples"][0]
+    for sample in segment["samples"]:
+        row = dict(sample)
+        for key in ("x", "y"):
+            if key in row:
+                row[key] = round(row[key] - first[key], 6)
+        samples.append(row)
+    return json.dumps([segment["t_start_ms"], segment["t_end_ms"], channels, samples],
+                      sort_keys=True, separators=(",", ":"), allow_nan=False)
+
+
+def _group(segments: list[dict]) -> list[dict]:
+    """Annotate associations without discarding member coordinates or identities."""
+    groups: dict[str, list[dict]] = {}
+    for segment in segments:
+        groups.setdefault(_motion_signature(segment), []).append(segment)
+    associations = []
+    for members in groups.values():
+        if len(members) < 2 or len({member["element_id"] for member in members}) != len(members):
+            continue
+        identity = f"g{len(associations) + 1}"
+        for member in members:
+            member["motion_group"] = identity
+        associations.append({"id": identity, "segment_ids": [m["id"] for m in members],
+                             "relation": "equivalent_sampled_motion"})
+    return associations
+
+
 def spec_from_trace(trace: dict, out_dir: str | Path | None = None, *, max_segments: int = 40) -> dict:
     if type(max_segments) is not int or not 0 <= max_segments <= 4096:
         raise ValueError("max_segments must be an integer between 0 and 4096")
@@ -193,13 +298,21 @@ def spec_from_trace(trace: dict, out_dir: str | Path | None = None, *, max_segme
         for table in _runs(element["rows"], ticks):
             seg = _segment(element, table, ticks, ratio, size)
             if seg is not None:
+                seg["element_id"] = element["id"]
                 found.append(seg)
+        for name, rows in element.get("props", {}).items():
+            for table in _runs(rows, ticks):
+                seg = _property_segment(element, name, table, ticks, ratio, size)
+                if seg is not None:
+                    seg["element_id"] = element["id"]
+                    found.append(seg)
     found.sort(key=lambda s: -s["_effect"])
     dropped = max(0, len(found) - max_segments)
     kept = sorted(found[:max_segments], key=lambda s: (s["t_start_ms"], s["region"][1], s["region"][0]))
     for number, seg in enumerate(kept, start=1):
         seg.pop("_effect")
         kept[number - 1] = {"id": f"s{number}", **seg}
+    motion_groups = _group(kept)
     warnings = []
     if dropped:
         warnings.append(f"{dropped} smaller property change(s) were dropped (max_segments)")
@@ -226,6 +339,7 @@ def spec_from_trace(trace: dict, out_dir: str | Path | None = None, *, max_segme
         "coverage": {"dropped_candidates": dropped, "truncated_segments": 0, "ambient_regions": 0},
         "ambient": [],
         "segments": kept,
+        "motion_groups": motion_groups,
         "lifecycle": [
             {"element_id": element["id"], "kind": event["kind"],
              "timestamp_ms": float(ticks[event["tick"]])}

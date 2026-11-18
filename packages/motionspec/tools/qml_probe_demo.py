@@ -6,6 +6,7 @@
 需要 PySide6。场景里的真值：
 - card：300ms 起，x 从 40 到 340（300 逻辑像素），300ms，Easing.OutCubic
 - toast：900ms 起，opacity 0→1、scale 0.9→1，250ms，Easing.InOutQuad
+- glass：1200ms 起，自定义属性 hoverAmount 0→1（150ms）和颜色 #232838→#2b6ff2（200ms），都是线性
 """
 
 from __future__ import annotations
@@ -40,9 +41,17 @@ Window {
             NumberAnimation { target: toast; property: "scale"; to: 1; duration: 250; easing.type: Easing.InOutQuad }
         }
     }
+    Rectangle {
+        id: glass; objectName: "glass"
+        x: 40; y: 220; width: 200; height: 60; radius: 8; color: "#232838"
+        property real hoverAmount: 0
+        Behavior on hoverAmount { NumberAnimation { duration: 150 } }
+        Behavior on color { ColorAnimation { duration: 200 } }
+    }
     Timer { interval: 300; running: true; onTriggered: slide.start() }
+    Timer { interval: 1200; running: true; onTriggered: { glass.hoverAmount = 1; glass.color = "#2b6ff2" } }
     Timer { interval: 900; running: true; onTriggered: pop.start() }
-    Timer { interval: 1500; running: true; onTriggered: Qt.quit() }
+    Timer { interval: 1700; running: true; onTriggered: Qt.quit() }
 }
 """
 
@@ -63,7 +72,7 @@ def main() -> None:
     engine.loadData(QML)
     if not engine.rootObjects():
         raise SystemExit("QML failed to load")
-    recorder = load_probe().Recorder()
+    recorder = load_probe().Recorder(properties=("hoverAmount",))
     QTimer.singleShot(120, recorder.start)  # 等窗口建好、根元素定好尺寸再开始记
     app.exec()
     recorder.stop()

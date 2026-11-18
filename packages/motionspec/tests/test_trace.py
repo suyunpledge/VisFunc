@@ -91,7 +91,7 @@ def test_separate_runs_of_one_element_stay_separate():
 
 def test_smaller_changes_are_dropped_and_counted():
     elements = [{"class": "QFrame", "name": "card", "rows": rows(11, 18, slide)}]
-    elements += [{"class": "QLabel", "rows": rows(11, 6, lambda p, i=i: [10, 10 + 2 * p, 50, 20, 1.0, 1.0, 0.0, 1.0, 10, 100 + 30 * i + 2 * p])}
+    elements += [{"class": "QLabel", "rows": rows(11, 6, lambda p, i=i: [10, 10 + (2 + i) * p, 50, 20, 1.0, 1.0, 0.0, 1.0, 10, 100 + 30 * i + (2 + i) * p])}
                  for i in range(3)]
     spec = spec_from_trace(trace(elements), max_segments=1)
     assert [s["element"].get("name") for s in spec["segments"]] == ["card"]
@@ -171,3 +171,54 @@ def test_resize_updates_bounds_and_center_without_independent_translation():
     assert set(segment["channels"]) == {"size"}
     assert segment["region"] == [100, 100, 300, 150]
     assert [segment["samples"][-1][key] for key in ("x", "y")] == [200, 125]
+
+
+STILL = [300, 300, 220, 44, 1.0, 1.0, 0.0, 1.0, 300, 300]
+
+
+def test_colour_and_custom_properties_become_segments():
+    colour = [[19, 0.14, 0.16, 0.22, 1.0]] + [[19 + i, *(round(a + (b - a) * i / 12, 4) for a, b in
+                                                       zip((0.14, 0.16, 0.22), (0.17, 0.44, 0.95))), 1.0] for i in range(1, 13)]
+    hover = [[39, 0.0]] + [[39 + i, i / 9] for i in range(1, 10)]
+    spec = spec_from_trace(trace([{"class": "QQuickRectangle", "name": "glass", "rows": [[0, *STILL]],
+                                   "props": {"color": colour, "hoverAmount": hover}}]))
+    assert validate(spec) == []
+    first, second = spec["segments"]
+    assert first["kind"] == second["kind"] == "fade"
+    assert first["channels"]["color"]["from"][:3] == [0.14, 0.16, 0.22]
+    assert first["channels"]["color"]["to"][:3] == [0.17, 0.44, 0.95]
+    assert first["channels"]["color"]["easing"]["named"][0]["name"] == "linear"
+    prop = second["channels"]["property"]
+    assert (prop["name"], prop["from"], prop["to"]) == ("hoverAmount", 0.0, 1.0)
+    assert second["duration_ms"] == pytest.approx(150, abs=FRAME)
+    assert second["region"] == [300, 300, 520, 344]
+
+
+def test_bad_property_rows_are_rejected():
+    for props in ({"color": [[5, 0.1, 0.2]]}, {"color": [[5, 2.0, 0.2, 0.3, 1.0]]}, {"x": [[5, 1.0], [4, 2.0]]}, {"": [[5, 1.0]]}):
+        with pytest.raises(ValueError):
+            spec_from_trace(trace([{"class": "QFrame", "rows": [[0, *STILL]], "props": props}]))
+
+
+def test_growing_from_zero_size_is_a_size_change_not_a_fade():
+    """展开、进度条从 0 开始时控件先是隐藏的：这不该被报成透明度 0→1。"""
+    def grow(p):
+        h = round(180 * p)
+        return [210, 140, 400, h, 1.0, 1.0, 0.0, 1.0 if h > 0 else 0.0, 210, 140]
+    (seg,) = spec_from_trace(trace([{"class": "QFrame", "name": "panel", "rows": rows(11, 18, grow)}]))["segments"]
+    assert "opacity" not in seg["channels"]
+    size = seg["channels"]["size"]
+    assert (size["height_from"], size["height_to"]) == (0.0, 180.0)
+
+
+def test_elements_moving_together_are_grouped():
+    def row(offset):
+        return lambda p: [210, offset + round(180 * p), 400, 40, 1.0, 1.0, 0.0, 1.0, 210, offset + round(180 * p)]
+    spec = spec_from_trace(trace([{"class": "QFrame", "name": "a", "rows": rows(11, 18, row(150))},
+                                  {"class": "QFrame", "name": "b", "rows": rows(11, 18, row(200))}]))
+    first, second = spec["segments"]
+    assert [s["element"]["name"] for s in spec["segments"]] == ["a", "b"]
+    assert first["element_id"] != second["element_id"]
+    assert first["samples"][0]["y"] != second["samples"][0]["y"]
+    assert spec["motion_groups"] == [{"id": "g1", "segment_ids": ["s1", "s2"],
+                                      "relation": "equivalent_sampled_motion"}]

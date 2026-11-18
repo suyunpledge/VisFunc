@@ -146,8 +146,60 @@ def listing(fps: float = 60.0, items: int = 3, gap_ms: float = 66.667, duration_
     return frames, {"starts_ms": starts, "delta": [0.0, -rise], "duration_ms": duration_ms}
 
 
+def modal(fps: float = 60.0, lead=10, tail=12):
+    """模态框：整个窗口线性变暗到 55%（200ms），同时对话框上移 24px 并淡入（300ms，decelerate）。"""
+    bg, sprite = background(), card()
+    tau_dim, _ = _timeline(fps, 200.0, lead, tail + 6)
+    tau, _ = _timeline(fps, 300.0, lead, tail)
+    v = bezier_ease(0.0, 0.0, 0.2, 1.0, tau)
+    frames = []
+    for d, p in zip(tau_dim, v):
+        dim = (bg.astype(np.float32) * (1 - 0.45 * d)).round().astype(np.uint8)
+        frames.append(compose(dim, sprite, 320, 190 + 24 * (1 - p), alpha=float(p)))
+    return frames, {"dim_ms": 200.0, "delta": [0.0, -24.0], "duration_ms": 300.0}
+
+
+def swap(fps: float = 60.0, gap: float = 70.0, duration_ms: float = 300.0, lead=10, tail=12):
+    """两行对调：上面一行下移、下面一行上移，交错时上面那行被挡住。"""
+    bg = background()
+    a, b = card(220, 56, (200, 120, 70)), card(220, 56, (80, 150, 200))
+    tau, _ = _timeline(fps, duration_ms, lead, tail)
+    v = bezier_ease(0.65, 0.0, 0.35, 1.0, tau)
+    frames = [compose(compose(bg, a, 320, 150 + gap * p), b, 320, 150 + gap - gap * p) for p in v]
+    return frames, {"delta_a": [0.0, gap], "delta_b": [0.0, -gap], "duration_ms": duration_ms}
+
+
+def progress(fps: float = 60.0, duration_ms: float = 500.0, length: int = 360, lead=10, tail=12):
+    """进度条：从左端起长到 360px，线性。"""
+    bg = background()
+    tau, _ = _timeline(fps, duration_ms, lead, tail)
+    frames = []
+    for p in tau:
+        frame = bg.copy()
+        cv2.rectangle(frame, (140, 300), (140 + length, 310), (70, 60, 50), -1)
+        w = int(round(length * p))
+        if w > 0:
+            cv2.rectangle(frame, (140, 300), (140 + w - 1, 310), (240, 140, 40), -1)
+        frames.append(frame)
+    return frames, {"width": [0, length], "duration_ms": duration_ms}
+
+
+def indicator(fps: float = 60.0, duration_ms: float = 250.0, lead=10, tail=12):
+    """标签指示条：4px 高，右移 150px 同时从 80px 变宽到 120px，out-cubic。"""
+    bg = background()
+    tau, _ = _timeline(fps, duration_ms, lead, tail)
+    frames = []
+    for p in bezier_ease(0.33, 1.0, 0.68, 1.0, tau):
+        frame = bg.copy()
+        x0 = 120 + 150 * p
+        cv2.rectangle(frame, (int(round(x0)), 80), (int(round(x0 + 80 + 40 * p)) - 1, 83), (240, 140, 40), -1)
+        frames.append(frame)
+    return frames, {"centre_shift": 170.0, "width": [80, 120], "duration_ms": duration_ms}
+
+
 CASES = {"slide": slide, "fade": fade, "pop": pop, "stagger": stagger,
-         "enter": enter, "leave": leave, "popover": popover, "listing": listing}
+         "enter": enter, "leave": leave, "popover": popover, "listing": listing,
+         "modal": modal, "swap": swap, "progress": progress, "indicator": indicator}
 
 
 def write_video(path, frames, fps: float = 60.0) -> None:

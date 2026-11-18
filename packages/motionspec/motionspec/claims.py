@@ -77,7 +77,7 @@ def _evaluate(spec: dict, by_id: dict, claim: dict) -> tuple[str, str, object]:
     if not isinstance(sid, str) or sid not in by_id:
         return "failed", "no such segment", sorted(by_id)
     if field in NUMERIC_FIELDS and (
-        not finite(value) or value < 0 or (field == "scale_to" and value == 0)
+        not finite(value) or value < 0
     ):
         return "failed", "expected a finite numeric value in range", None
     if field == "overshoot" and type(value) is not bool:
@@ -101,6 +101,8 @@ def _evaluate(spec: dict, by_id: dict, claim: dict) -> tuple[str, str, object]:
             "blend",
             "opacity",
             "size",
+            "color",
+            "property",
         }:
             return "failed", "unknown measurement channel", None
         if name not in channels:

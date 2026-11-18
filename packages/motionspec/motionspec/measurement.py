@@ -14,9 +14,9 @@ ENUMS = {
 }
 
 
-def _finite_nonnegative(value):
+def _finite_number(value, *, nonnegative):
     try:
-        return type(value) in (int, float) and math.isfinite(value) and value >= 0
+        return type(value) in (int, float) and math.isfinite(value) and (not nonnegative or value >= 0)
     except OverflowError:
         return False
 
@@ -25,7 +25,8 @@ def _reject_constant(value):
     raise ValueError(f"nonfinite JSON constant: {value}")
 
 
-def decode_measurement(text: str) -> dict:
+def decode_measurement(text: str, *, numeric_fields=NUMBERS, nonnegative_fields=NUMBERS,
+                       enum_fields=None) -> dict:
     """Keep diagnostic rows even on schema failure; accepted gates downstream use."""
     result = {
         "rows": None,
@@ -58,13 +59,13 @@ def decode_measurement(text: str) -> dict:
     for i, row in enumerate(rows):
         if not isinstance(row.get("element"), str) or not row["element"].strip():
             result["errors"].append(f"animations[{i}].element must be nonempty text")
-        for key in NUMBERS:
+        for key in numeric_fields:
             value = row.get(key)
-            if not _finite_nonnegative(value):
+            if not _finite_number(value, nonnegative=key in nonnegative_fields):
                 result["errors"].append(
-                    f"animations[{i}].{key} must be a finite nonnegative number"
+                    f"animations[{i}].{key} must be a finite number in the declared range"
                 )
-        for key, choices in ENUMS.items():
+        for key, choices in (ENUMS if enum_fields is None else enum_fields).items():
             if not isinstance(row.get(key), str) or row[key] not in choices:
                 result["errors"].append(f"animations[{i}].{key} is missing or invalid")
     result["accepted"] = not result["errors"]

@@ -66,7 +66,8 @@ def main(argv: list[str] | None = None) -> int:
 
     q = sub.add_parser("query", help="evaluate a data-only query against shared functions")
     q.add_argument("manifest")
-    q.add_argument("parameters", help="JSON file containing one function call")
+    q.add_argument("parameters", nargs="?", help="JSON file with one function call or a list of calls")
+    q.add_argument("--list", action="store_true", help="print a compact catalogue of segments, functions and frames")
 
     d = sub.add_parser("demo", help="analyse built-in synthetic clips")
     d.add_argument("-o", "--out", default="motionspec-demo")
@@ -120,13 +121,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "query":
-        from .functions import require_svsg
+        from .functions import catalogue, run_queries
 
         try:
-            require_svsg()
-            from svsg.video_functions import VideoRuntime
-
-            result = VideoRuntime.load(args.manifest).call(_load_json(args.parameters))
+            if args.list:
+                result = catalogue(args.manifest)
+            elif args.parameters is None:
+                raise ValueError("give a parameters file, or --list to see what can be queried")
+            else:
+                result = run_queries(args.manifest, _load_json(args.parameters))
         except (OSError, ValueError) as exc:
             q.exit(2, f"motionspec query: {exc}\n")
         print(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False))

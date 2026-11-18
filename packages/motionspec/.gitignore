@@ -4,3 +4,4 @@ __pycache__/
 motionspec-out/
 motionspec-demo/
 out/
+bench/results/*/data/

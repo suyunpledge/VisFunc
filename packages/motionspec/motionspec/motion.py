@@ -22,6 +22,7 @@ LK = {"winSize": (15, 15), "maxLevel": 3,
       "criteria": (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01)}
 MAX_POINTS = 300
 COHERENT = 0.6  # 低于这个一致性就不当作单个刚体
+SPLIT_AREA = 60_000  # 遮罩分类时的目标像素数
 LAYER_MAX_FRAMES = 180
 LAYER_MAX_MS = 3000.0
 
@@ -649,11 +650,17 @@ def _layer_results(fit: dict, crops: list[np.ndarray], t: np.ndarray, origin, in
             keys.setdefault(a + int(np.argmin(np.abs(progress[a : b + 1] - 0.5))), "midpoint")
             keys.setdefault(a + int(np.argmax(speed)) + 1, "peak-velocity")
         samples = []
+        boxed = el.box[0] > 1 and el.box[1] > 1 and el.box[2] < width - 1 and el.box[3] < height - 1
         for k in np.unique(np.linspace(start, end, min(end - start + 1, 40)).round().astype(int)):
             row = {"t_ms": _r(t[k], 3), "progress": _r(progress[k], 3)}
             row["x"], row["y"] = to_source(pos[k])
             row["opacity"] = _r(float(np.clip(alpha[k], 0, 1)), 3)
             row["channel_progress"] = {name: _r(p[k], 3) for name, p in progresses.items()}
+            # 元素的外接框（完整显示那一帧里和背景不同的范围）乘当前缩放。框碰到窗口边时，
+            # 里面混进了窗口边上的残差（例如遮罩补偿留下的一圈），不是元素本身的尺寸，就不给
+            if boxed:
+                row["width"] = _r(el.size[0] * el.scale[k] * inv_scale, 1)
+                row["height"] = _r(el.size[1] * el.scale[k] * inv_scale, 1)
             if grow is not None:
                 row["scale"] = _r(el.scale[k], 3)
             samples.append(row)
@@ -679,7 +686,130 @@ def _layer_results(fit: dict, crops: list[np.ndarray], t: np.ndarray, origin, in
     return results
 
 
+def _split_backdrop(crops: list[np.ndarray], threshold: int) -> tuple[np.ndarray, tuple[int, int, int, int]] | None:
+    """窗口里是否有一大片区域按同一条曲线在首尾两帧之间混合（遮罩变暗、整体变色），
+    同时还有一块区域在做别的事（对话框弹出）。是的话返回 (混合区域掩码, 其余部分的外接框)。
+
+    模态框是最常见的例子：遮罩把整个窗口调暗，对话框在上面滑入淡入。两者混在一个窗口里时，
+    图层模型以为整片画面都是"新出现的元素"，跟踪又被变暗的背景干扰，两边都测不准。
+    """
+    # 这里只是分类（哪里是遮罩、哪里是别的元素），在缩小的图上做就够了，掩码最后放大回原尺寸
+    full_h, full_w = crops[0].shape[:2]
+    factor = min(1.0, math.sqrt(SPLIT_AREA / (full_h * full_w)))
+    if factor < 1.0:
+        size = (max(8, round(full_w * factor)), max(8, round(full_h * factor)))
+        crops = [crops[0], *crops[1:-1:max(1, (len(crops) - 2) // 24)], crops[-1]]
+        crops = [cv2.resize(c, size, interpolation=cv2.INTER_AREA) for c in crops]
+    f0, f1 = crops[0].astype(np.float32), crops[-1].astype(np.float32)
+    delta = f1 - f0
+    power = (delta * delta).sum(axis=2)
+    changed = power > (3 * threshold) ** 2
+    touched = power > threshold ** 2  # 暗背景变暗只有十几个灰度，算不上 changed，但仍是遮罩的证据
+    if changed.mean() < 0.05:
+        return None
+    sampled = crops[1:-1:max(1, (len(crops) - 2) // 24)]
+    # 形态学核按像素算，缩小后要跟着缩，否则细的运动带会被开运算整条抹掉
+    kernel = np.ones((5, 5) if factor >= 0.75 else (3, 3), np.uint8)
+    grow = 2 if factor >= 0.75 else max(1, round(4 * factor))
+
+    def evaluate(basis):
+        """以 basis 里的像素估一条共同的混合曲线，返回 (曲线, 每个像素的最大偏离比例, 最大变化幅度)。"""
+        curve, worst, swing = [], np.zeros(changed.shape, np.float32), np.zeros(changed.shape, np.float32)
+        for crop in sampled:
+            moved = crop.astype(np.float32) - f0
+            b = float(np.median((moved * delta).sum(axis=2)[basis] / power[basis]))
+            curve.append(b)
+            worst = np.maximum(worst, np.sqrt(((moved - b * delta) ** 2).sum(axis=2)) / np.maximum(np.sqrt(power), 2.0 * threshold))
+            swing = np.maximum(swing, np.sqrt((moved * moved).sum(axis=2)))
+        return curve, worst, swing
+
+    # 第一遍：用变化大的像素估曲线，找出变化幅度大又对不上的那块（对话框）
+    curve, worst, swing = evaluate(changed)
+    other = (worst >= 0.3) & (swing > 3 * threshold)
+    other = cv2.dilate(cv2.morphologyEx(other.astype(np.uint8), cv2.MORPH_OPEN, kernel), kernel, iterations=grow) > 0
+    # 第二遍：只用那块之外的像素估曲线。对话框占了变化像素的大头时，第一遍的曲线其实是对话框的
+    basis = touched & ~other
+    if basis.sum() < 0.05 * basis.size:
+        return None
+    curve, worst, swing = evaluate(basis)
+    consistent = (worst < 0.3) & touched & ~other
+    if not any(0.15 < b < 0.85 for b in curve):
+        return None
+    other = (worst >= 0.3) & (swing > 3 * threshold) & ~consistent
+    other = cv2.dilate(cv2.morphologyEx(other.astype(np.uint8), cv2.MORPH_OPEN, kernel), kernel, iterations=grow)
+    if other.sum() < 0.01 * other.size or other.sum() > 0.6 * other.size:
+        return None
+    if consistent.sum() < 0.4 * (touched & ~(other > 0)).sum():
+        return None
+    ys, xs = np.nonzero(other)
+    h, w = other.shape
+    pad = 6
+    box = (max(0, int(xs.min()) - pad), max(0, int(ys.min()) - pad), min(w, int(xs.max()) + 1 + pad), min(h, int(ys.max()) + 1 + pad))
+    # 混合区域得在那块"别的东西"外面：一张边移动边淡入的卡片，内部也按同一条曲线混合，
+    # 但它被移动的边缘包着，那是同一个元素，不是遮罩
+    outside = int(consistent.sum() - consistent[box[1]:box[3], box[0]:box[2]].sum())
+    if outside < 0.15 * consistent.sum() or outside < 0.02 * consistent.size:
+        return None
+    if factor < 1.0:
+        consistent = cv2.resize(consistent.astype(np.uint8), (full_w, full_h), interpolation=cv2.INTER_NEAREST) > 0
+        sx, sy = full_w / w, full_h / h
+        box = (max(0, int(box[0] * sx) - 2), max(0, int(box[1] * sy) - 2),
+               min(full_w, int(math.ceil(box[2] * sx)) + 2), min(full_h, int(math.ceil(box[3] * sy)) + 2))
+    return consistent, box
+
+
 def analyze_window(
+    crops: list[np.ndarray],
+    times: list[float],
+    *,
+    origin: tuple[int, int],
+    inv_scale: float,
+    threshold: int = 12,
+    allow_layer: bool = True,
+    allow_split: bool = True,
+) -> list[dict]:
+    split = _split_backdrop(crops, threshold) if allow_split and len(crops) >= 5 else None
+    if split is not None:
+        blend, (x1, y1, x2, y2) = split
+        first, last = crops[0], crops[-1]
+        # 遮罩部分：把其余区域冻结在首帧，剩下的就是一次纯混合
+        frozen = []
+        for crop in crops:
+            copy = crop.copy()
+            copy[y1:y2, x1:x2] = first[y1:y2, x1:x2]
+            frozen.append(copy)
+        backdrop = _analyze_single(frozen, times, origin=origin, inv_scale=inv_scale, threshold=threshold)
+        backdrop["notes"].append("a large area blends towards its final state on one shared curve (dimming overlay or "
+                                 "colour change); the element drawn on top of it is reported separately")
+        # 其余区域：把遮罩的变化从每个像素里减掉（包括对话框底下和它扫过的地方），
+        # 背景就停在末帧的状态，元素落在一张静止的背景上
+        f0 = first.astype(np.float32)
+        mapped = np.empty_like(f0)
+        for channel in range(f0.shape[2]):  # 遮罩是逐通道的仿射：末帧 = 增益 × 首帧 + 偏移
+            x = f0[..., channel][blend]
+            y = last[..., channel].astype(np.float32)[blend]
+            gain, offset = np.polyfit(x, y, 1) if np.ptp(x) > 1 else (1.0, float(np.mean(y - x)))
+            mapped[..., channel] = gain * f0[..., channel] + offset
+        shift = (mapped - f0)[y1:y2, x1:x2]
+        delta = (last.astype(np.float32) - f0)[blend]
+        parts = []
+        for crop in crops:
+            b = float(np.median(((crop.astype(np.float32) - f0)[blend] * delta).sum(axis=1)
+                                / np.maximum((delta * delta).sum(axis=1), 1e-6)))
+            fixed = crop[y1:y2, x1:x2].astype(np.float32) + (1.0 - b) * shift
+            parts.append(np.clip(fixed, 0, 255).round().astype(np.uint8))
+        others = analyze_window(parts, times, origin=(origin[0] + x1, origin[1] + y1), inv_scale=inv_scale,
+                                threshold=threshold, allow_layer=allow_layer, allow_split=False)
+        for result in others:
+            sx1, sy1, sx2, sy2 = result.get("_roi", (0, 0, x2 - x1, y2 - y1))
+            result["_roi"] = (x1 + sx1, y1 + sy1, x1 + sx2, y1 + sy2)
+            result["notes"].append("measured after removing the dimming or colour change behind it")
+        return [backdrop, *others]
+    return _analyze_window_plain(crops, times, origin=origin, inv_scale=inv_scale, threshold=threshold,
+                                 allow_layer=allow_layer)
+
+
+def _analyze_window_plain(
     crops: list[np.ndarray],
     times: list[float],
     *,
@@ -693,6 +823,9 @@ def analyze_window(
     先试图层模型（进入 / 退出类动效），解释不了再走跟踪和混合度那条路。
     每个结果可带 "_roi"：该片段在窗口内的子区域（分析尺度，相对窗口左上角）。
     """
+    box = _solid_box(crops, times, origin, inv_scale, threshold) if len(crops) >= 5 else None
+    if box is not None:
+        return [box]
     # 进入 / 退出都是短动效；又长又大的窗口多半是持续变化的内容，不值得试
     if allow_layer and len(crops) <= LAYER_MAX_FRAMES and times[-1] - times[0] <= LAYER_MAX_MS:
         fit = fit_layers(crops, threshold)
@@ -700,4 +833,326 @@ def analyze_window(
             results = _layer_results(fit, crops, np.asarray(times, dtype=float), origin, inv_scale)
             if results:
                 return results
-    return [_analyze_single(crops, times, origin=origin, inv_scale=inv_scale, threshold=threshold)]
+    single = _analyze_single(crops, times, origin=origin, inv_scale=inv_scale, threshold=threshold)
+    if single["kind"] == "nonrigid":
+        bodies = _multibody(crops, times, origin, inv_scale, threshold)
+        if bodies:
+            return bodies
+    return [single]
+
+
+def _multibody(crops: list[np.ndarray], times, origin, inv_scale: float, threshold: int) -> list[dict] | None:
+    """一块区域里有几个已存在的元素各自平移（列表重排、两项对调）。
+
+    单个相似变换解释不了这种情况，原先只能报 nonrigid。这里把特征点从首帧一路跟到末帧，
+    按整条位移轨迹聚类：轨迹逐帧一致的点属于同一个元素。每一类单独报一个平移片段。
+    只处理平移；任何一类点数太少、或几类加起来解释不了大部分运动点，就放弃。
+    """
+    n = len(crops)
+    t = np.asarray(times, dtype=float)
+    grays = [to_gray(c) for c in crops]
+    moving = np.zeros(grays[0].shape, np.uint8)
+    for k in range(n - 1):
+        moving |= (cv2.absdiff(grays[k], grays[k + 1]) > max(4, threshold // 2)).astype(np.uint8)
+    moving = cv2.dilate(moving, np.ones((9, 9), np.uint8))
+    start = cv2.goodFeaturesToTrack(grays[0], 400, 0.01, 3, mask=moving * 255)
+    if start is None or len(start) < 16:
+        return None
+    pts = start.reshape(-1, 2).astype(np.float32)
+    path = np.full((n, len(pts), 2), np.nan, np.float32)
+    path[0] = pts
+    alive = np.ones(len(pts), bool)
+    lost_at = np.full(len(pts), n, int)
+    for k in range(n - 1):
+        if not alive.any():
+            break
+        p0 = path[k][alive].reshape(-1, 1, 2)
+        p1, st1, _ = cv2.calcOpticalFlowPyrLK(grays[k], grays[k + 1], p0, None, **LK)
+        back, st2, _ = cv2.calcOpticalFlowPyrLK(grays[k + 1], grays[k], p1, None, **LK)
+        ok = (st1.ravel() == 1) & (st2.ravel() == 1) & (np.linalg.norm(p0.reshape(-1, 2) - back.reshape(-1, 2), axis=1) < 0.7)
+        index = np.flatnonzero(alive)
+        path[k + 1, index[ok]] = p1.reshape(-1, 2)[ok]
+        alive[index[~ok]] = False
+        lost_at[index[~ok]] = k + 1
+    # 互相交错的元素会彼此遮挡，被挡住的那个上面的点在交错时会跟丢。
+    # 只用交错之前的那段轨迹来分组：取一半运动点还活着的最后一帧
+    reach_all = np.nanmax(np.linalg.norm(path - path[0], axis=2), axis=0)
+    active = reach_all >= 2.0
+    if active.sum() < 16:
+        return None
+    horizon = int(np.sort(lost_at[active])[len(lost_at[active]) // 2])
+    keep = active & (lost_at >= horizon)
+    if horizon < 4 or keep.sum() < 16:
+        return None
+    track = path[:horizon, keep] - path[0, keep]
+    reach = np.linalg.norm(track, axis=2).max(axis=0)
+    movers = np.flatnonzero(reach >= 1.0)
+    if len(movers) < 16:
+        return None
+    left = list(movers)
+    groups = []
+    while left:
+        seed = max(left, key=lambda i: reach[i])
+        gap = np.linalg.norm(track[:, left] - track[:, [seed]], axis=2).max(axis=0)
+        members = [i for i, g in zip(left, gap) if g <= 1.5 + 0.05 * reach[seed]]
+        left = [i for i in left if i not in set(members)]
+        if len(members) >= 8:
+            groups.append(members)
+    if len(groups) < 2 or sum(len(g) for g in groups) < 0.6 * len(movers):
+        return None
+    starts = path[0, keep]
+    # 每一组用首帧里它的外接框做模板，逐帧在预测位置附近匹配，穿过遮挡
+    height, width = grays[0].shape
+    tracks = []
+    for members in groups:
+        x0, y0 = np.floor(starts[members].min(axis=0) - 4).astype(int)
+        x1, y1 = np.ceil(starts[members].max(axis=0) + 4).astype(int)
+        x0, y0, x1, y1 = max(0, x0), max(0, y0), min(width, x1), min(height, y1)
+        template = grays[0][y0:y1, x0:x1].astype(np.float32)
+        if template.size < 64 or float(template.std()) < 4:
+            return None
+        box = (x0, y0, x1, y1)
+        forward, f_score = _follow(grays, template, box, np.zeros(2), range(1, n))
+        # 末帧里在整个窗口找一次，再倒着跟回来：被遮挡的元素在交错之后能重新对上
+        whole = cv2.matchTemplate(grays[-1].astype(np.float32), template, cv2.TM_CCOEFF_NORMED)
+        _, best_end, _, (ex, ey) = cv2.minMaxLoc(np.nan_to_num(whole, nan=-1.0))
+        if best_end >= 0.9:
+            backward, b_score = _follow(grays, template, box, np.array([ex - x0, ey - y0], float), range(n - 2, -1, -1))
+            backward[-1], b_score[-1] = np.array([ex - x0, ey - y0], float), best_end
+        else:
+            backward, b_score = forward, f_score
+        use_back = b_score > f_score
+        shift = np.where(use_back[:, None], backward, forward)
+        score = np.maximum(f_score, b_score)
+        good = score >= 0.9
+        good[0] = True
+        if good.sum() < 0.6 * n:
+            return None
+        for axis in range(2):  # 两个方向都对不上的帧（真正被挡住的那几帧）按时间插值
+            shift[~good, axis] = np.interp(np.flatnonzero(~good), np.flatnonzero(good), shift[good, axis])
+        tracks.append((members, (x0, y0, x1, y1), shift))
+    results = []
+    for members, (bx0, by0, bx1, by1), shift in sorted(tracks, key=lambda item: -len(item[0])):
+        centre = np.array([(bx0 + bx1) / 2, (by0 + by1) / 2])
+        box0 = np.array([[bx0, by0], [bx1, by1]], dtype=float)
+        pos = centre + shift
+        offset = shift[-1]
+        far = shift[int(np.argmax(np.linalg.norm(shift, axis=1)))]
+        reach_body = float(np.linalg.norm(far))
+        if reach_body < 2.0:
+            continue
+        target = offset if np.linalg.norm(offset) >= 0.3 * reach_body else far
+        value = shift @ (target / np.linalg.norm(target))
+        eps = float(np.clip(0.3 / reach_body, 0.002, 0.05))
+        first, last, peak, progress, curve = _fit_channel(t, value, eps, abs(value[-1]) < 0.3 * reach_body)
+        k_to = last if peak is None else peak
+        delta = (pos[k_to] - pos[first]) * inv_scale
+        channel = {"t_start_ms": _r(t[first], 3), "t_end_ms": _r(t[last], 3), "duration_ms": _r(t[last] - t[first], 3),
+                   "easing": curve, "from": [_r((pos[first][0] + origin[0]) * inv_scale, 1), _r((pos[first][1] + origin[1]) * inv_scale, 1)],
+                   "to": [_r((pos[k_to][0] + origin[0]) * inv_scale, 1), _r((pos[k_to][1] + origin[1]) * inv_scale, 1)],
+                   "delta": [_r(delta[0], 1), _r(delta[1], 1)], "distance_px": _r(np.linalg.norm(delta), 1),
+                   "reference": "tracked_point_group"}
+        if peak is not None:
+            channel.update(pattern="out-and-back", peak_ms=_r(t[peak] - t[first], 1))
+        pad = 8
+        lo = (box0.min(axis=0) + shift.min(axis=0)) - pad
+        hi = (box0.max(axis=0) + shift.max(axis=0)) + pad
+        roi = (max(0, int(lo[0])), max(0, int(lo[1])), min(width, int(math.ceil(hi[0]))), min(height, int(math.ceil(hi[1]))))
+        keys = {first: "start", last: "end"}
+        if last - first >= 2:
+            keys.setdefault(first + int(np.argmin(np.abs(progress[first : last + 1] - 0.5))), "midpoint")
+        samples = []
+        for k in np.unique(np.linspace(first, last, min(last - first + 1, 40)).round().astype(int)):
+            samples.append({"t_ms": _r(t[k], 3), "progress": _r(progress[k], 3),
+                            "x": _r((pos[k][0] + origin[0]) * inv_scale, 1), "y": _r((pos[k][1] + origin[1]) * inv_scale, 1),
+                            "channel_progress": {"translate": _r(progress[k], 3)}})
+        results.append({
+            "luma": {"from": _r(grays[0][roi[1]:roi[3], roi[0]:roi[2]].mean(), 1), "to": _r(grays[-1][roi[1]:roi[3], roi[0]:roi[2]].mean(), 1)},
+            "notes": [f"several elements in this region move differently; {len(groups)} groups of tracked points were separated by their trajectories",
+                      "translation follows the tracked point group; the element boundary is approximate"],
+            "kind": "transform",
+            "model": "multibody",
+            "channels": {"translate": channel},
+            "dominant": "translate",
+            "confidence": "medium" if len(members) >= 20 else "low",
+            "easing": curve,
+            "samples": samples,
+            "_roi": roi,
+            "_view": {"pos": pos - np.array([roi[0], roi[1]]), "progress": progress, "start": first, "end": last,
+                      "progress_range": (first, last), "keys": sorted(keys.items())},
+        })
+        if peak is not None:
+            results[-1].update(pattern="out-and-back", peak_ms=channel["peak_ms"])
+    return results if len(results) >= 2 else None
+
+
+def _follow(grays, template, box, start, order):
+    """模板逐帧跟踪：在预测位置附近匹配，带亚像素插值。返回每帧的位移和匹配分数。"""
+    n = len(grays)
+    height, width = grays[0].shape
+    x0, y0, x1, y1 = box
+    shift = np.zeros((n, 2))
+    score = np.full(n, -1.0)
+    order = list(order)
+    previous = order[0] - 1 if order[0] > 0 and (len(order) < 2 or order[1] > order[0]) else order[0] + 1
+    step = 1 if previous < order[0] else -1
+    shift[previous] = start
+    score[previous] = 1.0
+    velocity = np.zeros(2)
+    for k in order:
+        guess = shift[k - step] + velocity
+        radius = int(max(8, 2 * np.linalg.norm(velocity) + 6))
+        gx, gy = int(round(x0 + guess[0])), int(round(y0 + guess[1]))
+        sx0, sy0 = max(0, gx - radius), max(0, gy - radius)
+        sx1, sy1 = min(width, gx + (x1 - x0) + radius), min(height, gy + (y1 - y0) + radius)
+        if sx1 - sx0 < x1 - x0 or sy1 - sy0 < y1 - y0:
+            shift[k] = guess
+            continue
+        result = np.nan_to_num(cv2.matchTemplate(grays[k][sy0:sy1, sx0:sx1].astype(np.float32), template,
+                                                 cv2.TM_CCOEFF_NORMED), nan=-1.0)
+        _, best, _, (mx, my) = cv2.minMaxLoc(result)
+        fx = fy = 0.0
+        if 0 < mx < result.shape[1] - 1:
+            a, b, c = result[my, mx - 1], result[my, mx], result[my, mx + 1]
+            fx = 0.5 * (a - c) / (a - 2 * b + c) if (a - 2 * b + c) < 0 else 0.0
+        if 0 < my < result.shape[0] - 1:
+            a, b, c = result[my - 1, mx], result[my, mx], result[my + 1, mx]
+            fy = 0.5 * (a - c) / (a - 2 * b + c) if (a - 2 * b + c) < 0 else 0.0
+        score[k] = best
+        if best < 0.9:  # 可能被挡住：按预测走，速度不更新
+            shift[k] = guess
+            continue
+        shift[k] = np.array([sx0 + mx + fx - x0, sy0 + my + fy - y0])
+        velocity = shift[k] - shift[k - step]
+    return shift, score
+
+
+def _solid_box(crops: list[np.ndarray], times, origin, inv_scale: float, threshold: int) -> dict | None:
+    """纯色块的尺寸变化：进度条变长、标签指示条边移边变宽、面板展开。
+
+    相似变换只有等比缩放，表达不了"只变宽"；图层模型和跟踪都假设元素形状不变。
+    这里直接逐帧找出那块颜色的外接框，看它四条边怎么动：一条边不动、对边在动就是从那条边长出来；
+    两条边都动但距离在变，就是边移边变宽。只接受尺寸确实变了、而且框的变化平滑连续的情况。
+    """
+    n = len(crops)
+    t = np.asarray(times, dtype=float)
+    f0, f1 = crops[0].astype(np.int16), crops[-1].astype(np.int16)
+    support = np.abs(f1 - f0).max(axis=2) > threshold
+    if support.sum() < 30:
+        return None
+    height, width = support.shape
+    near = cv2.dilate(support.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+    best = None
+    ring = np.concatenate([f0[:2].reshape(-1, 3), f0[-2:].reshape(-1, 3), f0[:, :2].reshape(-1, 3), f0[:, -2:].reshape(-1, 3)])
+    backdrop = np.median(ring, axis=0)  # 窗口边上的颜色当作背景，元素的颜色要和它不同
+    for which, frame in (("end", f1), ("start", f0)):  # 元素的颜色：变化区域里最常见的那个，先看末帧（长出来的），再看首帧（缩回去的）
+        pixels = frame[support]
+        pixels = pixels[np.abs(pixels - backdrop).max(axis=1) > 18]
+        if len(pixels) < 0.15 * support.sum():
+            continue
+        colours = (pixels // 16).astype(np.int32)
+        keys = colours[:, 0] * 256 + colours[:, 1] * 16 + colours[:, 2]
+        values, counts = np.unique(keys, return_counts=True)
+        if counts.max() < 0.3 * len(pixels):
+            continue
+        tone = np.median(pixels[keys == values[np.argmax(counts)]], axis=0)
+        boxes = []
+        for crop in crops:
+            mask = (np.abs(crop.astype(np.int16) - tone).max(axis=2) <= 18).astype(np.uint8)
+            count, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=4)
+            box = None
+            if count > 1:
+                overlap = [int(near[labels == i].sum()) if stats[i, cv2.CC_STAT_AREA] >= 6 else 0 for i in range(1, count)]
+                if max(overlap) > 0:
+                    i = 1 + int(np.argmax(overlap))
+                    x, y, w, h, area = stats[i]
+                    if area >= 0.8 * w * h or (min(w, h) <= 12 and area >= 0.6 * w * h):  # 实心的块（小块的圆角占比大）
+                        box = (x, y, x + w, y + h)
+            boxes.append(box)
+        if sum(b is not None for b in boxes) < 0.6 * n or boxes[-1 if which == "end" else 0] is None:
+            continue
+        edges = np.array([b if b is not None else (np.nan,) * 4 for b in boxes], dtype=float)
+        empty = np.isnan(edges[:, 0])
+        size = np.stack([edges[:, 2] - edges[:, 0], edges[:, 3] - edges[:, 1]], axis=1)
+        size[empty] = 0.0  # 框不存在的帧：长度还是 0
+        change = np.abs(size - size[0]).max(axis=0)
+        span = float(change.max())
+        if span < 3 or span < 0.05 * max(1.0, float(size.max())):
+            continue
+        axis = int(np.argmax(change))
+        if float(change[1 - axis]) > max(2.0, 0.1 * span):  # 两个方向一起变是缩放，交给跟踪
+            continue
+        if float(np.abs(np.diff(size[:, axis])).max()) > 0.35 * span:  # 一帧跳变太大：是淡入或突变，不是长出来
+            continue
+        known = edges[~empty]
+        limit = (width, height)[axis]
+        if (known[:, axis] <= 1).any() or (known[:, axis + 2] >= limit - 1).any():  # 被窗口边裁掉的"变短"不算
+            continue
+        best = (edges, size, axis, empty)
+        break
+    if best is None:
+        return None
+    edges, size, axis, empty = best
+    seen = np.flatnonzero(~empty)
+    for column in range(4):  # 不存在的帧用看得见的帧补全
+        values = edges[:, column]
+        values[empty] = np.interp(np.flatnonzero(empty), seen, values[seen])
+    lo, hi = (0, 2) if axis == 0 else (1, 3)
+    moved = np.abs(edges - edges[seen[0]]).max(axis=0)
+    fixed = lo if moved[lo] <= moved[hi] else hi
+    size[empty, 1 - axis] = np.interp(np.flatnonzero(empty), seen, size[seen, 1 - axis])
+    centre = np.stack([(edges[:, 0] + edges[:, 2]) / 2, (edges[:, 1] + edges[:, 3]) / 2], axis=1)
+    centre[empty, axis] = edges[empty, fixed]  # 0 尺寸的帧：中心落在固定边上
+    value = size[:, axis] - size[0, axis]
+    eps = float(np.clip(0.3 / max(abs(float(value[-1])), 1e-6), 0.002, 0.05))
+    first, last, _, progress, curve = _fit_channel(t, value, eps, False)
+    if curve is None:
+        return None
+    s = inv_scale
+    anchored = min(moved[lo], moved[hi]) <= 1.0
+    channels = {"size": {"t_start_ms": _r(t[first], 3), "t_end_ms": _r(t[last], 3), "duration_ms": _r(t[last] - t[first], 3),
+                         "easing": curve, "width_from": _r(size[first, 0] * s, 1), "width_to": _r(size[last, 0] * s, 1),
+                         "height_from": _r(size[first, 1] * s, 1), "height_to": _r(size[last, 1] * s, 1),
+                         "anchor": ["left", "top", "right", "bottom"][fixed] if anchored else "none",
+                         "reference": "solid_colour_box"}}
+    shift = centre[last] - centre[first]
+    if not anchored and float(np.linalg.norm(shift)) >= 2:  # 两条边都在动：同时有位移
+        direction = shift / np.linalg.norm(shift)
+        travel = (centre - centre[first]) @ direction
+        a, b, _, move_progress, c2 = _fit_channel(t, travel, float(np.clip(0.3 / max(abs(float(travel[-1])), 1e-6), 0.002, 0.05)), False)
+        channels["translate"] = {"t_start_ms": _r(t[a], 3), "t_end_ms": _r(t[b], 3), "duration_ms": _r(t[b] - t[a], 3),
+                                 "easing": c2, "from": [_r((centre[first][0] + origin[0]) * s, 1), _r((centre[first][1] + origin[1]) * s, 1)],
+                                 "to": [_r((centre[last][0] + origin[0]) * s, 1), _r((centre[last][1] + origin[1]) * s, 1)],
+                                 "delta": [_r(shift[0] * s, 1), _r(shift[1] * s, 1)], "distance_px": _r(np.linalg.norm(shift) * s, 1),
+                                 "reference": "solid_colour_box_center"}
+    pad = 4
+    x0 = max(0, int(np.floor(edges[:, 0].min())) - pad)
+    y0 = max(0, int(np.floor(edges[:, 1].min())) - pad)
+    x1 = min(width, int(np.ceil(edges[:, 2].max())) + pad)
+    y1 = min(height, int(np.ceil(edges[:, 3].max())) + pad)
+    keys = {first: "start", last: "end"}
+    if last - first >= 2:
+        keys.setdefault(first + int(np.argmin(np.abs(progress[first : last + 1] - 0.5))), "midpoint")
+    samples = []
+    for k in np.unique(np.linspace(first, last, min(last - first + 1, 40)).round().astype(int)):
+        row = {"t_ms": _r(t[k], 3), "progress": _r(progress[k], 3), "x": _r((centre[k][0] + origin[0]) * s, 1),
+               "y": _r((centre[k][1] + origin[1]) * s, 1), "width": _r(size[k, 0] * s, 1), "height": _r(size[k, 1] * s, 1),
+               "channel_progress": {"size": _r(progress[k], 3)}}
+        if "translate" in channels:
+            row["channel_progress"]["translate"] = _r(move_progress[k], 3)
+        samples.append(row)
+    grays = (to_gray(crops[0]), to_gray(crops[-1]))
+    return {
+        "luma": {"from": _r(grays[0][y0:y1, x0:x1].mean(), 1), "to": _r(grays[1][y0:y1, x0:x1].mean(), 1)},
+        "notes": ["a solid-coloured box changes size; edges are measured on the box of that colour, frame by frame"],
+        "kind": "transform",
+        "model": "solid-box",
+        "channels": channels,
+        "dominant": "size",
+        "confidence": "high" if len(seen) >= 0.8 * n and curve["rmse"] < 0.03 else "medium",
+        "easing": curve,
+        "samples": samples,
+        "_roi": (x0, y0, x1, y1),
+        "_view": {"pos": centre - np.array([x0, y0]), "progress": progress, "start": first, "end": last,
+                  "progress_range": (first, last), "keys": sorted(keys.items())},
+    }

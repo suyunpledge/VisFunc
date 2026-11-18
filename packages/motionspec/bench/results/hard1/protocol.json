@@ -1,0 +1,312 @@
+{
+  "truth": {
+    "modal-open": [
+      {
+        "element": "dim overlay",
+        "start": 166.7,
+        "duration": 200,
+        "dx": [
+          0,
+          0
+        ],
+        "dy": [
+          0,
+          0
+        ],
+        "dw": 0,
+        "dh": 0,
+        "opacity": "fade-in",
+        "color": "no",
+        "easing": "linear"
+      },
+      {
+        "element": "dialog",
+        "start": 166.7,
+        "duration": 250,
+        "dx": [
+          0,
+          0
+        ],
+        "dy": [
+          -24,
+          -24
+        ],
+        "dw": 0,
+        "dh": 0,
+        "opacity": "fade-in",
+        "color": "no",
+        "easing": "ease-out"
+      }
+    ],
+    "accordion": [
+      {
+        "element": "expanding panel",
+        "start": 166.7,
+        "duration": 300,
+        "dx": [
+          0,
+          0
+        ],
+        "dy": [
+          0,
+          0
+        ],
+        "dw": 0,
+        "dh": 270,
+        "opacity": "none",
+        "color": "no",
+        "easing": "ease-out"
+      },
+      {
+        "element": "rows below",
+        "start": 166.7,
+        "duration": 300,
+        "dx": [
+          0,
+          0
+        ],
+        "dy": [
+          270,
+          270
+        ],
+        "dw": 0,
+        "dh": 0,
+        "opacity": "none",
+        "color": "no",
+        "easing": "ease-out"
+      }
+    ],
+    "sidebar-collapse": [
+      {
+        "element": "sidebar",
+        "start": 166.7,
+        "duration": 300,
+        "dx": [
+          0,
+          0
+        ],
+        "dy": [
+          0,
+          0
+        ],
+        "dw": -234,
+        "dh": 0,
+        "opacity": "none",
+        "color": "no",
+        "easing": "ease-in-out"
+      },
+      {
+        "element": "content",
+        "start": 166.7,
+        "duration": 300,
+        "dx": [
+          -234,
+          -234
+        ],
+        "dy": [
+          0,
+          0
+        ],
+        "dw": 0,
+        "dh": 0,
+        "opacity": "none",
+        "color": "no",
+        "easing": "ease-in-out"
+      }
+    ],
+    "scroll": [
+      {
+        "element": "list",
+        "start": 166.7,
+        "duration": 250,
+        "dx": [
+          0,
+          0
+        ],
+        "dy": [
+          -180,
+          -180
+        ],
+        "dw": 0,
+        "dh": 0,
+        "opacity": "none",
+        "color": "no",
+        "easing": "ease-out"
+      }
+    ],
+    "tab-indicator": [
+      {
+        "element": "indicator",
+        "start": 166.7,
+        "duration": 250,
+        "dx": [
+          180,
+          225
+        ],
+        "dy": [
+          0,
+          0
+        ],
+        "dw": 45,
+        "dh": 0,
+        "opacity": "none",
+        "color": "no",
+        "easing": "ease-out"
+      }
+    ],
+    "reorder-swap": [
+      {
+        "element": "row moving down",
+        "start": 166.7,
+        "duration": 300,
+        "dx": [
+          0,
+          0
+        ],
+        "dy": [
+          75,
+          75
+        ],
+        "dw": 0,
+        "dh": 0,
+        "opacity": "none",
+        "color": "no",
+        "easing": "ease-in-out"
+      },
+      {
+        "element": "row moving up",
+        "start": 166.7,
+        "duration": 300,
+        "dx": [
+          0,
+          0
+        ],
+        "dy": [
+          -75,
+          -75
+        ],
+        "dw": 0,
+        "dh": 0,
+        "opacity": "none",
+        "color": "no",
+        "easing": "ease-in-out"
+      }
+    ],
+    "overshoot": [
+      {
+        "element": "card",
+        "start": 166.7,
+        "duration": 400,
+        "dx": [
+          0,
+          0
+        ],
+        "dy": [
+          -90,
+          -90
+        ],
+        "dw": 0,
+        "dh": 0,
+        "opacity": "none",
+        "color": "no",
+        "easing": "overshoot"
+      }
+    ],
+    "button-color": [
+      {
+        "element": "button",
+        "start": 166.7,
+        "duration": 200,
+        "dx": [
+          0,
+          0
+        ],
+        "dy": [
+          0,
+          0
+        ],
+        "dw": 0,
+        "dh": 0,
+        "opacity": "none",
+        "color": "yes",
+        "easing": "linear"
+      }
+    ],
+    "progress": [
+      {
+        "element": "progress fill",
+        "start": 166.7,
+        "duration": 600,
+        "dx": [
+          0,
+          0
+        ],
+        "dy": [
+          0,
+          0
+        ],
+        "dw": 600,
+        "dh": 0,
+        "opacity": "none",
+        "color": "no",
+        "easing": "linear"
+      }
+    ]
+  },
+  "question": "This is a screen recording of a desktop application: {width}x{height} pixels, {duration} ms long, 60 frames per second.\nList every UI animation in it, one entry per animated element (elements that only move because their parent moves are not separate entries).\n\nReply with JSON only, in exactly this shape:\n{{\"animations\": [{{\"element\": \"<short description>\", \"start_ms\": <number>, \"duration_ms\": <number>,\n  \"dx_px\": <number>, \"dy_px\": <number>, \"dw_px\": <number>, \"dh_px\": <number>,\n  \"opacity_change\": \"fade-in|fade-out|none\", \"color_change\": \"yes|no\",\n  \"easing\": \"linear|ease-in|ease-out|ease-in-out|overshoot\"}}]}}\n\nDefinitions:\n- start_ms from the start of the recording; duration_ms is the designed duration of the animation.\n- dx_px, dy_px: how far the element moves (right and down are positive). An element that only grows or shrinks from a fixed edge does not move: use 0.\n- dw_px, dh_px: change of the element's width and height (positive = grows). 0 if its size does not change.\n- opacity_change: a translucent overlay that darkens the window counts as fade-in.\n- color_change: yes if the element changes colour without fading in or out.\n- easing: overshoot = goes past its final position and settles back.\nAll distances are in pixels of this recording.\n{extra}",
+  "extra": {
+    "video": "",
+    "video+vision-old": "- A motion analysis of this same recording follows, made by a tool that tracks pixels frame by frame. Use it together with the recording.\n",
+    "video+vision": "- A motion analysis of this same recording follows, made by a tool that tracks pixels frame by frame. Use it together with the recording.\n",
+    "video+probe": "- A trace of this same recording follows, read directly from the application's widget properties while it was recorded. Use it together with the recording.\n"
+  },
+  "conditions": [
+    "video",
+    "video+vision-old",
+    "video+vision",
+    "video+probe"
+  ],
+  "models": [
+    [
+      "mimo-v2.6-flash",
+      "mimo-v2.6-flash"
+    ],
+    [
+      "mimo-v2.6-pro",
+      "mimo-v2.6-pro"
+    ],
+    [
+      "seed-2.1-turbo",
+      "doubao-seed-2-1-turbo-260628"
+    ],
+    [
+      "seed-2.1-pro",
+      "doubao-seed-2-1-pro-260915"
+    ],
+    [
+      "gpt-6.1-sol",
+      "gpt-6.1-sol"
+    ],
+    [
+      "gpt-6.1-terra",
+      "gpt-6.1-terra"
+    ]
+  ],
+  "slots": {
+    "mimo-v2.6-flash": "^custom__46f49f87-ec66-44_a58d1f$",
+    "mimo-v2.6-pro": "^custom__242d3471-9f5e-4d_4653e1$",
+    "seed-2.1-turbo": "^custom__b3840c88-b73d-49_c19412$",
+    "seed-2.1-pro": "^custom__b3840c88-b73d-49_c19412$",
+    "gpt-6.1-sol": "^custom__78dbc0dd-ae0b-40_77edc2$",
+    "gpt-6.1-terra": "^custom__78dbc0dd-ae0b-40_77edc2$"
+  },
+  "fields": [
+    "start",
+    "duration",
+    "move",
+    "size",
+    "opacity",
+    "color",
+    "easing"
+  ]
+}

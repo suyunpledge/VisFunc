@@ -112,5 +112,28 @@ def normalize_trace(trace: dict) -> dict:
             if type(tick) is not int or not last_event < tick < len(ticks):
                 raise ValueError("lifecycle ticks must be ordered and in bounds")
             last_event = tick
+        props = element.get("props", {})
+        if not isinstance(props, dict) or len(props) > 16:
+            raise ValueError("trace props must map up to 16 property names to rows")
+        for name, prop_rows in props.items():
+            if type(name) is not str or not name or len(name) > 64:
+                raise ValueError("trace property names must be short nonempty strings")
+            if not isinstance(prop_rows, list) or not prop_rows:
+                raise ValueError("trace property rows must be nonempty")
+            total += len(prop_rows)
+            if total > MAX_ROWS:
+                raise ValueError("trace exceeds the row budget")
+            width = 5 if name == "color" else 2
+            last_tick = -1
+            for row in prop_rows:
+                if not isinstance(row, list) or len(row) != width:
+                    raise ValueError(f"trace property {name!r} rows must have {width} values")
+                if type(row[0]) is not int or not last_tick < row[0] < len(ticks):
+                    raise ValueError("trace property ticks must be in bounds and strictly increasing")
+                last_tick = row[0]
+                for value in row[1:]:
+                    _number(value, name)
+                if name == "color" and not all(0 <= v <= 1 for v in row[1:]):
+                    raise ValueError("colour components must lie in 0..1")
         normalized.append({**element, "fields": list(FIELDS), "rows": canonical})
     return {**trace, "device_pixel_ratio": ratio, "elements": normalized}

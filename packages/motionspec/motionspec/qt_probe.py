@@ -28,6 +28,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import time
 
 SCHEMA = "motionspec-trace/0.1"
@@ -69,10 +70,55 @@ def _snapshot(obj) -> tuple | None:
         opacity = effect.opacity() if effect is not None and hasattr(effect, "opacity") else 1.0
         if window is obj:
             opacity *= obj.windowOpacity()
+        # 只看元素自己的可见性：父级隐藏导致的"不可见"属于父级，不应在每个子元素上各报一次
+        parent = obj.parentWidget()
+        shown = obj.isVisibleTo(parent) if parent is not None else obj.isVisible()
         return (float(obj.x()), float(obj.y()), float(obj.width()), float(obj.height()), float(opacity), 1.0, 0.0,
-                1.0 if obj.isVisible() else 0.0, float(origin.x()), float(origin.y()))
+                1.0 if shown else 0.0, float(origin.x()), float(origin.y()))
     except RuntimeError:  # 对象已被销毁
         return None
+
+
+_BACKGROUND = re.compile(r"background(?:-color)?\s*:\s*(#[0-9a-fA-F]{6}|rgba?\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*(?:,\s*[\d.]+\s*)?\))")
+
+
+def _colour_of(obj) -> tuple | None:
+    """元素自身的颜色（0~1 的 r, g, b, a）。QML 读 color 属性；控件读样式表里的背景色。"""
+    try:
+        if _is_item(obj):
+            value = obj.property("color")
+            if value is not None and hasattr(value, "redF") and value.isValid():
+                return (round(value.redF(), 4), round(value.greenF(), 4), round(value.blueF(), 4), round(value.alphaF(), 4))
+            return None
+        sheet = obj.styleSheet() if hasattr(obj, "styleSheet") else ""
+        match = _BACKGROUND.search(sheet or "")
+        if not match:
+            return None
+        text = match.group(1)
+        if text.startswith("#"):
+            r, g, b = (int(text[i : i + 2], 16) / 255 for i in (1, 3, 5))
+            return (round(r, 4), round(g, 4), round(b, 4), 1.0)
+        parts = [float(v) for v in re.findall(r"[\d.]+", text)]
+        alpha = parts[3] if len(parts) > 3 else 1.0
+        return (round(parts[0] / 255, 4), round(parts[1] / 255, 4), round(parts[2] / 255, 4), round(alpha if alpha <= 1 else alpha / 255, 4))
+    except (RuntimeError, ValueError, IndexError):
+        return None
+
+
+def _extras(obj, names: tuple[str, ...]) -> dict:
+    """颜色和指定的数值属性（例如 QML 里的 hoverAmount）。读不到的跳过。"""
+    out = {}
+    colour = _colour_of(obj)
+    if colour is not None:
+        out["color"] = colour
+    for name in names:
+        try:
+            value = obj.property(name)
+        except RuntimeError:
+            continue
+        if type(value) in (int, float) and math.isfinite(value):
+            out[name] = (float(value),)
+    return out
 
 
 def _describe(obj) -> dict:
@@ -99,9 +145,17 @@ class Recorder:
     只在值变化时存一行，外加变化前最后一帧和变化后第一帧，所以静止的界面几乎不占空间。
     """
 
-    def __init__(self, roots=None, *, max_elements: int = 20000, frame_ms: float = 1000.0 / 60):
+    def __init__(self, roots=None, *, max_elements: int = 20000, frame_ms: float = 1000.0 / 60,
+                 properties: tuple[str, ...] | list[str] = ()):
         if type(max_elements) is not int or max_elements < 1 or not math.isfinite(frame_ms) or frame_ms <= 0:
             raise ValueError("invalid recorder element budget or frame interval")
+        if not isinstance(properties, (tuple, list)):
+            raise ValueError("properties must be a list or tuple of names")
+        names = tuple(properties)
+        if (len(names) > 15 or any(type(n) is not str or not n or len(n) > 64 or n == "color" for n in names)
+                or len(set(names)) != len(names)):
+            raise ValueError("properties must be up to 15 property names (color is recorded automatically)")
+        self._properties = names
         self._roots = list(roots) if roots is not None else None
         self._max = max_elements
         self.frame_ms = frame_ms  # 一帧的名义时长，用来识别"隔了很久才来的一帧"
@@ -207,8 +261,21 @@ class Recorder:
                 entry = self._elements[identity] = {"info": _describe(obj), "last": values, "last_tick": tick,
                                                    "stored": tick if tick else -1, "settle": False,
                                                    "rows": [[tick, *values]] if tick else [],
-                                                   "events": [{"tick": tick, "kind": "appeared"}] if tick else []}
+                                                   "events": [{"tick": tick, "kind": "appeared"}] if tick else [],
+                                                   "props": {name: {"last": value, "stored": -1, "settle": False, "rows": []}
+                                                             for name, value in _extras(obj, self._properties).items()}}
                 continue
+            for name, value in _extras(obj, self._properties).items():  # 颜色和自定义属性，记法和几何属性一样
+                prop = entry["props"].setdefault(name, {"last": value, "stored": -1, "settle": False, "rows": []})
+                if value != prop["last"]:
+                    if prop["stored"] != tick - 1:
+                        prop["rows"].append([tick - 1, *prop["last"]])
+                    prop["rows"].append([tick, *value])
+                    prop["stored"], prop["settle"] = tick, True
+                elif prop["settle"]:
+                    prop["rows"].append([tick, *value])
+                    prop["stored"], prop["settle"] = tick, False
+                prop["last"] = value
             # 只看元素自己的属性。窗口内的绝对位置会随父级一起变，那是父级的动效，不是它的
             if values[:LOCAL] != entry["last"][:LOCAL]:
                 if entry["info"] is None:
@@ -265,9 +332,14 @@ class Recorder:
     def trace(self) -> dict:
         elements = []
         for key, entry in self._elements.items():
-            if entry["rows"]:
-                elements.append({"id": key, **(entry["info"] or {}), "fields": ["tick", *FIELDS],
-                                 "rows": entry["rows"], "events": entry["events"]})
+            props = {name: prop["rows"] for name, prop in entry.get("props", {}).items() if prop["rows"]}
+            rows = entry["rows"] or ([[entry["last_tick"], *entry["last"]]] if props else [])
+            if rows:
+                element = {"id": key, **(entry["info"] or {}), "fields": ["tick", *FIELDS], "rows": rows,
+                           "events": entry["events"]}
+                if props:
+                    element["props"] = props
+                elements.append(element)
         return {
             "schema": SCHEMA,
             "title": self._title,
@@ -293,7 +365,8 @@ def attach_from_env(variable: str = "MOTIONSPEC_TRACE") -> Recorder | None:
         from PySide6.QtCore import QCoreApplication, QTimer
     except ImportError:
         from PyQt6.QtCore import QCoreApplication, QTimer
-    recorder = Recorder()
+    names = tuple(n for n in os.environ.get("MOTIONSPEC_PROPS", "").replace(" ", "").split(",") if n)
+    recorder = Recorder(properties=names)
 
     def finish() -> None:
         recorder.stop()

@@ -15,7 +15,8 @@ NUMERIC_CHANNELS = {"translate": ("distance_px",), "scale": ("from", "to", "peak
                     "rotate": ("from_deg", "to_deg"), "blend": ("mean_abs_delta", "residual"),
                     "change": ("mean_abs_delta",), "appearance": ("luma_min", "luma_max"),
                     "opacity": ("from", "to"),
-                    "size": ("width_from", "width_to", "height_from", "height_to")}
+                    "size": ("width_from", "width_to", "height_from", "height_to"),
+                    "color": ("distance",), "property": ("from", "to")}
 
 
 def finite(value) -> bool:
@@ -131,6 +132,13 @@ def validate(spec: dict) -> list[str]:
                         or any(not finite(channel.get(k)) for k in NUMERIC_CHANNELS[name])
                         or (name == "translate" and not all(_vector(channel.get(k), 2) for k in ("from", "to", "delta")))
                         or (name == "translate" and not _number(channel["distance_px"]))
+                        or (name == "color" and (
+                            not _number(channel["distance"])
+                            or not all(_vector(channel.get(k), 4, lambda v: finite(v) and 0 <= v <= 1)
+                                       for k in ("from", "to"))))
+                        or (name == "property" and (
+                            not isinstance(channel.get("name"), str)
+                            or not 1 <= len(channel["name"]) <= 64))
                         or (name == "scale" and (
                             channel["peak"] <= 0
                             or any(channel[k] < 0 for k in ("from", "to"))
@@ -151,6 +159,29 @@ def validate(spec: dict) -> list[str]:
         notes = seg.get("notes", [])
         if not isinstance(notes, list) or not all(isinstance(note, str) for note in notes):
             problems.append(f"{where} notes must be a list of strings")
+    groups = spec.get("motion_groups", [])
+    if not isinstance(groups, list) or len(groups) > len(segments):
+        problems.append("invalid motion associations")
+    else:
+        group_ids, membership = set(), {}
+        for group in groups:
+            if not isinstance(group, dict):
+                problems.append("invalid motion association")
+                continue
+            gid, ids = group.get("id"), group.get("segment_ids")
+            if (not isinstance(gid, str) or not gid or gid in group_ids
+                    or group.get("relation") != "equivalent_sampled_motion"
+                    or not isinstance(ids, list) or len(ids) < 2
+                    or any(not isinstance(sid, str) or sid not in seen or sid in membership for sid in ids)
+                    or len(set(ids)) != len(ids)):
+                problems.append("invalid or repeated motion association members")
+                continue
+            group_ids.add(gid)
+            membership.update({sid: gid for sid in ids})
+        for seg in segments:
+            if (isinstance(seg, dict) and isinstance(seg.get("id"), str)
+                    and seg.get("motion_group") != membership.get(seg["id"])):
+                problems.append("segment motion association disagrees with group membership")
     if "coverage" in spec:
         coverage = spec["coverage"]
         if not isinstance(coverage, dict) or any(type(coverage.get(k)) is not int or coverage[k] < 0
@@ -171,7 +202,8 @@ def validate(spec: dict) -> list[str]:
     if "function_evidence" in spec:
         functions = spec["function_evidence"]
         if (not isinstance(functions, dict) or functions.get("manifest") != "functions.json"
-                or functions.get("version") != "svsg.video-functions/1"
+                or functions.get("version") != ("svsg.probe-functions/1" if source.get("timestamps") == "probe"
+                                                 else "svsg.video-functions/1")
                 or not isinstance(functions.get("sequence_id"), str)
                 or not isinstance(functions.get("sha256"), str)
                 or re.fullmatch(r"[a-f0-9]{64}", functions["sha256"]) is None
@@ -218,6 +250,13 @@ def describe_change(seg: dict) -> str:
     if "size" in ch:
         box = ch["size"]
         parts.append(f"size {box['width_from']:g}x{box['height_from']:g} -> {box['width_to']:g}x{box['height_to']:g}")
+    if "color" in ch:
+        a, b = ch["color"]["from"], ch["color"]["to"]
+        parts.append("colour rgb({},{},{}) -> rgb({},{},{})".format(*(round(v * 255) for v in a[:3] + b[:3])))
+        if a[3] != b[3]:
+            parts.append(f"colour alpha {a[3]:g} -> {b[3]:g}")
+    if "property" in ch:
+        parts.append(f"property {ch['property']['name']} {ch['property']['from']:g} -> {ch['property']['to']:g}")
     if "opacity" in ch:
         fade = ch["opacity"]
         text = f"opacity {fade['from']:g} -> {fade['to']:g}"
@@ -304,9 +343,13 @@ def summarize(spec: dict) -> str:
         ]
         for seg in spec["segments"]:
             lines.append(f"- {seg['id']}: region {seg['region']}" + (f", sheet `{seg['sheet']}`" if seg.get("sheet") else "")
-                         + describe_element(seg.get("element")))
+                         + describe_element(seg.get("element"))
+                         + (f" (+{len(seg['members']) - 1} more moving the same way)" if seg.get("members") else ""))
             for note in seg["notes"]:
                 lines.append(f"  - {note}")
+    for group in spec.get("motion_groups", []):
+        lines.append(f"\nMotion association {group['id']}: {', '.join(group['segment_ids'])}. "
+                     "Each member retains its own coordinates and element identity.")
     if spec.get("ambient"):
         lines.append("\nContinuously changing regions (animated backdrop, video, spinner). They are not analysed "
                      "as motion, and changes drawn on top of them cannot be isolated:")
