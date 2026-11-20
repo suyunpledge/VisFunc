@@ -1,116 +1,245 @@
-# motionspec
+# VisFunc-Motion
 
-从录屏测量 2D 界面动效，输出时间、坐标、曲线和可追溯的原始关键帧。
+English · [中文](README.zh.md) · [Back to VisFunc](../../README.md)
 
-本项目位于 SVSG + MotionSpec 单仓库的 `packages/motionspec/`。
-仓库总览和统一安装见 [根 README](../../README.md)，共享协议见
-[视频函数说明](../../docs/video-functions.md)。以下未注明位置的独立项目命令在本目录运行。
+VisFunc-Motion measures animation in a screen recording of a user interface: which element moves, when it starts, how far it
+goes, how its size and opacity change, and which easing curve it follows. If the target is your own Qt app, it can skip the
+recording and read widget properties every frame instead. The result is a numeric spec, a one-page summary and a few annotated
+images, which can go to a model together with the original footage, or be exported as functions that can be queried by time.
 
-数值规格可以和原始画面一起交给模型，用于回答与时间和运动有关的问题。
+The code is in `packages/motionspec/`; the Python package and command are `motionspec`. It depends only on numpy and
+opencv-python; exporting functions also needs [VisFunc-Image](../../svsg/README.md) from the same repository.
 
 ```
-视频 ──> 哪里在动、何时动 ──> 怎么动（位移/缩放/旋转/淡入淡出）──> 缓动曲线 ──> spec.json + summary.md + 标注图
+recording ─▶ where and when things change ─▶ how (move, scale, rotate, size, opacity) ─▶ easing curves ─▶ spec.json, summary.md, sheets, functions
 ```
 
-## 安装与使用
+## Install and use
+
+In this directory:
 
 ```bash
 pip install -e .
 ```
 
 ```bash
-motionspec analyze 录屏.mp4 -o out/
+motionspec analyze recording.mp4 -o out/
 ```
 
 ```bash
 motionspec demo -o demo/
 ```
 
-Python 里：
+Install VisFunc-Image as well, from the repository root, to export and query functions:
+
+```bash
+python -m pip install -e ".[functions]" -e "./packages/motionspec"
+motionspec analyze clip.mp4 -o out --functions --evidence-every-ms 500
+motionspec query out/functions.json --list
+```
+
+From Python:
 
 ```python
 from motionspec import analyze, check
 
-spec = analyze("clip.mp4", "out/")          # 也接受图片目录或内存里的帧列表
+spec = analyze("clip.mp4", "out/")   # also accepts a directory of images or a list of frames in memory
 verdict = check(spec, [{"segment": "s1", "field": "easing", "value": "ease-out"}])
 ```
 
-常用参数：`--start` / `--end`（秒）截取时间段，`--max-dim` 分析分辨率（默认最长边 960），
-`--min-area` 忽略更小的变化，`--max-segments` 最多保留几个片段。
-输入图片目录时必须指定 `--fps`，帧按文件名自然排序，例如 `1.png`、`2.png`、`10.png`。
-`--max-frames` 限制所选区间的帧数，`--max-crop-mb` 限制同一次任务并行缓存的裁剪帧（默认 150 MB）。
-窗口重叠且无法共用预算时，会分批重读输入。裁剪缓存限额不包含解码器、拟合工作区和 Python 内存。
+Common options:
 
-## 输出
-
-| 文件 | 给谁看 | 内容 |
-|---|---|---|
-| `summary.md` | AI，首先读这个 | 每个片段一行：时间、时长、类型、变化量、缓动、置信度 |
-| `spec.json` | 程序 | 格式版本 `motionspec/0.1`，每个片段最多 40 个采样点，记录被过滤或截短的范围 |
-| `s1.png` … | AI，需要看图时 | 关键帧并排 + 轨迹线 + 实测点与拟合曲线对比 |
-| `overview.png` | AI | 首帧上标出各片段所在区域 |
-| `frame-<帧号>-<SHA-256>.png` | AI 或其他视觉系统 | 原分辨率的解码帧，含所选范围首尾及片段关键帧。`evidence_frames` 提供源帧号、毫秒时间戳、用途和 SHA-256 |
-
-即使没有检测到片段，也会保留所选范围的首尾帧。用 `--no-sheets` 关闭标注图，用 `--no-raw-frames` 关闭原分辨率帧。自动处理时以本次 `spec.json` 中引用的文件为准。
-
-片段有四种类型：
-
-| 类型 | 含义 | 给出的数值 |
-|---|---|---|
-| `transform` | 一个元素在移动、缩放、旋转或改变宽高，可同时改变透明度 | 位移、均匀缩放、旋转、宽高、透明度，各通道有独立的时段和拟合 |
-| `fade` | 画面近似首尾帧的混合 | 时长和混合进度曲线，可对应透明度或颜色过渡 |
-| `instant` | 一帧内完成的突变 | 发生时刻 |
-| `nonrigid` | 以上都解释不了：辉光、模糊、粒子、3D 画面 | 只有亮度范围、周期等统计量，置信度恒为 low |
-
-缓动给三种说法：自由拟合的 `cubic-bezier(...)`；有回弹时的弹簧参数（阻尼比、角频率）；
-以及最接近的命名曲线和它对应的时长，例如 "out-cubic over 400 ms"。
-
-`transform` 内部有几条测量路径，结果里用 `model` 字段区分：
-
-- **跟踪**（无 `model` 字段）：元素在首尾两帧里都存在，只是换了位置或大小。用特征点光流测量。
-- **图层**（`"model": "layer"`）：进入或退出，即元素一边移动或缩放、一边淡入淡出。
-  把首尾两帧中没有该元素的一帧当背景，每一帧解成"背景 + 透明度 × 变换后的元素"，
-  同时得到位移、缩放、透明度三条曲线。同一区域里依次进入的多个元素会拆成各自的片段。
-  本来就在、只是挪了位置的元素（包括纹理很少的纯色卡片）不走这条路。
-- **多体**（`"model": "multibody"`）：一块区域里几个已存在的元素各自平移（列表重排、两项对调）。
-  特征点按整条轨迹分组，每组用模板前后双向跟踪，穿过互相遮挡的那几帧；被完全挡住的帧按时间插值。
-- **纯色块**（`"model": "solid-box"`）：只沿一个方向改变尺寸的纯色块（进度条、标签指示条）。
-  逐帧找出那块颜色的外接框，`size` 通道给出宽高的起止值，`anchor` 说明从哪条边长出来；
-  两条边都在动时另给 `translate`（框中心的位移）。
-
-整个窗口按同一条曲线变暗或变色、上面又有元素在动时（模态框的遮罩加对话框），
-先把遮罩部分作为一个 `fade` 片段单独报，再把遮罩的变化从每个像素里减掉，测上面的元素。
-这类片段带 "dimming" 备注。
-
-图层路径要处理一个光流处理不了的问题：透明度为 0 的那一端，元素的位置看不见。有两种补法，
-通道里的字段会说明用了哪一种：
-
-| 字段 | 含义 |
+| Option | Effect |
 |---|---|
-| `follows_opacity: true` | 位移与 (1 − 透明度) 成正比，两者共用一条曲线，看不见那端的位置由这个比例直接得出 |
-| `extrapolated: true` | 两者曲线不同，看不见的部分不超过全程三成，由拟合曲线外推 |
-| `lower_bound: true` | 看不见的部分太多，只报看得见的距离，真实值不小于它 |
-| `visible_distance_px` | 实际量到的那一段距离 |
+| `--start`, `--end` | analyse only this time range (seconds) |
+| `--fps` | required for a directory of images; files are sorted naturally, `1.png`, `2.png`, `10.png` |
+| `--max-dim` | longest side used for analysis, default 960 |
+| `--min-area`, `--max-segments` | ignore smaller changes; keep at most this many segments |
+| `--ambient-ms` | how long a region must keep changing to count as ambient, default 3000; 0 turns it off |
+| `--max-frames`, `--max-crop-mb` | frame limit for the selected range; crop cache limit, default 150 MB |
+| `--no-sheets`, `--no-raw-frames` | skip the annotated images; skip the source-resolution evidence frames |
+| `--functions`, `--evidence-every-ms`, `--function-max-frames` | export functions; add evidence frames at a fixed interval; frame limit for the function bundle |
 
-透明度是相对"完整显示那一帧"的比例：真实不透明度从 0 到 0.8 的元素，这里读出来是 0 到 1。
+## Output
 
-`spec.json` 里的 `ambient` 列出**持续变化的区域**（动态背景、视频、转圈、闪烁的光标）：
-连续活动超过 3 秒（中间停顿不超过 0.6 秒）的格子不参与片段检测。否则它们会把时空上相邻的变化
-全连成一个贯穿全片的候选。可用 `--ambient-ms` 调整时长，设为 0 关闭。
+| File | Contents |
+|---|---|
+| `summary.md` | one row per segment: visible change, estimated design timing, kind, change, easing, confidence. Read this first |
+| `spec.json` | the full spec, `motionspec/0.1`, with up to 40 samples per segment and a record of anything filtered or truncated |
+| `s1.png` … | one per segment: key frames side by side, the motion path, measured samples against the fitted curve |
+| `overview.png` | the first frame with each segment's region marked |
+| `frame-<index>-<SHA-256>.png` | decoded source-resolution frames: the first and last of the range and each segment's key frames. `evidence_frames` records index, time, role and hash |
+| `functions.json`, `raster-*.json` | the function bundle and pixel data, with `--functions` |
 
-## 读数时要知道的事
+When nothing changes, the first and last frames are still kept.
 
-- **时长有一帧左右的不确定度。** 60 帧录屏约 17ms，30 帧约 33ms。
-- **`duration_ms` 是"看得见在动"的时长，通常比设计值短。** 缓出曲线最后 10%~15% 的时间里，
-  物体总共只移动不到 1 像素，量不出来。要还原设计参数，看命名曲线那一项给的时长。
-- **样本点少时曲线不唯一。** 150ms 的动效在 60 帧下只有 9 个点，好几条曲线都能贴合，
-  这种片段会带一条 "few samples" 的备注。
-- **可变帧率使用解码器报告的时间戳。** 遇到重复、倒序或非法值时，以源帧号和名义帧率重新扫描，然后按同一时间轴截取。
-- **位移是特征锚点的像素位移。** `origin` 是拟合出的固定点，画面可能同时允许其他等价变换分解。用 `transform_reference` 查看拟合参考和特征锚点位移。片段级 `easing` 属于 `dominant` 通道，各通道的时间和曲线在 `channels` 内。
+### Segment kinds
 
-## 断言校验
+| Kind | Meaning | Values reported |
+|---|---|---|
+| `transform` | one element moves, scales, rotates or changes width or height, possibly while changing opacity | timing and fit for each channel |
+| `fade` | frames are close to a mix of the first and last frame: fades, colour transitions, a dimming overlay | duration and blend progress curve |
+| `instant` | a change completed within one frame | when it happened |
+| `nonrigid` | none of the above explains it: glow, blur, particles, 3D footage | statistics only, such as luminance range and period; confidence is always low |
 
-AI 读完规格后给出的结论，可以再拿规格核对一遍，不符时返回实测值作为修正依据：
+### How it is measured
+
+The first pass finds where and when things change. Each frame is compared in colour with a reference frame and the result is
+pooled onto a coarse grid; a cell's reference is refreshed only after several unchanged frames, so even slow fades are caught.
+Cells that keep changing for more than 3 seconds (animated backgrounds, videos, spinners, a blinking caret) are listed under
+`ambient` and left out of segment detection; otherwise they would join everything around them into one segment spanning the
+whole clip. The remaining changes are grouped into windows by connectivity in space and time.
+
+The second pass explains each window, trying the paths below in order. The `model` field says which one was used:
+
+| Path | `model` | When it applies | How |
+|---|---|---|---|
+| Backdrop split | none (two segments) | the whole window dims or changes colour along one curve while an element moves on top (a modal) | report the overlay as a `fade`, remove its change from every pixel, then measure the element on top |
+| Solid box | `solid-box` | a block of colour that changes size along one axis: progress bars, tab indicators | find that colour's bounding box in each frame; `size` gives width and height from and to, `anchor` the edge it grows from, and `translate` is added when both edges move |
+| Layer | `layer` | enter or exit: an element moves or scales while fading | use the end frame without the element as background and solve each frame as "background + opacity × transformed element", giving movement, scale, opacity and sub-pixel size |
+| Tracking | none | an element present at both ends changes position or size | feature optical flow and a similarity transform |
+| Multi-body | `multibody` | several elements in one area move in different directions: reordering, swapping | group feature points by their whole trajectory and follow each group with a template, forwards and backwards, through occlusion |
+| Blend, instant, non-rigid | none | everything else | see the segment kinds above |
+
+Elements that were already present and merely moved do not go through the layer path, including plain cards with little texture,
+because those can also be fitted numerically as a fade-in.
+
+The layer path has a problem that optical flow does not: at the end where opacity is 0, the element's position cannot be seen.
+Fields on the channel say how that end was filled in:
+
+| Field | Meaning |
+|---|---|
+| `follows_opacity: true` | movement is proportional to (1 − opacity), so both follow one curve and the hidden position follows from the ratio |
+| `extrapolated: true` | the two curves differ; the hidden part is at most 30% of the motion and is extrapolated from the fit |
+| `lower_bound: true` | too much is hidden; only the visible distance is reported and the true value is at least that |
+| `visible_distance_px` | the distance that was actually measured |
+
+Layer opacity is relative to the fully shown frame. An element that goes from 0 to 0.8 opacity reads as 0 to 1.
+
+### Easing and timing
+
+Each channel is fitted three ways: a free `cubic-bezier(...)`, an under-damped spring (when there is overshoot), and the nearest
+named curve (common CSS, Material and easings.net curves). Named curves may start earlier and end later than the visible change,
+because the slow ends of an eased motion move less than a pixel per frame and cannot be measured.
+
+So every segment has two timings, in the format `svsg.motion-timing/1`:
+
+- `visible_change`: the interval in which change can be seen. The segment's top-level `t_start_ms`, `t_end_ms` and
+  `duration_ms` mean the same thing.
+- `estimated_design`: the designed start and duration from the best-aligned named curve, with its RMSE and alignment basis.
+  It is `null` when the fit is unreliable (RMSE above 0.05), the segment was truncated, or the estimated start would fall
+  before 0; `design_unavailable_reason` says which.
+
+When reading the numbers:
+
+- Times are uncertain by about one frame: 17 ms at 60 fps, 33 ms at 30 fps.
+- `duration_ms` is usually shorter than the designed duration. Use `estimated_design` to recover the designed values.
+- With few samples the curve is not unique. A 150 ms animation at 60 fps has 9 samples and several curves fit; such segments
+  carry a "few samples" note.
+- Variable-frame-rate video uses the decoder's timestamps. If they repeat, go backwards or are invalid, the range is rescanned
+  using frame indices and the nominal frame rate.
+- On the tracking path, movement is that of a feature anchor, not necessarily the element's centre. `transform_reference`
+  says what the reference point is.
+
+## Functions and queries
+
+`--functions` (or `motionspec functions out/spec.json -o functions` for existing results) writes `functions.json` in the
+format `svsg.video-functions/1`, compiled by VisFunc-Image. Each kept frame gets a pixel function that restores it exactly,
+plus region and contour descriptions; neighbouring kept frames get difference statistics; each motion segment gets sampled
+functions (linear between samples) and fitted functions (Bézier or spring).
+
+Read the catalogue first. It lists only what can be queried and is much smaller than the full manifest (about 4 KB for a
+132 KB manifest):
+
+```bash
+motionspec query out/functions.json --list
+```
+
+Then query. A parameters file holds one call or a list of up to 1000; a failing call reports an error in its own result only:
+
+```json
+[
+  {"id": "p", "op": "pixel_rgba", "frame_index": 0, "x": 100, "y": 80},
+  {"id": "x", "op": "motion_value", "segment_id": "s1", "name": "x", "t_ms": 300},
+  {"id": "e", "op": "motion_value", "segment_id": "s1", "name": "translate.progress", "t_ms": 300, "mode": "fitted"}
+]
+```
+
+```bash
+motionspec query out/functions.json query.json
+```
+
+`mean_rgba` and `delta_rgba` are also available. Frame indices, times and function names must come from this catalogue; a time
+outside a function's support is an error, not an extrapolation.
+
+Sampled functions exported by each path:
+
+| Path | `x`, `y` | `width`, `height` | `opacity` | `*.progress` |
+|---|---|---|---|---|
+| Tracking | yes (feature anchor) | no | no | yes |
+| Layer | yes (element centre) | yes (sub-pixel; omitted when the box touches the analysis window's edge) | yes | yes |
+| Multi-body | yes (point-group centre) | no | no | yes |
+| Solid box | yes (box centre) | yes | no | yes |
+| Qt probe | yes | yes | yes | yes, plus `color.r/g/b/a` and `property.value` |
+
+Exports default to at most 64 frames; change that with `--function-max-frames`. Missing frames, hash or size mismatches,
+out-of-order times and exceeded budgets are errors. An offline check of encoding and recomputation:
+`python tools/validate_functions.py --out checks`, with `--photo` to build a controlled panning video from a real photo.
+It checks encoding and recomputation only and says nothing about recognition accuracy on natural video. Protocol details are in
+the [video function notes](../../docs/video-functions.md) (Chinese).
+
+## Qt probe
+
+When the target is your own Qt app, widget properties can be read directly instead of inferred from pixels. Both QWidget and
+QML (QQuickItem) are supported. There are two parts:
+
+| | File | Depends on | What it does |
+|---|---|---|---|
+| In the app | `motionspec/qt_probe.py` | PySide6 or PyQt6 only | records each element's position, size, opacity, scale, rotation, visibility, colour and any named numeric properties, every frame |
+| Offline | `motionspec/trace.py` | numpy, OpenCV | splits the trace into segments, fits easing, and writes the same `spec.json` and `summary.md` |
+
+The in-app file imports nothing else from the package, so it can be copied into the target app or loaded by path (the package's
+`__init__` imports numpy, which the app's environment may not have):
+
+```python
+from qt_probe import attach_from_env   # or load motionspec/qt_probe.py by path
+attach_from_env()                      # active only when MOTIONSPEC_TRACE=<trace path> is set; writes the trace on exit
+```
+
+```bash
+motionspec trace trace.json -o probe
+motionspec functions probe/spec.json -o probe/functions
+```
+
+For explicit control, use `Recorder`: `start()` and `stop()` follow the app's frames (render frames for QML windows, a timer
+otherwise), or call `sample(t_ms)` once per frame.
+
+Colour comes from a QML `color` property, or from `background` / `background-color` in a widget's style sheet. Custom properties
+must be named: `Recorder(properties=("hoverAmount", "emphasis"))`, or the environment variable
+`MOTIONSPEC_PROPS=hoverAmount,emphasis`. Each becomes a `fade` segment with a `color` channel (RGBA from and to, 0 to 1) or a
+`property` channel (the name and its from and to values).
+
+In the spec, `model` is `qt-probe`, and each segment has `element` (class, object name, text) and an `element_id` within the
+recording. Elements that move together at the same time keep separate segments, linked by `motion_groups[].segment_ids`.
+Elements that grow from zero size (an expanding panel, a progress bar) are reported as size changes; being hidden at zero size
+is not reported as an opacity change. Coordinates are device pixels (logical pixels times the screen scale), so they match
+screenshots and recordings of the same window. The exported function format is `svsg.probe-functions/1`, with no pixel frames.
+
+| | Visual measurement | Qt probe |
+|---|---|---|
+| Needs | a recording | access to the app's start-up code |
+| Movement, opacity | measured, with sub-pixel to roughly 1 px error | the property values themselves |
+| Which widget | region coordinates only | class, object name, text |
+| Position at opacity 0 | inferred | read as usual |
+| What it sees | everything on screen, including shaders and other people's apps | only the recorded properties |
+| Easing curve | fitted | also fitted (the animation object itself is not visible), but from exact progress values |
+
+The probe walks the whole widget tree every frame, which is noticeable with many elements, so it is meant for debugging sessions.
+It has not been run for long periods inside a large application.
+
+## Checking claims
+
+Conclusions a model gives after reading a spec can be checked against it:
 
 ```bash
 motionspec check out/spec.json claims.json
@@ -125,261 +254,121 @@ motionspec check out/spec.json claims.json
 ]
 ```
 
-支持的字段：`count`、`kind`、`duration_ms`、`easing`、`overshoot`、`distance_px`、`direction`、`scale_to`。
-`duration_ms`、`easing`、`overshoot` 可指定 `channel`（`translate`、`scale`、`rotate`、`blend`、`opacity`、`size`）。`count` 只表示在当前检测条件下找到的片段数。请求中的 `tol` 会被拒绝，容差由校验器决定。
-退出码 0 表示通过，1 表示断言错误，2 表示输入非法，3 表示证据不足。
+Supported fields: `count`, `kind`, `duration_ms`, `easing`, `overshoot`, `distance_px`, `direction`, `scale_to`.
+`duration_ms`, `easing` and `overshoot` accept a `channel` (`translate`, `scale`, `rotate`, `blend`, `opacity`, `size`).
+Tolerances are set by the checker; a `tol` in the request is rejected. `count` only refers to segments found under the current
+detection settings. Exit codes: 0 passed, 1 failed, 2 invalid input, 3 insufficient evidence.
 
-## 实测精度
+## Accuracy
 
-合成动效（已知真值，60 帧），测试见 `tests/test_synthetic.py`：
+Synthetic animations with known values, at 60 fps:
 
-| 样本 | 真值 | 实测 |
+| Sample | Truth | Measured |
 |---|---|---|
-| 滑动 | 300px，out-cubic，400ms | 299.8px，out-cubic，400ms |
-| 淡入 | 线性，250ms | linear，250ms |
-| 弹簧缩放 | 阻尼比 0.35，角频率 28，放大 1.667 倍 | 0.355，28.04，1.68 倍 |
-| 先后两个元素 | 位移 300ms，淡入 200ms | 300ms，200ms，分成两个片段 |
+| slide | 300 px, out-cubic, 400 ms | 299.8 px, out-cubic, 400 ms |
+| fade-in | linear, 250 ms | linear, 250 ms |
+| spring scale | damping ratio 0.35, angular frequency 28, ×1.667 | 0.355, 28.04, ×1.68 |
+| move up and fade in | 24 px, decelerate, 300 ms | 23.9 px, material-decelerate, 300 ms |
+| three identical list items entering in turn | starts at 167 / 233 / 300 ms, 20 px each | 3 segments, same starts, 19.9 to 20.0 px each |
 
-本机复测滑动样本。经 H.264 压缩（CRF 23 和 32）后仍识别为 `out-cubic`、400 ms。再丢掉约五分之一帧且保留其余帧时间戳，仍识别为 `out-cubic`，拟合时长为 383.3 ms。
+Scenes rendered frame by frame with real Qt widgets (Chinese text, rounded corners, `QGraphicsOpacityEffect`, screen scale 1.5,
+values in device pixels):
 
-进入 / 退出类合成动效（60 帧），测试见 `tests/test_layer.py`：
-
-| 样本 | 真值 | 实测 |
+| Scene | Truth | Measured |
 |---|---|---|
-| 上移 + 淡入，同一条曲线 | 24px，decelerate，300ms | 23.9px，material-decelerate，300ms |
-| 上移 + 淡入，曲线不同 | 位移 decelerate，透明度线性 | 23.7px material-decelerate，透明度 linear 300ms |
-| 弹出层缩放 + 淡入 | 0.9 → 1，300ms | 0.901 → 1，300ms |
-| 下移 + 淡出 | 24px，ease-in，250ms | 23.9px，ease-in，250ms |
-| 三个相同的列表项依次进入 | 起点 167/233/300ms，各 20px | 3 个片段，起点 167/233/300ms，各 19.9~20.0px |
+| card slide | 300 px, OutCubic, 300 ms | 300.0 px, out-cubic, 300 ms |
+| notification enters | up 36 px and fades in, OutCubic, 250 ms | 36.1 px, out-cubic, 250 ms |
+| notification exits | up 24 px and fades out, InCubic, 200 ms | 23.1 px, in-cubic, 200 ms |
+| plain fade-in | InOutQuad, 300 ms | in-out-quad, 300 ms |
+| card slide while something else fades in | 90 px InOutCubic 400 ms; Linear 200 ms | 89.9 px in-out-cubic 400 ms; linear 200 ms |
 
-真实 Qt 控件渲染（PySide6，带中文文字、圆角、`QGraphicsOpacityEffect`，位置为整数像素，屏幕缩放 1.5 倍，
-下表为设备像素）。用 `tools/qt_scenes.py` 生成、`tools/qt_compare.py` 对比，素材不入库：
+Nine harder Qt scenes (a modal, an expanding panel, a sidebar, scrolling, a tab indicator, a swap, an overshoot, a colour change,
+a progress bar) are scored automatically by `tools/qt_hard_compare.py`: 85% field by field for visual measurement and 100% for
+the probe. Evaluating the exported functions frame by frame against the properties the probe recorded
+(`tools/function_accuracy.py`): on the basic scenes, position error is at most 1.0 px, the size of entering and exiting
+elements is within 1.0 px, and opacity error is 0.
 
-| 场景 | 真值 | 实测 |
-|---|---|---|
-| 卡片平移 | 300px，OutCubic，300ms | 300.0px，out-cubic，300ms |
-| 提示条进入 | 上移 36px + 淡入，OutCubic，250ms | 36.1px，out-cubic，250ms |
-| 提示条退出 | 上移 24px + 淡出，InCubic，200ms | 23.1px，in-cubic，200ms |
-| 纯淡入 | InOutQuad，300ms | in-out-quad，300ms |
-| 三行依次进入 | 各 24px，OutCubic，200ms，起点 167/217/267ms | 24.7px，out-cubic，183~200ms，起点 167/217/267ms |
-| 卡片平移与另一处淡入同时发生 | 90px InOutCubic 400ms；淡入 Linear 200ms | 89.9px in-out-cubic 400ms；linear 200ms |
+Speed: analysing and exporting functions for a sub-second 1350 × 840 clip takes about 2 to 4 seconds; the nine scenes above
+take about 24 seconds in total on one development machine.
 
-同样的 Qt 场景压成 H.264：CRF 23 和 CRF 30 时三行依次进入的位移均恢复到 24~25px（`follows_opacity: true`）。
+All of this footage is rendered frame by frame with perfectly regular timing; dropped frames and capture delay in real screen
+recordings have had little testing. The nine harder scenes were used repeatedly during development and are not an independent
+validation.
 
-这些素材都是逐帧渲染的，帧间隔严格均匀。真实录屏还会有丢帧和录制软件自身的延迟，这部分没有用界面类录屏验证过。
+## Model benchmarks
 
-## 已知限制
+`bench/` holds comparison scripts: the same animation is given to a model as video only, or with the measurements attached, and
+both are scored. Keys are read from the local Forge configuration and used only inside the process. `bench/canary.py` first
+confirms that a model actually received the video.
 
-- 测量面向 2D 界面动效。复杂画面可能被标为 `nonrigid`，也可能碰巧符合 2D 运动模型。项目未分析音频、字幕和对象语义。
-- 一个片段只描述一个整体运动。已经存在的多个元素贴在一起同时动，会被合成一个片段；
-  方向不同时走多体路径，只处理平移，被遮挡的元素在遮挡那几帧是插值，它的时长和曲线不可靠。
-  同一位置前后相隔不到约 8 帧的两段动效也会被合并。
-- 布局重排测不准：面板展开把下面几行往下推、侧栏收起把内容往左拉时，变尺寸的那块和被推动的那块
-  落在同一个窗口里，前者被当成位移，或者两者合成一个片段。纯色块路径只在那块颜色单独成片、
-  而且没有被窗口边裁到时才生效。
-- 图层路径只解平移和等比缩放，不解旋转；元素须在首尾某一帧里完全不存在。
-  从半透明变到不透明、进入时背景本身也在变（遮罩之外的情况），没有验证过。
-- 图层路径只在不超过 3 秒、180 帧的窗口上尝试。
-- 画在持续变化区域上面的动效（动态背景上的半透明面板）分离不出来，这类片段会标为低置信。
-- 持续超过 `--ambient-ms` 的慢动效（长进度条）会被归入 `ambient` 而不是片段。
-- 往返运动（抖动、脉冲）只报峰值和峰值时刻，不拟合曲线。
-- 鼠标指针移动会被当成一个小元素的位移。
-- 默认单窗口最多 300 帧，受裁剪预算约束。超过上限的片段只测量取到的窗口，标为低置信并记录 `truncated`。
+| Scenes | Video only | With visual measurements | With Qt probe |
+|---|---|---|---|
+| 6 basic scenes, 6 models | 55% | 92% | 94% |
+| 9 harder scenes, 6 models | 58% | 82% | 100% |
 
-## 结构
+The two GPT models received timestamped still frames, because the organisation behind the key does not have video input enabled.
+Full results, scoring rules and raw answers are in the [benchmark notes](bench/results/README.md) (Chinese). `bench/pedestrian_*.py`
+is an experiment on pedestrian detection in MOT17 street videos and is still in progress.
+
+## Known limits
+
+- Built for 2D interface animation. Complex footage may be marked `nonrigid`, or may happen to fit a 2D model.
+  Audio, subtitles and object semantics are not analysed.
+- A segment describes one overall motion. Several adjacent elements moving the same way at the same time become one segment.
+  When they move in different directions the multi-body path handles translation only; frames where an element is fully
+  covered are interpolated, so its duration and curve are unreliable. Two animations at the same place less than about 8 frames
+  apart are merged.
+- Layout reflow is measured wrongly. When an expanding panel pushes rows down or a collapsing sidebar pulls content along, the
+  resizing block and the pushed block fall into one window; the former is reported as moving, or both become one segment.
+  The solid-box path only applies when that colour forms its own region and is not cut by the window edge.
+- The layer path solves translation and uniform scale only, not rotation; the element must be completely absent at one end;
+  it is only tried on windows of at most 3 seconds and 180 frames.
+- Animation drawn over a continuously changing area (a translucent panel over an animated background) cannot be separated and
+  is marked low confidence. Slow animations lasting longer than `--ambient-ms` (a very long progress bar) end up in `ambient`.
+- Back-and-forth motion (shakes, pulses) reports only the peak and its time, with no curve fit.
+- H.264 chroma subsampling smears the curve of a colour transition.
+- Mouse pointer movement is reported as a small element moving.
+- A window holds at most 300 frames by default. Longer segments are measured only over what was kept, marked low confidence and
+  flagged `truncated`.
+
+## Code layout
 
 ```
 motionspec/
-  frames.py    帧来源：视频 / 图片目录 / 内存帧，统一时间戳
-  segment.py   第一遍：颜色帧差 → 粗网格 → 剔除持续变化的格子 → 增量时空连通域
-  motion.py    第二遍：先试图层模型，再走特征点跟踪、首尾混合度、分类
-  layer.py     图层模型：进入 / 退出时的平移、缩放、透明度联合求解
-  fit.py       缓动拟合：贝塞尔、命名曲线、弹簧（只用 numpy）
-  annotate.py  标注图
-  spec.py      规格版本、结构校验、文字摘要
-  claims.py    断言校验
-  synth.py     合成动效（测试素材和演示）
-  qt_probe.py  Qt 探针的应用内部分：记录控件属性（只依赖 Qt 绑定）
-  trace.py     Qt 探针的离线部分：轨迹转规格
-  cli.py       命令行
+  frames.py       frame sources: video, image directory, frames in memory; unified timestamps
+  segment.py      pass one: colour differences → coarse grid → ambient removal → space-time components
+  motion.py       pass two: backdrop split, solid box, layer, tracking, multi-body, classification
+  layer.py        the layer model: joint solve of movement, scale and opacity for entering and exiting elements
+  fit.py          easing fits: Bézier, named curves, spring (numpy only)
+  timing.py       one calculation for both timings
+  annotate.py     annotated images
+  spec.py         spec format, validation, text summary
+  claims.py       claim checking
+  functions.py    function export, query catalogue, batch queries (via VisFunc-Image)
+  qt_probe.py     the in-app part of the Qt probe
+  trace.py        the offline part of the Qt probe; trace_contract.py validates the trace format
+  synth.py        synthetic animations for tests and demos
+  cli.py          command line
 tools/
-  qt_scenes.py      用真实 Qt 控件渲染已知真值的动效，同时让探针取样（需要 PySide6）
-  qt_compare.py     把视觉路径、探针和真值并排打印
-  qml_probe_demo.py 在实时运行的 QML 窗口上试探针，含自定义属性和颜色动画（需要 PySide6）
-  qt_hard_scenes.py 第二批 9 个更接近真实界面的场景：模态框、展开、侧栏、滚动、指示条、对调、回弹、变色、进度条
-  qt_hard_compare.py 对第二批场景自动判分（视觉路径和探针各自对真值）
-  function_accuracy.py 导出 SVSG 函数后逐帧求值，和探针记录的真实属性对比，并计时
+  qt_scenes.py, qt_hard_scenes.py     render scenes with known values using real Qt widgets while the probe records (needs PySide6)
+  qt_compare.py, qt_hard_compare.py   compare visual measurement, probe and truth; the latter scores automatically
+  function_accuracy.py                evaluate exported functions per frame against the probe's values, with timings
+  qml_probe_demo.py                   try the probe on a live QML window
+  validate_functions.py               offline check of function encoding and recomputation
 bench/
-  providers.py   读取本机 Forge 的模型配置
-  client.py      三家模型的调用封装
-  canary.py      确认模型是否真的收到视频
-  run.py         实测；report.py 汇总
-  run_hard.py    第二批场景的实测，问题覆盖尺寸、颜色和回弹；report_hard.py 汇总
+  run.py, run_hard.py, report*.py      model benchmarks and summaries
+  providers.py, client.py, canary.py   local model configuration, API calls, video receipt check
+  pedestrian_*.py                     MOT17 pedestrian experiment (in progress)
 ```
 
-依赖只有 numpy 和 opencv-python。
+Tests are in `tests/`; run `python -m pytest` in this directory.
 
-## 与 SVSG 共用图像和时间函数
+## Not done yet
 
-在仓库根目录安装 SVSG 的 `[functions]` 扩展和本包后，启用统一函数导出：
+- Publishing results while analysis is still running; the spec is written only after the whole range has been analysed
+- Visual measurement of layout reflow
+- Comparing two specs, for example a reference animation against your implementation, or visual measurement against the probe
 
-```bash
-python -m pip install -e ".[functions]" -e "./packages/motionspec"
-motionspec analyze clip.mp4 -o out --functions --sequence-id clip-001 --evidence-every-ms 500
-motionspec functions out/spec.json -o functions --sequence-id clip-001
-```
+## License
 
-`functions.json` 使用 `svsg.video-functions/1`，内部图像保持 `svsg.functions/1`，精确像素
-编码仍为 `svsg.raster/1`。每个保留帧复用 SVSG 的像素、轮廓和空间计算；相邻保留帧输出
-RGBA 差分统计，运动采样输出分段线性函数，拟合结果输出可求值的贝塞尔/弹簧参数。
-实现只维护在 SVSG，MotionSpec 的 `functions.py` 负责适配和引用绑定。
-
-`--evidence-every-ms` 添加周期证据，默认仅保留原有关键帧。函数导出默认上限 64 帧、
-64×1024² 总像素（单帧 ≤ 16×1024²），帧数可用 `--function-max-frames` 调整。
-缺帧、错误哈希、尺寸不符、倒序时间和预算超限会报错，不静默丢失证据。
-完整像素载荷保存在 `raster-<文件SHA-256>.json`，另保留像素哈希，相同像素复用文件，
-不需把载荷发给模型。
-
-模型可以只提交 JSON 函数参数，例如保存以下内容为 `query.json`：
-
-```json
-{"id":"p","op":"pixel_rgba","frame_index":0,"x":100,"y":80}
-```
-
-```bash
-motionspec query out/functions.json query.json
-```
-
-另支持 `mean_rgba`、`delta_rgba` 和 `motion_value`。帧索引必须在本次清单内。
-Python 入口为 `svsg.video_functions.VideoRuntime`；现有识别结果可用 `attach_recognition`
-在校验序列、帧号、时间、文件/像素哈希和尺寸后接入。它不会自动调用模型。
-
-像素函数精确复现保留帧的解码图像；采样点之间的运动是插值，拟合值带 RMSE，不外推到
-片段范围之外。运动片段不是物体轨迹，帧差不代表物体身份或动作。自然视频的跟踪和切镜
-语义仍需后续验证。详细协议说明见 [共享视频函数](../../docs/video-functions.md)。
-
-本地无网络验证可运行 `python tools/validate_functions.py --out checks`；可选 `--photo`
-添加真实照片生成的受控平移/静止视频。测试只验证编码与函数复算，不代表自然视频识别准确率。
-
-## Qt 探针
-
-被测程序是自己的 Qt 应用时，不必从像素反推：探针直接读控件属性，输出同一种规格。
-QWidget 和 QML（QQuickItem）界面都支持。
-
-分成两半：
-
-| | 文件 | 依赖 | 做什么 |
-|---|---|---|---|
-| 应用内 | `motionspec/qt_probe.py` | 只要 PySide6 或 PyQt6 | 按帧记录每个元素的 x、y、宽、高、透明度、缩放、旋转、可见性，写成轨迹文件 |
-| 离线 | `motionspec/trace.py` | numpy、OpenCV | 把轨迹切成片段、拟合缓动，输出 `spec.json` 和 `summary.md` |
-
-应用内那一半是单个文件，不引用包内其他模块，可以直接拷进被测应用或按路径加载
-（包的 `__init__` 会引入 numpy，被测应用的环境里未必有）。
-
-```python
-from qt_probe import attach_from_env   # 或按路径加载 motionspec/qt_probe.py
-attach_from_env()                      # 设了 MOTIONSPEC_TRACE=轨迹路径 才生效，应用退出时写出
-```
-
-```bash
-motionspec trace trace.json -o out/
-```
-
-需要自己控制时机时用 `Recorder`：`start()` / `stop()` 跟着应用的帧走（QML 窗口按渲染帧取样，
-其余用定时器），或者每推进一帧调用一次 `sample(t_ms)`。
-
-和视觉路径相比：
-
-| | 视觉路径（看录屏） | Qt 探针（读属性） |
-|---|---|---|
-| 需要什么 | 一段录屏 | 能改被测应用的启动代码 |
-| 位移、透明度 | 测量值，有亚像素到 1px 左右的误差 | 精确值 |
-| 知道是哪个控件 | 不知道，只有区域坐标 | 类名、对象名、文字 |
-| 看不见的部分 | 透明度为 0 时位置靠推算 | 照常读到 |
-| 能看到什么 | 画面上的一切，包括着色器、别人的应用 | 只有控件属性；着色器、自绘内容、自定义属性看不到 |
-| 缓动曲线 | 拟合 | 仍是拟合（探针看不到动画对象本身），但用的是精确进度值 |
-
-规格里 `model` 为 `qt-probe`，每个片段多一个 `element` 字段。位置单位是设备像素（逻辑像素乘屏幕缩放），
-和同一窗口的截图、录屏对得上。
-
-验证：`tools/qt_scenes.py` 逐帧渲染 6 个 QWidget 场景并同时让探针取样，探针给出的片段数量、位移、
-透明度起止、曲线名和设计时长与真值全部一致。`tools/qml_probe_demo.py` 在一个实时运行的 QML 窗口上取样
-（300 逻辑像素的 OutCubic 平移、0.9→1 的缩放加淡入），位移和起止值精确，时长因实时帧抖动有约 ±15ms 的出入。
-
-颜色和自定义属性：探针同时记录元素的颜色（QML 的 `color` 属性；控件取样式表里的背景色），
-以及构造 `Recorder(properties=("hoverAmount", "emphasis"))` 时点名的数值属性
-（用环境变量时设 `MOTIONSPEC_PROPS=hoverAmount,emphasis`）。它们各自成为 `fade` 片段，
-通道是 `color`（起止 RGBA，0~1）或 `property`（属性名和起止值）。
-同步移动的元素分别保留片段、坐标和录制内的 `element_id`。导出的采样轨迹和通道参数一致时，
-`motion_groups[].segment_ids` 关联这些片段；元素数、片段数和组数含义不同。分组只考虑未被预算截掉的片段。
-纯 Qt 规格也可以用 `motionspec functions` 导出并用 `motionspec query` 查询，不需要原始视频或 PNG；
-可用名称、采样区间和单位见 [函数协议](../../docs/video-functions.md)。
-从 0 尺寸长出来的元素（展开的面板、进度条）报尺寸变化，不再把"0 尺寸时隐藏"报成透明度变化。
-
-已知限制：
-
-- 只记录几何属性、透明度、颜色和点名的数值属性。着色器内部、自绘内容、未点名的属性看不到；
-  控件的颜色只认样式表里写的 `background` / `background-color`。
-- 父级移动时子元素不单独成段；布局重排引起的大量子元素变化会按影响大小排序，超出 `--max-segments` 的丢弃并计数。
-- 每帧要遍历整棵界面树，元素很多时有可感知的开销，只适合调试时开启。
-- 还没有在 Forge 本体上挂过，只在上面两类测试场景里跑过。
-
-## 模型实测
-
-`bench/` 里是一套对比脚本：同一段界面动效，只给模型看视频，和同时给出 motionspec 的结果，各测得多准。
-密钥从本机 Forge 配置读取，只在进程内使用。
-
-```bash
-python tools/qt_scenes.py out/qt
-```
-
-```bash
-python bench/run.py out/qt bench/results/run1 --repeat 2
-```
-
-```bash
-python bench/report.py bench/results/run1
-```
-
-`bench/canary.py` 先确认模型是否真的收到了视频：视频里放一串只有画面上才有的随机字符，答得出才算。
-
-6 个模型（MiMo v2.6 flash / pro、Seed 2.1 turbo / pro、GPT 6.1 sol / terra）在 6 个 Qt 场景上的逐项正确率：
-
-| 条件 | 第一轮 | 第二轮（摘要加了"设计时序"一列之后） |
-|---|---|---|
-| 只给视频 | 55% | 未重跑 |
-| 视频 + 视觉分析 | 92% | 100% |
-| 视频 + Qt 探针 | 94% | 100% |
-
-GPT 两个模型拿到的不是原生视频：这把密钥所属的组织没有开通视频输入，改传了带时间戳的静帧。
-第二轮是在同样的场景上测的，基准已经饱和。完整结果、判分规则和这些数字的适用范围见
-[bench/results/README.md](bench/results/README.md)。
-
-摘要表里的"measurable change"是看得见在动的区间，"design timing"是对齐命名曲线后的起点和时长，
-后者才是对设计参数的估计。第一轮里模型把前者当成了设计时长，时长一项只有 59%。
-
-第二批 9 个更难的场景（模态框、展开、侧栏、滚动、指示条、对调、回弹、变色、进度条）上，
-今天的改动让视觉路径从 49% 到 85%（无损帧），探针从 82% 到 100%。同样六个模型、每个组合两遍：
-旧报告给出 74% 和 89%，但该批日志没有重复轮次编号，无法复核为同轮配对结果。
-这批场景是边看边改的，不是独立验证。详见 [bench/results/README.md](bench/results/README.md) 的"第二批"一节。
-
-### 运行开销（2026-11-18）
-
-同一台机器、同样的 1350×840 Qt 场景，分析加函数导出：
-
-| | 之前 | 之后 |
-|---|---|---|
-| 第二批 9 个场景，合计 | 约 55 s | 24 s |
-| 第一批 6 个场景，合计 | 约 27 s | 15.5 s |
-
-结果不变（第二批逐项正确率仍为 85%，第一批每个数值相同）。主要来自：图层模型在拟合后立刻排除
-"元素本来就在"的窗口，不再做完整的合并、复拟合和另一个方向；透明度只在元素落点框里求解；
-静止帧复用上一帧的结果；只在需要时搜索缩放；遮罩分类在缩小的图上做；SVSG 的光栅行程编码改用正则在 C 里比较像素
-（输出逐字节相同）。
-
-## 还没做
-
-- 增量发布与模型编排，当前 CLI 等分析完成后写规格
-- 在 Forge 本体上实际挂载探针
-- 布局重排（展开推动下方元素、侧栏收起拉动内容）的视觉测量
-- 两份规格的对比（参考动效 vs 自己的实现；视觉路径 vs 探针）
+MIT
