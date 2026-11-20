@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from base64 import b64decode, b64encode
 from binascii import Error as Base64Error
 from collections.abc import Iterator
 from dataclasses import dataclass
+from functools import cached_property
 from hashlib import sha256
-import re
 from io import BytesIO
 from pathlib import Path
 from sys import byteorder
@@ -60,8 +61,12 @@ class RasterFunction:
     samples: bytes
 
     def __post_init__(self) -> None:
-        if len(self.samples) != _buffer_size(self.width, self.height):
+        size = _buffer_size(self.width, self.height)
+        if memoryview(self.samples).nbytes != size:
             raise ValueError("RGBA sample count does not match raster dimensions")
+        # A caller can supply a writable byte buffer. Snapshot it before caching its digest.
+        if not isinstance(self.samples, bytes):
+            object.__setattr__(self, "samples", bytes(self.samples))
 
     @classmethod
     def from_image(cls, image: bytes | Path) -> RasterFunction:
@@ -74,7 +79,7 @@ class RasterFunction:
             with ImageOps.exif_transpose(source) as oriented, oriented.convert("RGBA") as rgba:
                 return cls(*rgba.size, rgba.tobytes())
 
-    @property
+    @cached_property
     def pixel_sha256(self) -> str:
         return sha256(self.samples).hexdigest()
 
@@ -136,7 +141,7 @@ class RasterFunction:
 
     @classmethod
     def from_program(cls, data: dict) -> RasterFunction:
-        if data.get("version") != CODEC:
+        if not isinstance(data, dict) or data.get("version") != CODEC:
             raise ValueError("unsupported raster program")
         width, height = data.get("width_px"), data.get("height_px")
         if type(width) is not int or type(height) is not int:

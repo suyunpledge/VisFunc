@@ -40,6 +40,22 @@ def export_functions(spec: dict, evidence_dir: str | Path, out_dir: str | Path, 
 MAX_BATCH = 1000
 
 
+def _query_examples(segments: list[dict], frames: list[dict]) -> list[dict]:
+    examples = []
+    for mode in ("sampled", "fitted"):
+        for segment in segments:
+            functions = segment[mode]
+            if functions:
+                name, curve = next(iter(functions.items()))
+                examples.append({"id": mode, "op": "motion_value", "segment_id": segment["segment_id"],
+                                 "name": name, "mode": mode, "t_ms": curve["t_ms"][0]})
+                break
+    if frames:
+        examples.append({"id": "pixel", "op": "pixel_rgba",
+                         "frame_index": frames[0]["frame_index"], "x": 0, "y": 0})
+    return examples
+
+
 def catalogue(manifest: str | Path) -> dict:
     """函数清单的目录：给模型先读的那一小页。
 
@@ -61,26 +77,30 @@ def catalogue(manifest: str | Path) -> dict:
                              "provenance": function.provenance}
         fitted = {name: {"op": fit.op, "t_ms": [fit.t_start_ms, fit.t_end_ms], "rmse": fit.rmse}
                   for name, fit in motion.fits.items()}
-        design = motion.timing.estimated_design
+        timing = motion.timing
+        design = timing.estimated_design if timing is not None else None
         segments.append({
             "segment_id": motion.segment_id, "kind": motion.kind, "confidence": motion.confidence,
             "region": motion.region, "visible_t_ms": [motion.t_start_ms, motion.t_end_ms],
-            "design": None if design is None else {"easing": design.easing, "t_ms": [design.t_start_ms, design.t_end_ms]},
+            "visible_duration_ms": (timing.visible_change.duration_ms if timing is not None
+                                    else motion.t_end_ms - motion.t_start_ms),
+            "design": None if design is None else {"easing": design.easing, "duration_ms": design.duration_ms,
+                                                    "t_ms": [design.t_start_ms, design.t_end_ms]},
+            "design_unavailable_reason": timing.design_unavailable_reason if timing else "legacy_missing_timing",
+            "reference": {key: motion.reference[key] for key in ("type", "element_id", "property_name", "motion_group")
+                          if key in motion.reference},
             "sampled": sampled, "fitted": fitted,
             "flags": {k: v for k, v in (("truncated", motion.truncated), ("inferred", motion.inferred_channels),
                                         ("lower_bound", motion.lower_bound_channels)) if v},
         })
+    frames = [{"frame_index": f.frame_index, "t_ms": f.timestamp_ms, "roles": f.roles} for f in bundle.frames]
     return {
         "version": bundle.version, "sequence_id": bundle.sequence_id, "clock": bundle.clock,
+        "coverage": bundle.coverage, "coordinate_space": bundle.coordinate_space,
         "size_px": [bundle.width_px, bundle.height_px], "t_ms": [bundle.t_start_ms, bundle.t_end_ms],
-        "frames": [{"frame_index": f.frame_index, "t_ms": f.timestamp_ms, "roles": f.roles} for f in bundle.frames],
+        "frames": frames,
         "segments": segments,
-        "query_examples": [
-            {"id": "a", "op": "motion_value", "segment_id": "<segment_id>", "name": "<sampled name>", "t_ms": "<within t_ms>"},
-            {"id": "b", "op": "motion_value", "segment_id": "<segment_id>", "name": "<fitted name>", "t_ms": "<within t_ms>",
-             "mode": "fitted"},
-            {"id": "c", "op": "pixel_rgba", "frame_index": "<frame_index>", "x": 0, "y": 0},
-        ],
+        "query_examples": _query_examples(segments, frames),
     }
 
 
@@ -98,6 +118,7 @@ def run_queries(manifest: str | Path, calls) -> dict | list:
     for call in calls:
         try:
             results.append(runtime.call(call))
-        except (ValueError, TypeError) as exc:  # pydantic 的校验错误也是 ValueError
-            results.append({"id": call.get("id") if isinstance(call, dict) else None, "error": str(exc).splitlines()[0]})
+        except (ValueError, TypeError, OSError) as exc:
+            call_id = call.get("id") if isinstance(call, dict) else None
+            results.append({"id": call_id if isinstance(call_id, str) else None, "error": str(exc).splitlines()[0]})
     return results

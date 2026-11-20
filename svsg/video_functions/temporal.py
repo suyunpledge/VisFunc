@@ -44,7 +44,7 @@ def compile_motion(segment: dict) -> MotionFunctions:
                 provenance=(
                     "qt_property_sample"
                     if segment.get("model") == "qt-probe"
-                    and (key.startswith("color.") or key == "property.value")
+                    and (key.startswith("color.") or key in {"property.value", "rot_deg", "scale"})
                     else "motion_estimate"
                 ),
             )

@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from motionspec import analyze
-from motionspec.synth import enter, progress
+from motionspec import analyze, validate
+from motionspec.synth import background, enter, progress
 
 pytest.importorskip("svsg.video_functions")
 
@@ -40,11 +40,39 @@ def test_progress_bar_curves_cover_every_frame():
     assert all("size" in r["channel_progress"] for r in samples)
 
 
+def test_translating_box_keeps_motion_before_and_after_resize(tmp_path):
+    frames = []
+    for tick in range(34):
+        frame = background()
+        left = 100 + 4 * min(20, max(0, tick - 5))
+        width = 80 + 3 * min(10, max(0, tick - 8))
+        frame[80:86, left:left + width] = (240, 140, 40)
+        frames.append(frame)
+    spec = analyze(frames, tmp_path, fps=50, functions=True, sheets=False)
+    segment, samples = rows(spec)
+    assert segment["model"] == "solid-box" and segment["frames"] == [5, 25]
+    assert segment["keyframes"][0]["t_ms"] == samples[0]["t_ms"] == 100
+    assert segment["keyframes"][-1]["t_ms"] == samples[-1]["t_ms"] == 500
+    size = segment["channels"]["size"]
+    move = segment["channels"]["translate"]
+    assert (size["t_start_ms"], size["t_end_ms"]) == (160, 360)
+    assert (move["t_start_ms"], move["t_end_ms"]) == (100, 500)
+    assert move["delta"] == [95, 0]
+    calls = [{"id": str(t), "op": "motion_value", "segment_id": segment["id"], "name": "x", "t_ms": t}
+             for t in (100, 500)]
+    results = run_queries(tmp_path / "functions.json", calls)
+    assert [r["value"] for r in results] == [move["from"][0], move["to"][0]]
+    segment.update(t_start_ms=160, t_end_ms=360, duration_ms=200)
+    assert any("'translate' timing exceeds the segment" in error for error in validate(spec))
+
+
 def test_catalogue_and_batch_queries(tmp_path, capsys):
     frames, _ = progress()
     spec = analyze(frames, tmp_path, fps=60, functions=True, sequence_id="bar")
     manifest = tmp_path / spec["function_evidence"]["manifest"]
     page = catalogue(manifest)
+    assert {call["id"] for call in page["query_examples"]} == {"sampled", "fitted", "pixel"}
+    assert all("value" in r for r in run_queries(manifest, page["query_examples"]))
     (segment,) = page["segments"]
     assert {"width", "height", "size.progress"} <= set(segment["sampled"])
     width = segment["sampled"]["width"]
@@ -62,3 +90,29 @@ def test_catalogue_and_batch_queries(tmp_path, capsys):
         run_queries(manifest, [])
     assert main(["query", str(manifest), "--list"]) == 0
     assert json.loads(capsys.readouterr().out)["sequence_id"] == "bar"
+
+
+def test_legacy_catalogue_and_batch_with_missing_raster(tmp_path, capsys):
+    frames, _ = progress()
+    analyze(frames, tmp_path, fps=60, functions=True, sheets=False)
+    path = tmp_path / "functions.json"
+    data = json.loads(path.read_bytes())
+    for motion in data["motions"]:
+        del motion["timing"]
+    path.write_text(json.dumps(data), encoding="utf-8")
+    assert main(["query", str(path), "--list"]) == 0
+    page = json.loads(capsys.readouterr().out)
+    (segment,) = page["segments"]
+    start, end = segment["visible_t_ms"]
+    assert segment["visible_duration_ms"] == pytest.approx(end - start)
+    assert segment["design"] is None
+    assert segment["design_unavailable_reason"] == "legacy_missing_timing"
+
+    (tmp_path / data["frames"][0]["raster_file"]).unlink()
+    examples = {q["id"]: q for q in page["query_examples"]}
+    queries = tmp_path / "queries.json"
+    queries.write_text(json.dumps([examples["pixel"], examples["sampled"]]), encoding="utf-8")
+    assert main(["query", str(path), str(queries)]) == 0
+    failed, succeeded = json.loads(capsys.readouterr().out)
+    assert failed["id"] == "pixel" and failed["error"]
+    assert succeeded["id"] == "sampled" and "value" in succeeded

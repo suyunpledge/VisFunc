@@ -1115,14 +1115,17 @@ def _solid_box(crops: list[np.ndarray], times, origin, inv_scale: float, thresho
                          "height_from": _r(size[first, 1] * s, 1), "height_to": _r(size[last, 1] * s, 1),
                          "anchor": ["left", "top", "right", "bottom"][fixed] if anchored else "none",
                          "reference": "solid_colour_box"}}
-    shift = centre[last] - centre[first]
+    start, end = first, last
+    shift = centre[-1] - centre[0]
     if not anchored and float(np.linalg.norm(shift)) >= 2:  # 两条边都在动：同时有位移
         direction = shift / np.linalg.norm(shift)
-        travel = (centre - centre[first]) @ direction
+        travel = (centre - centre[0]) @ direction
         a, b, _, move_progress, c2 = _fit_channel(t, travel, float(np.clip(0.3 / max(abs(float(travel[-1])), 1e-6), 0.002, 0.05)), False)
+        start, end = min(first, a), max(last, b)
+        shift = centre[b] - centre[a]
         channels["translate"] = {"t_start_ms": _r(t[a], 3), "t_end_ms": _r(t[b], 3), "duration_ms": _r(t[b] - t[a], 3),
-                                 "easing": c2, "from": [_r((centre[first][0] + origin[0]) * s, 1), _r((centre[first][1] + origin[1]) * s, 1)],
-                                 "to": [_r((centre[last][0] + origin[0]) * s, 1), _r((centre[last][1] + origin[1]) * s, 1)],
+                                 "easing": c2, "from": [_r((centre[a][0] + origin[0]) * s, 1), _r((centre[a][1] + origin[1]) * s, 1)],
+                                 "to": [_r((centre[b][0] + origin[0]) * s, 1), _r((centre[b][1] + origin[1]) * s, 1)],
                                  "delta": [_r(shift[0] * s, 1), _r(shift[1] * s, 1)], "distance_px": _r(np.linalg.norm(shift) * s, 1),
                                  "reference": "solid_colour_box_center"}
     pad = 4
@@ -1130,11 +1133,11 @@ def _solid_box(crops: list[np.ndarray], times, origin, inv_scale: float, thresho
     y0 = max(0, int(np.floor(edges[:, 1].min())) - pad)
     x1 = min(width, int(np.ceil(edges[:, 2].max())) + pad)
     y1 = min(height, int(np.ceil(edges[:, 3].max())) + pad)
-    keys = {first: "start", last: "end"}
+    keys = {start: "start", end: "end"}
     if last - first >= 2:
         keys.setdefault(first + int(np.argmin(np.abs(progress[first : last + 1] - 0.5))), "midpoint")
     samples = []
-    for k in np.unique(np.linspace(first, last, min(last - first + 1, 40)).round().astype(int)):
+    for k in np.unique(np.linspace(start, end, min(end - start + 1, 40)).round().astype(int)):
         row = {"t_ms": _r(t[k], 3), "progress": _r(progress[k], 3), "x": _r((centre[k][0] + origin[0]) * s, 1),
                "y": _r((centre[k][1] + origin[1]) * s, 1), "width": _r(size[k, 0] * s, 1), "height": _r(size[k, 1] * s, 1),
                "channel_progress": {"size": _r(progress[k], 3)}}
@@ -1153,6 +1156,6 @@ def _solid_box(crops: list[np.ndarray], times, origin, inv_scale: float, thresho
         "easing": curve,
         "samples": samples,
         "_roi": (x0, y0, x1, y1),
-        "_view": {"pos": centre - np.array([x0, y0]), "progress": progress, "start": first, "end": last,
+        "_view": {"pos": centre - np.array([x0, y0]), "progress": progress, "start": start, "end": end,
                   "progress_range": (first, last), "keys": sorted(keys.items())},
     }

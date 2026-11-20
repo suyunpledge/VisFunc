@@ -157,6 +157,8 @@ motionspec query probe/functions/functions.json query.json
 四个颜色分量 `color.r/g/b/a`（查询需写完整名称，例如 `color.r`）取值 0 到 1；
 `property.value` 保留自定义数值的原始单位和符号，属性名在 `reference.property_name`。
 几何样本的 `width` 和 `height` 单位为源像素。只有实际保存了对应样本的片段才提供该函数。
+从 Qt 几何轨迹新生成的片段还保留控件的旋转角 `rot_deg`，单位为度。
+对采样时刻求值返回记录的角度，采样点之间的查询标记为 `interpolated`。
 采样点间线性插值，区间外不外推。录制内的元素 ID 和同步组保存在每段的 `reference`；
 同组元素仍可逐个查询。这些属性值不等于渲染后的像素颜色。
 
@@ -170,10 +172,16 @@ python -m motionspec query functions/functions.json --list
 
 目录只从清单里提取：每个片段的类型、置信度、区域、可见区间与设计时间，每个采样函数的单位、
 时间支持、取值范围、节点数和来源，每个拟合函数的时间支持与 RMSE，以及可做像素查询的帧号和时间。
-不做新的测量。上面这个例子从 132 KB 缩到 4 KB。
+目录还列出坐标系、证据覆盖范围和片段的测量参照。对于 Qt 自定义属性，可用
+`reference.element_id` 和 `reference.property_name` 找到要查询的控件和属性。
+`visible_duration_ms` 表示可见时长，`design.duration_ms` 表示设计时长估计。
+旧包缺少时间协议时，目录仍保留可见区间，并返回 `design: null` 和原因 `legacy_missing_timing`。
+如果旧规格曾按宽度变化截短片段，使平移通道超出片段边界，需从源视频重新运行 `analyze` 才能取回遗漏区间的采样。
+`query_examples` 根据当前清单中的帧号、函数名和有效时间生成，可以直接提交给 `query`。
 
 参数文件可以是一个调用，也可以是至多 1000 个调用的列表。批量时逐个求值，某个调用出错
-（时间超出支持范围、函数不存在、参数不合法）只在它自己的结果里给出 `error`，不影响其他调用。
+（例如参数不合法，或该帧的像素文件缺失）时，该项返回 `id` 和 `error`，同批的其余项继续求值。
+函数清单本身无法读取或验证时，整次请求失败。
 
 各条测量路径现在导出的采样函数：
 

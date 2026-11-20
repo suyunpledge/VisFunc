@@ -30,6 +30,15 @@ def _shape() -> tuple[bytes, bytes]:
         return buf.getvalue(), image.tobytes()
 
 
+def test_pixel_digest_and_samples_remain_bound_to_the_same_bytes():
+    buffer = bytearray([10, 20, 30, 40])
+    raster = RasterFunction(1, 1, buffer)
+    original = raster.pixel_sha256
+    buffer[0] = 100
+    assert raster.pixel(0, 0) == (10, 20, 30, 40)
+    assert raster.pixel_sha256 == original == sha256(raster.samples).hexdigest()
+
+
 def test_raster_round_trip_preserves_all_channels_and_validates_hash():
     source, pixels = _shape()
     raster = RasterFunction.from_image(source)

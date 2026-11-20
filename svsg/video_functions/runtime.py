@@ -6,6 +6,7 @@ import json
 import math
 from bisect import bisect_left
 from hashlib import sha256
+from operator import itemgetter
 from pathlib import Path
 
 from svsg.contracts.video_functions import (
@@ -25,15 +26,16 @@ def evaluate(function: SampledFunction | FittedProgress, t_ms: float) -> dict:
     if type(t_ms) not in (int, float) or not math.isfinite(t_ms):
         raise ValueError("time must be a finite number")
     if isinstance(function, SampledFunction):
-        times = [row[0] for row in function.knots]
-        if not times[0] <= t_ms <= times[-1]:
+        knots = function.knots
+        if not knots[0][0] <= t_ms <= knots[-1][0]:
             raise ValueError("time outside function support; extrapolation is disabled")
-        index = bisect_left(times, t_ms)
-        if times[index] == t_ms:
-            value = function.knots[index][1]
-            support, mode = [times[index]], "sample"
+        index = bisect_left(knots, t_ms, key=itemgetter(0))
+        b, vb = knots[index]
+        if b == t_ms:
+            value = vb
+            support, mode = [b], "sample"
         else:
-            (a, va), (b, vb) = function.knots[index - 1 : index + 1]
+            a, va = knots[index - 1]
             weight = (t_ms - a) / (b - a)
             value = va * (1 - weight) + vb * weight
             support, mode = [a, b], "interpolated"

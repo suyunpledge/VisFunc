@@ -158,6 +158,7 @@ def _segment(element: dict, table: np.ndarray, ticks: np.ndarray, ratio: float, 
     for k in np.unique(np.linspace(start, end, min(end - start + 1, 40)).round().astype(int)):
         samples.append({"t_ms": _r(t[k], 3), "progress": _r(lead["progress"][k], 3), "x": _r(centre[k][0], 1),
                         "y": _r(centre[k][1], 1), "opacity": _r(alpha[k], 3), "scale": _r(scale[k], 3),
+                        "rot_deg": float(rotation[k]),
                         "width": _r(width[k], 3), "height": _r(height[k], 3),
                         "channel_progress": {name: _r(f["progress"][k], 3) for name, f in fitted.items()}})
     t_start, t_end = _r(t[start], 3), _r(t[end], 3)

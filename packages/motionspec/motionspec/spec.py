@@ -148,6 +148,10 @@ def validate(spec: dict) -> list[str]:
                         or ("t_start_ms" in channel and not _interval(channel))
                         or not _valid_easing(channel.get("easing"))):
                     problems.append(f"{where} has an invalid {name!r} channel")
+                elif "t_start_ms" in channel and _interval(seg) and not (
+                    seg["t_start_ms"] <= channel["t_start_ms"] <= channel["t_end_ms"] <= seg["t_end_ms"]
+                ):
+                    problems.append(f"{where} {name!r} timing exceeds the segment; re-analyse the source")
         if not _valid_easing(seg.get("easing")):
             problems.append(f"{where} has invalid easing")
         if "timing" in seg:

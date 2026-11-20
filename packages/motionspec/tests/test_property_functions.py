@@ -6,6 +6,7 @@ import pytest
 
 from motionspec import check, validate
 from motionspec.cli import main
+from motionspec.functions import catalogue, run_queries
 from motionspec.qt_probe import Recorder
 from motionspec.spec import summarize
 from motionspec.trace import spec_from_trace
@@ -84,6 +85,31 @@ def test_custom_properties_keep_names_negative_values_and_unknown_units():
         assert evaluate(curve, (a[0] + b[0]) / 2)["value"] == pytest.approx((a[1] + b[1]) / 2)
         with pytest.raises(ValueError, match="outside"):
             evaluate(curve, curve.knots[-1][0] + 1)
+
+
+def test_probe_directory_exposes_property_identity_and_recorded_rotation(tmp_path):
+    trace = property_trace({"offset": [[i, -3 + i / 8] for i in range(5, 18)]})
+    for row in trace["elements"][0]["rows"]:
+        row[FIELDS.index("rotation")] = -30 + row[0] * 2.25
+    spec_from_trace(trace, tmp_path)
+    assert main(["functions", str(tmp_path / "spec.json"), "-o", str(tmp_path)]) == 0
+    path = tmp_path / "functions.json"
+    page = catalogue(path)
+    assert page["coverage"] == "qt_properties_only"
+    assert page["coordinate_space"] == "qt_window_device_px"
+    assert all(q["op"] == "motion_value" for q in page["query_examples"])
+    assert all("value" in r for r in run_queries(path, page["query_examples"]))
+    prop = next(s for s in page["segments"] if "property.value" in s["sampled"])
+    assert prop["reference"]["element_id"] == "button"
+    assert prop["reference"]["property_name"] == "offset"
+    rotating = next(s for s in page["segments"] if "rot_deg" in s["sampled"])
+    angle, between = run_queries(path, [
+        {"id": f"t{t}", "op": "motion_value", "segment_id": rotating["segment_id"], "name": "rot_deg", "t_ms": t}
+        for t in (200, 210)
+    ])
+    assert angle["unit"] == "degrees" and angle["value"] == -7.5
+    assert angle["provenance"] == "qt_property_sample" and angle["evaluation"] == "sample"
+    assert between["evaluation"] == "interpolated" and between["value"] == pytest.approx(-6.375)
 
 
 def test_colour_region_covers_motion_during_property_change():
