@@ -1,17 +1,19 @@
 """Prepare short, frame-aligned MOT17 clips. Ground truth is only read by the scorer."""
+
 import argparse
 import configparser
 import json
 from concurrent.futures import ThreadPoolExecutor
 from hashlib import sha256
+from http.client import IncompleteRead
 from pathlib import Path
 from time import sleep
 from urllib.request import urlopen
 
 import cv2
 import numpy as np
-
 from motionspec import analyze
+
 from svsg.image_functions.compiler import describe_raster
 from svsg.image_functions.projection import function_context
 from svsg.image_functions.raster import RasterFunction
@@ -22,7 +24,9 @@ SPLITS = {"dev": ("02", "04", "05"), "holdout": ("09", "10", "13")}
 
 
 def save(path, value):
-    path.write_text(json.dumps(value, ensure_ascii=False, allow_nan=False, indent=2), encoding="utf-8")
+    path.write_text(
+        json.dumps(value, ensure_ascii=False, allow_nan=False, indent=2), encoding="utf-8"
+    )
 
 
 def read(path):
@@ -37,7 +41,7 @@ def download(url, path):
                     data = response.read()
                 path.write_bytes(data)
                 break
-            except OSError:
+            except (OSError, IncompleteRead):
                 if attempt == 2:
                     raise
                 sleep(attempt + 1)
@@ -49,36 +53,48 @@ def geometry(clip, last_frame):
     evidence = describe_raster(RasterFunction.from_image(last_frame))
     image = function_context(evidence)
     grid = image.get("quantized") or image
-    regions = [{k: r[k] for k in ("box", "area_px", "rgba", "shape", "centroid_x", "centroid_y")}
-               for r in grid["regions"]]
+    regions = [
+        {k: r[k] for k in ("box", "area_px", "rgba", "shape", "centroid_x", "centroid_y")}
+        for r in grid["regions"]
+    ]
     return {
         "frame_size_px": [evidence.width_px, evidence.height_px],
-        "last_frame_color_grid_size": [grid.get("width", evidence.width_px), grid.get("height", evidence.height_px)],
+        "last_frame_color_grid_size": [
+            grid.get("width", evidence.width_px),
+            grid.get("height", evidence.height_px),
+        ],
         "color_regions_in_grid_coordinates": regions,
         "motion_segments_in_source_pixels": [
             {k: s[k] for k in ("region", "t_start_ms", "t_end_ms", "kind", "confidence")}
             for s in spec["segments"]
         ],
-        "meaning": "Color regions and motion segments are geometric measurements without object labels.",
+        "meaning": (
+            "Color regions and motion segments are geometric measurements without object labels."
+        ),
     }
 
 
-def prepare(root, seq):
+def prepare(root, seq, *, midpoint=False, start_seconds=2):
     folder = root / seq
     folder.mkdir(parents=True, exist_ok=True)
     url = f"{BASE}/MOT17-{seq}-FRCNN"
     ini = configparser.ConfigParser()
-    ini.read_string(download(f"{url}/seqinfo.ini", folder/"seqinfo.ini").decode("utf-8-sig"))
+    ini.read_string(download(f"{url}/seqinfo.ini", folder / "seqinfo.ini").decode("utf-8-sig"))
     fps = ini.getint("Sequence", "frameRate")
-    indices = [1 + round((2 + i/5)*fps) for i in range(11)]
+    indices = [1 + round((start_seconds + i / 5) * fps) for i in range(6 if midpoint else 11)]
+    source_path = folder / "source.json"
+    if source_path.exists() and read(source_path)["source_frames"] != indices:
+        raise ValueError("use a separate output directory for each sampling window")
+
     def fetch(i):
-        raw = download(f"{url}/img1/{i:06d}.jpg", folder/f"{i:06d}.jpg")
+        raw = download(f"{url}/img1/{i:06d}.jpg", folder / f"{i:06d}.jpg")
         return cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
+
     with ThreadPoolExecutor(max_workers=5) as pool:
         frames = list(pool.map(fetch, indices))
-    h,w = frames[0].shape[:2]
+    h, w = frames[0].shape[:2]
     clip = folder / "clip.mp4"
-    writer = cv2.VideoWriter(str(clip), cv2.VideoWriter_fourcc(*"mp4v"), 5, (w,h))
+    writer = cv2.VideoWriter(str(clip), cv2.VideoWriter_fourcc(*"mp4v"), 5, (w, h))
     if not writer.isOpened():
         raise RuntimeError("cannot encode evaluation video")
     try:
@@ -94,23 +110,44 @@ def prepare(root, seq):
             break
         decoded.append(frame)
     cap.release()
-    if len(decoded) != 13:
+    if len(decoded) != len(indices) + 2:
         raise ValueError("unexpected encoded frame count")
-    last = folder/"last.png"
+    last = folder / "last.png"
     if not cv2.imwrite(str(last), decoded[-1]):
         raise OSError("cannot write evaluation frame")
-    save(folder/"geometry.json", geometry(clip, last))
-    gt = download(f"{url}/gt/gt.txt", folder/"gt.txt")
-    save(folder/"source.json", {"revision": REV, "sequence": seq, "source_frames": indices,
-         "last_frame": indices[-1], "size": [w,h], "clip_sha256": sha256(clip.read_bytes()).hexdigest(),
-         "last_png_sha256": sha256(last.read_bytes()).hexdigest(), "gt_sha256": sha256(gt).hexdigest()})
+    save(folder / "geometry.json", geometry(clip, last))
+    gt = download(f"{url}/gt/gt.txt", folder / "gt.txt")
+    save(
+        folder / "source.json",
+        {
+            "revision": REV,
+            "sequence": seq,
+            "source_frames": indices,
+            "last_frame": indices[-1],
+            "size": [w, h],
+            "clip_sha256": sha256(clip.read_bytes()).hexdigest(),
+            "last_png_sha256": sha256(last.read_bytes()).hexdigest(),
+            "gt_sha256": sha256(gt).hexdigest(),
+        },
+    )
     print("prepared", seq, indices[-1], flush=True)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", type=Path)
+    parser.add_argument("--start-seconds", type=int, default=2)
+    parser.add_argument(
+        "--sequences", nargs="+", choices=("02", "04", "05", "09", "10", "11", "13")
+    )
+    parser.add_argument(
+        "--midpoint",
+        action="store_true",
+        help="prepare the held-out clips ending at 3 s in a separate output directory",
+    )
     args = parser.parse_args()
-    for split in SPLITS.values():
-        for sequence in split:
-            prepare(args.root, sequence)
+    sequences = args.sequences or (
+        SPLITS["holdout"] if args.midpoint else SPLITS["dev"] + SPLITS["holdout"]
+    )
+    for sequence in sequences:
+        prepare(args.root, sequence, midpoint=args.midpoint, start_seconds=args.start_seconds)

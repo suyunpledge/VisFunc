@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, cast
 
+from svsg.image_functions.raster import RasterFunction
+
 from .geometry_engine import BBox
 
 ImageSource = bytes | Path
@@ -117,7 +119,7 @@ class YoloDetector:
     模型来源）。权重路径即版本标识，写入 IR.detector_model。
     """
 
-    def __init__(self, weights: str = "yolov8n.pt") -> None:
+    def __init__(self, weights: str = "yolov8n.pt", *, imgsz: int | None = None) -> None:
         try:
             from ultralytics import YOLO  # noqa: PLC0415
         except ImportError as exc:  # pragma: no cover
@@ -126,18 +128,27 @@ class YoloDetector:
             ) from exc
         self._model = YOLO(weights)
         self._weights = weights
+        self._imgsz = imgsz
 
     @property
     def model_name(self) -> str:
         return f"yolov8::{self._weights}"
 
     def detect(self, image: ImageSource) -> list[RawDetection]:
-        # ultralytics 8.x 不接受 bytes 输入(仅支持路径/PIL/numpy/URL),
-        # 这里把 bytes 转成 PIL Image 再送入推理(复用 Pillow,惰性导入)。
-        from svsg.image_functions.raster import RasterFunction
+        return self.detect_raster(RasterFunction.from_image(image))
 
-        with RasterFunction.from_image(image).to_image() as rgba, rgba.convert("RGB") as src:
-            results = cast(Any, self._model.predict(src, verbose=False))
+    def detect_raster(self, raster: RasterFunction) -> list[RawDetection]:
+        options: dict[str, Any] = {} if self._imgsz is None else {"imgsz": self._imgsz}
+        with raster.to_image() as rgba, rgba.convert("RGB") as src:
+            results = cast(Any, self._model.predict(src, verbose=False, **options))
+            try:
+                import cv2
+                import numpy as np
+
+                with rgba.convert("L") as gray:
+                    pixels = np.asarray(gray)
+            except ImportError:
+                pixels = None
         raw: list[RawDetection] = []
         for result in results:
             names = result.names
@@ -146,31 +157,17 @@ class YoloDetector:
                 continue
             for box in boxes:
                 x1, y1, x2, y2 = (int(round(v)) for v in box.xyxy[0].tolist())
+                sharpness = 1.0
+                if pixels is not None:
+                    crop = pixels[y1:y2, x1:x2]
+                    variance = float(cv2.Laplacian(crop, cv2.CV_64F).var()) if crop.size else 0.0
+                    sharpness = min(1.0, variance / 500.0)
                 raw.append(
                     RawDetection(
                         label=str(names[int(box.cls[0])]),
                         bbox=(x1, y1, x2, y2),
                         detection_score=float(box.conf[0]),
-                        local_edge_sharpness=self._edge_sharpness(image, (x1, y1, x2, y2)),
+                        local_edge_sharpness=sharpness,
                     )
                 )
         return raw
-
-    @staticmethod
-    def _edge_sharpness(image: ImageSource, bbox: BBox) -> float:
-        """裁剪区域的 Laplacian 方差归一化锐度；无 OpenCV 时保守返回 1.0。"""
-        try:
-            import cv2  # noqa: PLC0415
-            import numpy as np  # noqa: PLC0415
-        except ImportError:  # pragma: no cover
-            return 1.0
-        from svsg.image_functions.raster import RasterFunction
-
-        with RasterFunction.from_image(image).to_image() as rgba, rgba.convert("L") as gray:
-            img = np.array(gray)
-        x1, y1, x2, y2 = bbox
-        crop = img[y1:y2, x1:x2]
-        if crop.size == 0:  # pragma: no cover
-            return 1.0
-        # 经验归一化：Laplacian 方差 500+ 视为完全清晰
-        return float(min(1.0, cv2.Laplacian(crop, cv2.CV_64F).var() / 500.0))

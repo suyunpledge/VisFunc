@@ -72,6 +72,18 @@ def main(argv: list[str] | None = None) -> int:
     d = sub.add_parser("demo", help="analyse built-in synthetic clips")
     d.add_argument("-o", "--out", default="motionspec-demo")
 
+    candidates = sub.add_parser("candidates", help="measure object proposals on an exported frame")
+    candidates.add_argument("manifest")
+    candidates.add_argument("--frame", type=int, required=True)
+    candidates.add_argument("--previous-frame", type=int)
+    candidates.add_argument("--weights", type=Path, required=True)
+    candidates.add_argument("--crowd-weights", type=Path, help="optional CrowdHuman person/head ONNX weights")
+    candidates.add_argument("--label", default="person")
+    views = candidates.add_mutually_exclusive_group()
+    views.add_argument("--whole-frame", dest="detail", action="store_false", help="skip detail crops")
+    views.add_argument("--detail-always", dest="detail", action="store_true", help="always inspect detail crops")
+    candidates.set_defaults(detail=None)
+
     t = sub.add_parser("trace", help="convert a Qt probe trace (motionspec.qt_probe) into a spec")
     t.add_argument("trace")
     t.add_argument("-o", "--out", default="motionspec-out")
@@ -118,6 +130,31 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, ValueError) as exc:
             f.exit(2, f"motionspec functions: {exc}\n")
         print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.command == "candidates":
+        try:
+            from svsg.l1_compiler.detector_adapter import YoloDetector
+            from svsg.recognition.crowd_detector import CrowdHumanDetector
+            from svsg.recognition.video_candidates import frame_candidates
+            from svsg.video_functions import VideoRuntime
+
+            rt = VideoRuntime.load(args.manifest)
+            if args.previous_frame is not None and args.previous_frame >= args.frame:
+                raise ValueError("previous frame must precede target frame")
+            if not args.weights.is_file():
+                raise ValueError("supply an installed local detector weights file")
+            target = rt.raster(args.frame)
+            prior = rt.raster(args.previous_frame) if args.previous_frame is not None else None
+            detector = YoloDetector(str(args.weights), imgsz=1280)
+            crowd_detector = CrowdHumanDetector(args.crowd_weights) if args.crowd_weights else None
+            result = frame_candidates(detector, target, prior, args.label,
+                                      detail=args.detail, crowd_detector=crowd_detector)
+            result.update(sequence_id=rt.bundle.sequence_id, frame_index=args.frame,
+                          previous_frame_index=args.previous_frame)
+        except (OSError, ValueError, ImportError) as exc:
+            candidates.exit(2, f"motionspec candidates: {exc}\n")
+        print(json.dumps(result, ensure_ascii=False, allow_nan=False))
         return 0
 
     if args.command == "query":
