@@ -16,18 +16,34 @@ from svsg.recognition.crowd_detector import CrowdHumanDetector
 
 
 def run(
-    root, sequences, weights, *, live=False, controls=False, adaptive=False, crowd_weights=None
+    root,
+    sequences,
+    weights,
+    *,
+    live=False,
+    controls=False,
+    proposal_control=False,
+    adaptive=False,
+    crowd_weights=None,
+    compare_overlap=False,
 ):
     model = YoloDetector(str(weights), imgsz=1280)
     digest = sha256(weights.read_bytes()).hexdigest()
     jobs = []
     records = []
     profiles = {"whole": False, "detail": True}
+    proposal_profile, prefix = "detail", ""
     if adaptive:
         profiles["auto"] = None
     specialist = CrowdHumanDetector(crowd_weights) if crowd_weights else None
     if specialist:
         profiles = {"auto": None, "crowd": None}
+        proposal_profile, prefix = "crowd", "crowd-"
+    if compare_overlap:
+        if not specialist:
+            raise ValueError("the paired overlap comparison requires crowd weights")
+        profiles = {"before": None, "after": None}
+        proposal_profile, prefix = "after", "overlap-"
     for seq in sequences:
         src = root / seq
         for profile, use_detail in profiles.items():
@@ -40,7 +56,8 @@ def run(
                 digest,
                 detail=use_detail,
                 output=dest,
-                crowd_detector=specialist if profile == "crowd" else None,
+                crowd_detector=specialist if profile in ("crowd", "before", "after") else None,
+                overlap_review=profile != "before",
             )
             seconds = perf_counter() - start
             packet = read(dest / "candidates-px.json")
@@ -57,8 +74,8 @@ def run(
             jobs.append((seq, profile, "video_proposals"))
         if controls:
             jobs.extend((seq, "control", c) for c in BASELINE)
-            jobs.append((seq, "crowd" if specialist else "detail", "proposals"))
-    prefix = "crowd-" if specialist else ""
+        if controls or proposal_control:
+            jobs.append((seq, proposal_profile, "proposals"))
     save(root / f"{prefix}detector-scores.json", records)
     random.Random(917).shuffle(jobs)
     if live:
@@ -118,9 +135,19 @@ if __name__ == "__main__":
         help="also run raw video, geometry and detail-only controls",
     )
     parser.add_argument("--live", action="store_true", help="make paid requests in fresh sessions")
+    parser.add_argument(
+        "--proposal-control",
+        action="store_true",
+        help="also send geometry and proposed boxes without video",
+    )
     parser.add_argument("--auto", action="store_true", help="also evaluate automatic cropping")
     parser.add_argument(
         "--crowd-weights", type=Path, help="compare automatic crops with/without CrowdHuman ONNX"
+    )
+    parser.add_argument(
+        "--compare-overlap",
+        action="store_true",
+        help="pair the same crowd detector with overlap review off and on",
     )
     args = parser.parse_args()
     run(
@@ -129,6 +156,8 @@ if __name__ == "__main__":
         args.weights,
         live=args.live,
         controls=args.controls,
+        proposal_control=args.proposal_control,
         adaptive=args.auto,
         crowd_weights=args.crowd_weights,
+        compare_overlap=args.compare_overlap,
     )

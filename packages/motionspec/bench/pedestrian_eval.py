@@ -6,6 +6,7 @@ import math
 import random
 from concurrent.futures import ThreadPoolExecutor
 from hashlib import sha256
+from itertools import combinations
 from pathlib import Path
 
 import client
@@ -165,15 +166,25 @@ def score(folder, predictions_px):
                 else "background",
             }
         )
+    overlapping = [
+        (i, j)
+        for i, j in combinations(range(len(gt)), 2)
+        if iou(gt[i]["bbox_px"], gt[j]["bbox_px"]) >= 0.35
+    ]
     return {
         "tp": len(matches),
         "fp": len(errors),
+        "duplicates": sum(e["kind"] == "duplicate" for e in errors),
+        "overlap_pairs": len(overlapping),
+        "both_matched": sum(i in hit and j in hit for i, j in overlapping),
         "fn": len(gt) - len(matches),
         "ignored_predictions": len(predictions_px) - len(matches) - len(errors),
         "small_gt": sum(g["small"] for g in gt),
         "small_tp": sum(gt[i]["small"] for i in hit),
         "occluded_gt": sum(g["visibility"] <= 0.5 for g in gt),
         "occluded_tp": sum(gt[i]["visibility"] <= 0.5 for i in hit),
+        "severe_gt": sum(g["visibility"] <= 0.25 for g in gt),
+        "severe_tp": sum(gt[i]["visibility"] <= 0.25 for i in hit),
         "misses": [g for i, g in enumerate(gt) if i not in hit],
         "false_positives": errors,
     }

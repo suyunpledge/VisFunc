@@ -12,7 +12,16 @@ from svsg.l1_compiler.detector_adapter import YoloDetector
 from svsg.recognition.video_candidates import frame_candidates
 
 
-def make(folder, detector, weight_digest, *, detail=None, output=None, crowd_detector=None):
+def make(
+    folder,
+    detector,
+    weight_digest,
+    *,
+    detail=None,
+    output=None,
+    crowd_detector=None,
+    overlap_review=True,
+):
     output = folder if output is None else output
     cap = cv2.VideoCapture(str(folder / "clip.mp4"))
     samples = len(read(folder / "source.json")["source_frames"])
@@ -36,6 +45,7 @@ def make(folder, detector, weight_digest, *, detail=None, output=None, crowd_det
         "person",
         detail=detail,
         crowd_detector=crowd_detector,
+        overlap_review=overlap_review,
     )
     data.update(
         model=Path(detector.model_name.split("::", 1)[-1]).name,

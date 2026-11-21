@@ -12,7 +12,12 @@ from svsg.l1_compiler.detector_adapter import RawDetection
 
 class CrowdHumanDetector:
     def __init__(self, weights: Path) -> None:
-        import onnxruntime as ort
+        try:
+            import onnxruntime as ort
+        except ImportError as exc:
+            raise ImportError(
+                "install the project's crowd extra to load CrowdHuman ONNX weights"
+            ) from exc
 
         with weights.open("rb") as stream:
             self.weights_sha256 = file_digest(stream, "sha256").hexdigest()
@@ -22,7 +27,11 @@ class CrowdHumanDetector:
             str(weights), options, providers=["CPUExecutionProvider"]
         )
         names = self.session.get_modelmeta().custom_metadata_map.get("names", "{}")
-        if literal_eval(names) != {0: "person", 1: "head"}:
+        try:
+            classes = literal_eval(names)
+        except (SyntaxError, ValueError) as exc:
+            raise ValueError("invalid CrowdHuman ONNX class metadata") from exc
+        if classes != {0: "person", 1: "head"}:
             raise ValueError("expected a CrowdHuman ONNX export with classes 0=person and 1=head")
         self.input_name = self.session.get_inputs()[0].name
         self.output_name = self.session.get_outputs()[0].name

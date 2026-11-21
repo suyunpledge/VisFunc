@@ -78,6 +78,7 @@ def main(argv: list[str] | None = None) -> int:
     candidates.add_argument("--previous-frame", type=int)
     candidates.add_argument("--weights", type=Path, required=True)
     candidates.add_argument("--crowd-weights", type=Path, help="optional CrowdHuman person/head ONNX weights")
+    candidates.add_argument("--no-overlap-review", action="store_true", help="skip the second-person review")
     candidates.add_argument("--label", default="person")
     views = candidates.add_mutually_exclusive_group()
     views.add_argument("--whole-frame", dest="detail", action="store_false", help="skip detail crops")
@@ -149,7 +150,8 @@ def main(argv: list[str] | None = None) -> int:
             detector = YoloDetector(str(args.weights), imgsz=1280)
             crowd_detector = CrowdHumanDetector(args.crowd_weights) if args.crowd_weights else None
             result = frame_candidates(detector, target, prior, args.label,
-                                      detail=args.detail, crowd_detector=crowd_detector)
+                                      detail=args.detail, crowd_detector=crowd_detector,
+                                      overlap_review=not args.no_overlap_review)
             result.update(sequence_id=rt.bundle.sequence_id, frame_index=args.frame,
                           previous_frame_index=args.previous_frame)
         except (OSError, ValueError, ImportError) as exc:

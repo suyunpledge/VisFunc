@@ -2,48 +2,18 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from svsg.image_functions.raster import RasterFunction
 from svsg.l1_compiler.detector_adapter import YoloDetector
 from svsg.recognition.crowd_detector import CrowdHumanDetector
+from svsg.recognition.crowd_pairs import review_overlaps
 from svsg.recognition.geometry import Box, canonical_label, iou
-
-
-@dataclass(frozen=True)
-class _Box:
-    bbox: Box
-    score: float
-    view: Box
-
-    @property
-    def area(self) -> int:
-        x, y, right, bottom = self.bbox
-        return (right - x) * (bottom - y)
+from svsg.recognition.video_evidence import _Box, _match, _match_heads, _proposal, measured_boxes
 
 
 def _measure(
     detector: YoloDetector, frame: RasterFunction, label: str, view: Box, size: tuple[int, int]
 ) -> list[_Box]:
-    x, y, right, bottom = view
-    width, height = size
-    boxes = []
-    for detection in detector.detect_raster(frame):
-        if detection.detection_score < 0.25 or canonical_label(detection.label) != label:
-            continue
-        a, b, c, d = detection.bbox
-        if not (0 <= a < c <= frame.width and 0 <= b < d <= frame.height):
-            continue
-        # An internal crop edge can turn part of a person into a second detection.
-        if (
-            (x > 0 and a <= 2)
-            or (y > 0 and b <= 2)
-            or (right < width and c >= frame.width - 2)
-            or (bottom < height and d >= frame.height - 2)
-        ):
-            continue
-        boxes.append(_Box((x + a, y + b, x + c, y + d), detection.detection_score, view))
-    return boxes
+    return measured_boxes(detector.detect_raster(frame), view, size, label, 0.25)
 
 
 def _detail_boxes(detector: YoloDetector, frame: RasterFunction, label: str) -> list[_Box]:
@@ -66,65 +36,14 @@ def _detail_boxes(detector: YoloDetector, frame: RasterFunction, label: str) -> 
     return unique
 
 
-def _match(current: list[_Box], support: list[_Box], minimum: float) -> dict[int, int]:
-    edges = [
-        (iou(a.bbox, b.bbox), i, j) for i, a in enumerate(current) for j, b in enumerate(support)
-    ]
-    matches: dict[int, int] = {}
-    used: set[int] = set()
-    for overlap, i, j in sorted(edges, reverse=True):
-        if overlap < minimum:
-            break
-        if i not in matches and j not in used:
-            matches[i] = j
-            used.add(j)
-    return matches
-
-
-def _proposal(box: _Box, prior: _Box | None, detail: _Box | None) -> dict:
-    return {
-        "bbox_px": list(box.bbox),
-        "score": round(box.score, 4),
-        "view_px": list(box.view),
-        "prior_iou": round(iou(box.bbox, prior.bbox), 4) if prior else None,
-        "prior_bbox_px": list(prior.bbox) if prior else None,
-        "prior_view_px": list(prior.view) if prior else None,
-        "supporting_detail_bbox_px": list(detail.bbox) if detail else None,
-        "supporting_detail_view_px": list(detail.view) if detail else None,
-    }
-
-
-def _match_heads(bodies: list[_Box], heads: list[_Box]) -> dict[int, int]:
-    """Assign a visible head once, favoring the expected upper-body center."""
-    edges = []
-    for i, body in enumerate(bodies):
-        left, top, right, bottom = body.bbox
-        w, h = right - left, bottom - top
-        for j, head in enumerate(heads):
-            x, y, x1, y1 = head.bbox
-            cx, cy = (x + x1) / 2, (y + y1) / 2
-            if (
-                left <= cx <= right
-                and top - 0.08 * h <= cy <= top + 0.42 * h
-                and y1 - y <= 0.55 * h
-                and x1 - x <= 0.95 * w
-            ):
-                cost = ((cx - (left + right) / 2) / w) ** 2 + ((cy - top) / h - 0.12) ** 2
-                edges.append((cost, i, j))
-    matched: dict[int, int] = {}
-    used: set[int] = set()
-    for _, i, j in sorted(edges):
-        if i not in matched and j not in used:
-            matched[i] = j
-            used.add(j)
-    return matched
-
-
 def _add_crowd_candidates(
     detector: CrowdHumanDetector,
     current: RasterFunction,
     previous: RasterFunction | None,
     boxes: list[dict],
+    *,
+    crops: bool,
+    overlap_review: bool,
 ) -> None:
     full = (0, 0, current.width, current.height)
     observations = detector.detect_raster(current)
@@ -139,23 +58,18 @@ def _add_crowd_candidates(
         for i, b in enumerate(bodies)
         if all(iou(b.bbox, other["bbox_px"]) < 0.45 for other in boxes)
     ]
-    if not available:
+    if not available and (not overlap_review or previous is None or not boxes):
         return
     head_matches = _match_heads(bodies, heads)
-    prior = (
-        [
-            _Box(d.bbox, d.detection_score, full)
-            for d in detector.detect_raster(previous)
-            if d.label == "person"
-        ]
-        if previous is not None
-        else []
-    )
-    temporal = _match(bodies, prior, 0.35)
+    prior_observations = detector.detect_raster(previous) if previous is not None else []
+    prior = [
+        _Box(d.bbox, d.detection_score, full) for d in prior_observations if d.label == "person"
+    ]
+    temporal = _match(bodies, prior, 0.55)
     for i in available:
-        if i not in head_matches and i not in temporal:
-            continue
         body = bodies[i]
+        if i not in temporal and (i not in head_matches or body.score < 0.75):
+            continue
         if any(iou(body.bbox, other["bbox_px"]) >= 0.47 for other in boxes):
             continue
         p = prior[temporal[i]] if i in temporal else None
@@ -168,6 +82,10 @@ def _add_crowd_candidates(
             prior_score=p.score if p else None,
         )
         boxes.append(entry)
+    if overlap_review and previous is not None:
+        review_overlaps(
+            detector, current, previous, boxes, observations, prior_observations, crops=crops
+        )
 
 
 def frame_candidates(
@@ -178,6 +96,7 @@ def frame_candidates(
     *,
     detail: bool | None = None,
     crowd_detector: CrowdHumanDetector | None = None,
+    overlap_review: bool = True,
 ) -> dict:
     label = canonical_label(label)
     if crowd_detector is not None and label != "person":
@@ -228,7 +147,14 @@ def frame_candidates(
             if j in tracked and all(iou(box.bbox, other["bbox_px"]) < 0.45 for other in boxes):
                 boxes.append(_proposal(box, prior_tiles[tracked[j]], None))
     if crowd_detector is not None:
-        _add_crowd_candidates(crowd_detector, current, previous if distinct else None, boxes)
+        _add_crowd_candidates(
+            crowd_detector,
+            current,
+            previous if distinct else None,
+            boxes,
+            crops=detail is not False,
+            overlap_review=overlap_review,
+        )
     result = {
         "label": label,
         "model": detector.model_name,

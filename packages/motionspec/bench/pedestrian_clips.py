@@ -1,4 +1,4 @@
-"""Prepare short, frame-aligned MOT17 clips. Ground truth is only read by the scorer."""
+"""Prepare short, frame-aligned MOT17 and MOT20 clips for last-frame evaluation."""
 
 import argparse
 import configparser
@@ -20,6 +20,8 @@ from svsg.image_functions.raster import RasterFunction
 
 REV = "f93908467986c77765667925a526ad07be8ad630"
 BASE = f"https://huggingface.co/datasets/Lekim89/MOT17/resolve/{REV}/train"
+MOT20_REV = "5fcaa0ef66906b63195a44672ec260d033545ef4"
+MOT20_SEQUENCES = ("01", "02", "03", "05")
 SPLITS = {"dev": ("02", "04", "05"), "holdout": ("09", "10", "13")}
 
 
@@ -74,15 +76,23 @@ def geometry(clip, last_frame):
     }
 
 
-def prepare(root, seq, *, midpoint=False, start_seconds=2):
+def prepare(root, seq, *, midpoint=False, start_seconds=2, dataset="MOT17"):
     folder = root / seq
     folder.mkdir(parents=True, exist_ok=True)
+    revision = REV
     url = f"{BASE}/MOT17-{seq}-FRCNN"
+    if dataset == "MOT20":
+        revision = MOT20_REV
+        url = f"https://huggingface.co/datasets/Lekim89/MOT20/resolve/{revision}/train/MOT20-{seq}"
+    source_path = folder / "source.json"
+    if source_path.exists() and read(source_path)["revision"] != revision:
+        raise ValueError("use a separate output directory for each dataset")
     ini = configparser.ConfigParser()
     ini.read_string(download(f"{url}/seqinfo.ini", folder / "seqinfo.ini").decode("utf-8-sig"))
+    if ini.get("Sequence", "name") != url.rsplit("/", 1)[-1]:
+        raise ValueError("cached sequence metadata belongs to a different sequence")
     fps = ini.getint("Sequence", "frameRate")
     indices = [1 + round((start_seconds + i / 5) * fps) for i in range(6 if midpoint else 11)]
-    source_path = folder / "source.json"
     if source_path.exists() and read(source_path)["source_frames"] != indices:
         raise ValueError("use a separate output directory for each sampling window")
 
@@ -93,13 +103,15 @@ def prepare(root, seq, *, midpoint=False, start_seconds=2):
     with ThreadPoolExecutor(max_workers=5) as pool:
         frames = list(pool.map(fetch, indices))
     h, w = frames[0].shape[:2]
+    # The mp4v encoder requires even dimensions. Keep the source coordinate origin.
+    w, h = w - w % 2, h - h % 2
     clip = folder / "clip.mp4"
     writer = cv2.VideoWriter(str(clip), cv2.VideoWriter_fourcc(*"mp4v"), 5, (w, h))
     if not writer.isOpened():
         raise RuntimeError("cannot encode evaluation video")
     try:
         for frame in [*frames, frames[-1], frames[-1]]:
-            writer.write(frame)
+            writer.write(frame[:h, :w])
     finally:
         writer.release()
     cap = cv2.VideoCapture(str(clip))
@@ -120,7 +132,8 @@ def prepare(root, seq, *, midpoint=False, start_seconds=2):
     save(
         folder / "source.json",
         {
-            "revision": REV,
+            "dataset": dataset,
+            "revision": revision,
             "sequence": seq,
             "source_frames": indices,
             "last_frame": indices[-1],
@@ -137,17 +150,30 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", type=Path)
     parser.add_argument("--start-seconds", type=int, default=2)
-    parser.add_argument(
-        "--sequences", nargs="+", choices=("02", "04", "05", "09", "10", "11", "13")
-    )
+    parser.add_argument("--dataset", choices=("MOT17", "MOT20"), default="MOT17")
+    parser.add_argument("--sequences", nargs="+")
     parser.add_argument(
         "--midpoint",
         action="store_true",
         help="prepare the held-out clips ending at 3 s in a separate output directory",
     )
     args = parser.parse_args()
-    sequences = args.sequences or (
-        SPLITS["holdout"] if args.midpoint else SPLITS["dev"] + SPLITS["holdout"]
+    allowed = (
+        MOT20_SEQUENCES if args.dataset == "MOT20" else SPLITS["dev"] + SPLITS["holdout"] + ("11",)
     )
+    defaults = (
+        MOT20_SEQUENCES
+        if args.dataset == "MOT20"
+        else (SPLITS["holdout"] if args.midpoint else SPLITS["dev"] + SPLITS["holdout"])
+    )
+    sequences = args.sequences or defaults
+    if any(seq not in allowed for seq in sequences):
+        parser.error(f"available sequences for {args.dataset}: {', '.join(allowed)}")
     for sequence in sequences:
-        prepare(args.root, sequence, midpoint=args.midpoint, start_seconds=args.start_seconds)
+        prepare(
+            args.root,
+            sequence,
+            midpoint=args.midpoint,
+            start_seconds=args.start_seconds,
+            dataset=args.dataset,
+        )

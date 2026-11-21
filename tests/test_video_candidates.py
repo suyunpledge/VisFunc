@@ -133,7 +133,7 @@ class CrowdFixture:
 
 def test_crowd_full_body_needs_current_body_and_unique_head_or_distinct_prior():
     bodies = [
-        RawDetection("person", (5, 5, 33, 56), 0.7),
+        RawDetection("person", (5, 5, 33, 56), 0.78),
         RawDetection("person", (23, 5, 51, 56), 0.8),
     ]
     head = RawDetection("head", (22, 6, 27, 14), 0.65)
@@ -167,6 +167,19 @@ def test_crowd_preserves_baseline_box_and_rejects_other_labels():
         frame_candidates(detector, now, prior, "car", crowd_detector=crowd)
 
 
+def test_weak_body_and_head_need_consistent_prior_position():
+    body = RawDetection("person", (10, 5, 30, 50), 0.65)
+    head = RawDetection("head", (15, 6, 23, 14), 0.9)
+    drifted = RawDetection("person", (18, 5, 38, 50), 0.85)
+    now, prior = marked_raster(1), marked_raster(2)
+    for before, expected_count in (([drifted], 0), ([body], 1)):
+        crowd = CrowdFixture([body, head], before)
+        result = frame_candidates(
+            TileDetector(), now, prior, "person", detail=False, crowd_detector=crowd
+        )
+        assert len(result["boxes"]) == expected_count
+
+
 def test_crowd_decode_unpads_coordinates_and_keeps_overlapping_head_and_body():
     np = pytest.importorskip("numpy")
     pytest.importorskip("cv2")
@@ -193,3 +206,58 @@ def test_crowd_decode_unpads_coordinates_and_keeps_overlapping_head_and_body():
         ("person", (30, 10, 70, 50)),
         ("head", (45, 12, 55, 22)),
     ]
+
+
+@pytest.mark.parametrize("evidence", ["separate", "one_head", "one_prior", "repeat", "disabled"])
+def test_overlapping_neighbor_requires_its_own_current_head_and_prior_body(evidence):
+    first = RawDetection("person", (10, 5, 42, 55), 0.85)
+    second = RawDetection("person", (21, 5, 53, 55), 0.76)
+    left_head = RawDetection("head", (17, 6, 26, 15), 0.78)
+    right_head = RawDetection("head", (36, 6, 45, 15), 0.72)
+    heads = [left_head] if evidence == "one_head" else [left_head, right_head]
+    prior = [first] if evidence == "one_prior" else [first, second]
+    crowd = CrowdFixture([first, second, *heads], prior)
+
+    class WholeFrame:
+        model_name = "whole"
+
+        def detect_raster(self, image):
+            return [first]
+
+    now = marked_raster(1)
+    result = frame_candidates(
+        WholeFrame(),
+        now,
+        now if evidence == "repeat" else marked_raster(2),
+        "person",
+        detail=False,
+        crowd_detector=crowd,
+        overlap_review=evidence != "disabled",
+    )
+    expected = [list(first.bbox)]
+    if evidence == "separate":
+        expected.append(list(second.bbox))
+        recovered = result["boxes"][-1]
+        assert recovered["prior_bbox_px"] == list(second.bbox)
+        assert recovered["head_bbox_px"] == list(right_head.bbox)
+        assert recovered["separated_from"] == [
+            {"bbox_px": list(first.bbox), "head_bbox_px": list(left_head.bbox)}
+        ]
+    assert [b["bbox_px"] for b in result["boxes"]] == expected
+
+
+def test_two_new_neighbors_keep_distinct_tracks_and_merge_repeated_crop_observations():
+    from svsg.recognition.crowd_pairs import _Pair, _same_observation
+    from svsg.recognition.video_evidence import _Box
+
+    full = (0, 0, 100, 60)
+
+    def observation(body, head, view=full):
+        box = _Box(body, 0.8, view)
+        return _Pair(box, _Box(head, 0.8, view), box, [])
+
+    a = observation((10, 5, 42, 55), (16, 6, 23, 15))
+    b = observation((21, 5, 53, 55), (35, 6, 43, 15))
+    assert not _same_observation(a, b)
+    jittered = observation((11, 6, 43, 54), (18, 7, 26, 16), (5, 0, 55, 60))
+    assert _same_observation(a, jittered)
