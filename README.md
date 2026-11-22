@@ -85,7 +85,9 @@ provenance `motion_estimate`.
 
 ### Read subtitles and UI icons
 
-Install local OCR to read Chinese and English captions and locate known icons in a screenshot or exported video frames. Results include source-pixel boxes and frame provenance. Automatic caption search retains likely title text in `detached_text_candidates`. When a measured gap and independent OCR reads support an extra space in a code, `spacing_review` records its original text and pixel position. Use `--player-toolbar` for bottom-bar icon matching and filtering player readouts, or `--icon-dir` to supply labeled PNG exemplars. [Evaluation and options](docs/subtitle-icon-evaluation-20261122.md) · [Cross-player recording results](docs/player-recordings-20261122.md)
+Install local OCR to read Chinese and English captions and locate icons in screenshots or exported video frames. Results include source-pixel boxes and frame provenance. A verified word gap in a caption or code is recorded in `spacing_review`. Automatic subtitle search keeps likely titles in `detached_text_candidates`. For video manifests it can also resolve a fluctuating title box using nearby frames, with the supporting indices in `temporal_review`. A requested `--frame` receives the same review as that frame in the full sequence.
+
+Use `--player-toolbar` for bottom-bar icons and player readouts. `--icon-dir` selects your own PNG template bank. `--fallback-icon-dir` first runs the built-in toolbar detector, then checks unused positions against your templates with support from nearby controls. [Evaluation and options](docs/subtitle-icon-evaluation-20261122.md) · [Earlier recording results](docs/player-recordings-20261122.md) · [Temporal OCR and unfamiliar icon styles](docs/temporal-player-overlays-20261122.md)
 
 ```bash
 python -m pip install -e ".[overlays]" -e "./packages/motionspec"

@@ -215,7 +215,8 @@ def _word_cuts(gray, bright: bool) -> list[int]:
     low, high = np.percentile(ink[dy : h - dy, dx : w - dx], [25, 93])
     if high - low < 65:
         return []
-    cuts: list[int] = []
+    stable = np.ones(w, dtype=bool)
+    clipped_strokes = np.zeros(w, dtype=bool)
     for fraction in (0.50, 0.68):
         mask = np.asarray(ink >= low + fraction * (high - low), dtype=np.uint8)
         _, _, stats, _ = cv2.connectedComponentsWithStats(mask)
@@ -224,11 +225,14 @@ def _word_cuts(gray, bright: bool) -> list[int]:
         for x, y, width, height, area in stats[1:]:
             if (
                 height < max(3, h * 0.28)
-                or width > height * 1.5
+                or width > height * 1.9
                 or area < height
-                or y == 0
-                or y + height == h
             ):
+                continue
+            if y == 0 or y + height == h:
+                # A cropped ascender can sit in the middle of an apparent space.
+                # Veto cuts through it without using the edge to estimate kerning.
+                clipped_strokes[x : x + width] = True
                 continue
             columns[x : x + width] = True
             heights.append(height)
@@ -237,16 +241,19 @@ def _word_cuts(gray, bright: bool) -> list[int]:
         xs = np.flatnonzero(columns)
         gaps = np.diff(xs) - 1
         typical = np.median(gaps[gaps > 0]) if np.any(gaps > 0) else 0
-        minimum = max(3, 0.30 * np.median(heights), typical + 1.5)
-        centers = [int(xs[i] + 1 + gaps[i] // 2) for i in np.flatnonzero(gaps >= minimum)]
-        if fraction == 0.50:
-            cuts = centers
-        else:
-            cuts = [x for x in cuts if any(abs(x - other) <= 1 for other in centers)]
-    return cuts
+        minimum = max(3, 0.30 * np.median(heights), typical + 1.5, typical * 1.55)
+        blank = np.zeros(w, dtype=bool)
+        for i in np.flatnonzero(gaps >= minimum):
+            blank[xs[i] + 1 : xs[i + 1]] = True
+        stable &= blank
+    # Antialiasing can shift a gap's midpoint even when its blank intervals overlap.
+    positions = np.flatnonzero(stable)
+    runs = np.split(positions, np.flatnonzero(np.diff(positions) > 1) + 1)
+    centers = [int(run[len(run) // 2]) for run in runs if len(run) >= 2]
+    return [cut for cut in centers if not clipped_strokes[cut]]
 
 
-def _review_code_spaces(engine, bgr, line: dict) -> dict:
+def _review_word_spacing(engine, bgr, line: dict) -> dict:
     """Insert a space at a measured gap only when both substrings decode independently."""
     import cv2
 
@@ -254,9 +261,14 @@ def _review_code_spaces(engine, bgr, line: dict) -> dict:
     boundaries = {
         match.start() + 1 for match in re.finditer(r"(?=([A-Za-z][0-9]|[0-9][A-Za-z]))", original)
     }
-    if not boundaries:
+    if boundaries:
+        boundaries.update(match.start() + 1 for match in re.finditer(r"[a-z][A-Z]", original))
+    # A split inside an English token needs at least two letters on each side.
+    word_boundaries = {m.start() for m in re.finditer(r"(?<=[A-Za-z]{2})(?=[A-Za-z]{2})", original)}
+    # Also recognize a terminal uppercase initial after a lowercase word.
+    word_boundaries.update(m.start() for m in re.finditer(r"(?<=[a-z]{2})(?=[A-Z]$)", original))
+    if not (boundaries or word_boundaries):
         return line
-    boundaries.update(match.start() + 1 for match in re.finditer(r"[a-z][A-Z]", original))
     left, top, right, bottom = line["bbox_px"]
     crop = bgr[top:bottom, left:right]
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
@@ -269,11 +281,12 @@ def _review_code_spaces(engine, bgr, line: dict) -> dict:
             continue
         prefix, sa = a[0]
         pos = len(prefix)
+        minimum = 0.90 if pos in boundaries else 0.95
         if (
-            pos not in boundaries
+            (pos not in boundaries and pos not in word_boundaries)
             or not original.startswith(prefix)
             or not isfinite(sa)
-            or sa < 0.90
+            or sa < minimum
         ):
             continue
         b, _ = engine(crop[:, cut:], use_det=False, use_cls=False)
@@ -288,7 +301,7 @@ def _review_code_spaces(engine, bgr, line: dict) -> dict:
             again, _ = engine(crop[2:-2, cut:-2], use_det=False, use_cls=False)
             if again and len(again) == 1 and again[0][0] == suffix:
                 sb = again[0][1]
-        if isfinite(sb) and sb >= 0.90:
+        if isfinite(sb) and sb >= minimum:
             spaces[pos] = left + cut
             confidence = min(confidence, float(sa), float(sb))
     if not spaces:
@@ -346,7 +359,7 @@ class SubtitleReader:
             if all(iou(line["bbox_px"], other["bbox_px"]) < 0.45 for other in kept):
                 kept.append(line)
         reviewed = [
-            _review_code_spaces(
+            _review_word_spacing(
                 self.engine,
                 bgr,
                 _review_typography(

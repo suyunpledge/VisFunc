@@ -2,7 +2,7 @@ import pytest
 
 from svsg.recognition import overlays
 from svsg.recognition.icon_matching import load_icons, match_icons
-from svsg.recognition.subtitle_ocr import _review_code_spaces, split_caption_band
+from svsg.recognition.subtitle_ocr import _review_word_spacing, split_caption_band
 
 cv2 = pytest.importorskip("cv2")
 np = pytest.importorskip("numpy")
@@ -62,7 +62,7 @@ def test_insert_space_needs_measured_gap_and_both_original_substrings(
         return [[next(reads), 0.98]], None
 
     line = dict(text="AB12", score=0.99, bbox_px=(0, 0, 38, 19))
-    out = _review_code_spaces(engine, crop, line)
+    out = _review_word_spacing(engine, crop, line)
     assert out["text"] == expected
     if expected == "AB 12":
         assert 14 <= out["spacing_review"]["gap_x_px"][0] <= 21
@@ -82,3 +82,71 @@ def test_muted_variant_requires_visible_cross_not_just_speaker_body():
     assert len(read()) == 1
     frame[:, 30:] = 20
     assert read() == []
+
+
+@pytest.mark.parametrize(
+    ("gap", "second", "expected"),
+    [(7, "NOW", "EXIT NOW"), (2, "NOW", "EXITNOW"), (7, "N0W", "EXITNOW")],
+)
+def test_english_word_space_uses_pixel_gap_and_exact_letters(gap, second, expected):
+    crop = np.full((19, 62, 3), 12, np.uint8)
+    for x in [4, 10, 16, 22, 26 + gap, 32 + gap, 38 + gap]:
+        crop[4:15, x : x + 4] = 241
+    reads = iter([["EXIT", 0.99], [second, 0.99]])
+    line = dict(text="EXITNOW", score=0.99, bbox_px=(0, 0, 62, 19))
+    out = _review_word_spacing(lambda *a, **kw: ([next(reads)], None), crop, line)
+    assert out["text"] == expected
+
+
+def test_bare_speaker_rejects_wave_outside_template():
+    icon = next(i for i in load_icons(player_toolbar=True) if i.check_speaker_margin)
+    frame = np.full((44, 80, 3), 18, np.uint8)
+    h, w = icon.pixels.shape
+    glyph = cv2.resize(icon.pixels, (round(24 * w / h), 24), interpolation=cv2.INTER_AREA)
+    frame[10:34, 16 : 16 + glyph.shape[1]] = (18 + 0.89 * glyph)[:, :, None]
+    found = match_icons(frame, (0, 0, 80, 44), [icon], sizes=(24,))
+    assert [i["label"] for i in found] == ["mute"]
+    frame[16:28, 19 + glyph.shape[1] : 21 + glyph.shape[1]] = 230
+    assert not match_icons(frame, (0, 0, 80, 44), [icon], sizes=(24,))
+
+
+def test_fallback_fills_row_gaps_without_overriding_volume_or_accepting_isolated_marks():
+    from svsg.recognition.icon_matching import supplement_toolbar
+
+    def hit(label, box, score=0.98):
+        return dict(label=label, bbox_px=box, score=score)
+
+    volume = hit("volume", (20, 40, 46, 60))
+    play = hit("play", (70, 40, 86, 60))
+    complete = hit("fullscreen", (110, 40, 126, 60))
+    inside = hit("mute", (21, 43, 29, 56))
+    stray = hit("mute", (110, 2, 126, 22))
+    low = hit("mute", (145, 40, 161, 60), 0.9)
+    result = supplement_toolbar([volume, play], [inside, complete, stray, low])
+    assert result[:2] == [volume, play]
+    assert len(result) == 3 and result[2]["template_id"] == "reference/fullscreen"
+    assert result[2]["row_support_px"]
+    assert supplement_toolbar([], [complete]) == []
+
+
+def test_letterspaced_title_cannot_invent_word_inside_track():
+    from svsg.recognition.subtitle_ocr import _word_cuts
+
+    crop = np.zeros((25, 154), np.uint8)
+    x = 3
+    for gap in (5, 5, 3, 13, 5, 6, 7, 5, 4, 0):
+        crop[4:21, x : x + 7] = 235
+        x += 7 + gap
+    cuts = _word_cuts(crop, True)
+    assert len(cuts) == 1 and 44 <= cuts[0] <= 56
+
+
+def test_word_boundary_cannot_pass_through_clipped_ascender():
+    from svsg.recognition.subtitle_ocr import _word_cuts
+
+    crop = np.zeros((20, 48), np.uint8)
+    for x in (2, 8, 14, 29, 35, 41):
+        crop[4:15, x : x + 4] = 235
+    (gap,) = _word_cuts(crop, True)
+    crop[:15, gap : gap + 2] = 235
+    assert _word_cuts(crop, True) == []

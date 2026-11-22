@@ -21,6 +21,7 @@ class Icon:
     template_id: str | None = None
     # The speaker-cross variant shares its left side with a loudspeaker.
     detail_from_x: float | None = None
+    check_speaker_margin: bool = False
 
 
 def _icon(label, image):
@@ -50,6 +51,68 @@ def _icon(label, image):
         digest.hexdigest(),
         foreground if glyph and np.ptp(foreground) > 35 else None,
     )
+
+
+def _transport_variants() -> list[Icon]:
+    from PIL import Image, ImageDraw
+
+    variants = []
+    for width, height, arm, stroke in ((60, 44, 15, 5), (52, 52, 15, 5)):
+        image = Image.new("RGBA", (64, 64))
+        draw = ImageDraw.Draw(image)
+        for x, dx in ((2, 1), (width + 1, -1)):
+            for y, dy in ((2, 1), (height + 1, -1)):
+                for a, b in ((arm, stroke), (stroke, arm)):
+                    end_x, end_y = x + dx * (a - 1), y + dy * (b - 1)
+                    draw.rectangle(
+                        (min(x, end_x), min(y, end_y), max(x, end_x), max(y, end_y)), fill="white"
+                    )
+        icon = _icon("fullscreen", image)
+        icon.template_id = f"fullscreen/thin-corners-{width}x{height}"
+        variants.append(icon)
+
+    image = Image.new("RGBA", (64, 64))
+    draw = ImageDraw.Draw(image)
+    for x, y, d in ((4, 59, 1), (59, 4, -1)):
+        draw.line([(x, y - 24 * d), (x, y), (x + 24 * d, y)], fill="white", width=6)
+        draw.line([(x, y), (x + 23 * d, y - 23 * d)], fill="white", width=8)
+    icon = _icon("fullscreen", image)
+    icon.template_id = "fullscreen/open-arrows"
+    variants.append(icon)
+
+    for style in ("speaker-only", "adjacent-cross", "diagonal-strike", "outline-cross"):
+        image = Image.new("RGBA", (64, 64))
+        draw = ImageDraw.Draw(image)
+        if style in ("speaker-only", "adjacent-cross"):
+            draw.polygon([(4, 22), (16, 22), (35, 5), (35, 58), (16, 41), (4, 41)], fill="white")
+        if style == "adjacent-cross":
+            for a, b in ((21, 42), (42, 21)):
+                draw.line([(38, a), (59, b)], fill="white", width=7)
+        elif style == "diagonal-strike":
+            # A strike normally extends beyond the speaker and breaks the
+            # upper half of the waves. Reserve a clear edge on that side.
+            draw.polygon([(6, 21), (17, 21), (33, 5), (33, 53), (17, 39), (6, 39)], fill="white")
+            draw.arc((4, 0, 62, 56), -69, 68, fill="white", width=7)
+            draw.arc((22, 13, 48, 43), -58, 58, fill="white", width=6)
+            draw.line([(7, 0), (63, 56)], fill=(0, 0, 0, 0), width=9)
+            draw.line([(2, 3), (60, 61)], fill="white", width=7)
+        elif style == "outline-cross":
+            draw.line(
+                [(43, 15), (43, 5), (22, 22), (4, 22), (4, 43), (22, 43), (43, 59), (43, 49)],
+                fill="white",
+                width=4,
+            )
+            for a, b in ((20, 45), (45, 20)):
+                draw.line([(36, a), (60, b)], fill="white", width=5)
+        icon = _icon("mute", image)
+        icon.template_id = f"mute/{style}"
+        if style == "adjacent-cross":
+            icon.detail_from_x = 0.61
+        if style == "outline-cross":
+            icon.detail_from_x = 0.59
+        icon.check_speaker_margin = style == "speaker-only"
+        variants.append(icon)
+    return variants
 
 
 def load_icons(directory: Path | None = None, *, player_toolbar: bool = False) -> list[Icon]:
@@ -149,6 +212,7 @@ def load_icons(directory: Path | None = None, *, player_toolbar: bool = False) -
             if style == "speaker-cross":
                 icon.detail_from_x = 0.62
             icons.append(icon)
+        icons.extend(_transport_variants())
     return icons
 
 
@@ -168,6 +232,40 @@ def _row_support(box: Box, anchors: list[dict]) -> list[Box]:
             if len(support) == 2:
                 break
     return support
+
+
+def supplement_toolbar(primary: list[dict], references: list[dict]) -> list[dict]:
+    """Fill unoccupied positions with strong reference hits supported by another control."""
+    strong = [row for row in references if row["score"] >= 0.93]
+    anchors = [*primary, *strong]
+    kept = list(primary)
+    for row in strong:
+        box = row["bbox_px"]
+        x, y, r, b = box
+        # A bare speaker exemplar can lie wholly inside a larger volume glyph.
+        # Include containment as well as IoU when deciding whether a spot is occupied.
+        occupied = False
+        for existing in kept:
+            a, t, c, d = existing["bbox_px"]
+            overlap = max(0, min(c, r) - max(a, x)) * max(0, min(b, d) - max(y, t))
+            if (
+                overlap >= 0.5 * min((r - x) * (b - y), (c - a) * (d - t))
+                or iou(box, existing["bbox_px"]) >= 0.35
+            ):
+                occupied = True
+                break
+        if occupied:
+            continue
+        support = _row_support(box, [v for v in anchors if v["label"] != row["label"]])
+        if support:
+            kept.append(
+                {
+                    **row,
+                    "template_id": "reference/" + row.get("template_id", row["label"]),
+                    "row_support_px": support,
+                }
+            )
+    return kept
 
 
 def match_icons(
@@ -200,7 +298,7 @@ def match_icons(
             if icon.silhouette:
                 glyph = np.pad(template, pad)
                 similarity = np.abs(cv2.matchTemplate(gray, glyph, cv2.TM_CCOEFF_NORMED))
-                threshold = 0.86
+                threshold = 0.93 if icon.check_speaker_margin else 0.86
             else:
                 # Use only opaque pixels: transparent margins have no observed RGB.
                 mask = (template[:, :, 3] >= 192).astype(np.uint8)
@@ -224,8 +322,9 @@ def match_icons(
                 threshold = 1 - tolerance / 255
             maxima = cv2.dilate(similarity, np.ones((5, 5), np.uint8))
             soften = review_row and icon.silhouette and size <= 32
+            review_threshold = 0.88 if icon.check_speaker_margin else 0.73
             ys, xs = np.where(
-                (similarity >= (0.73 if soften else threshold)) & (similarity == maxima)
+                (similarity >= (review_threshold if soften else threshold)) & (similarity == maxima)
             )
             soft_glyph = None
             for y, x in zip(ys.tolist(), xs.tolist(), strict=True):
@@ -235,6 +334,21 @@ def match_icons(
                     patch = gray[y : y + th + 2 * pad, x : x + tw + 2 * pad]
                     if patch.max().item() - patch.min().item() < 32:
                         continue
+                    if icon.check_speaker_margin:
+                        # Waves or a slash just outside the speaker body would
+                        # turn a partial match into a false mute. Require free space.
+                        start = x + pad + tw
+                        margin = max(3, round(th * 0.70))
+                        tail = gray[y + pad : y + pad + th, start : start + margin]
+                        if tail.shape[1] != margin:
+                            continue
+                        bg = float(np.median(patch[glyph <= 24]))
+                        delta = float(np.median(patch[glyph >= 192])) - bg
+                        if (
+                            abs(delta) < 64
+                            or np.count_nonzero((tail.astype(float) - bg) / delta > 0.4) > 1
+                        ):
+                            continue
                     if icon.detail_from_x is not None:
                         # The speaker body is shared with volume. Verify the X
                         # separately, in the same polarity as the complete glyph.

@@ -99,7 +99,10 @@ def main(argv: list[str] | None = None) -> int:
         "--player-toolbar", action="store_true",
         help="search the bottom 15%% for icons and separate player readouts from captions",
     )
-    overlays.add_argument("--icon-dir", type=Path, help="PNG exemplars named by label")
+    icon_bank = overlays.add_mutually_exclusive_group()
+    icon_bank.add_argument("--icon-dir", type=Path, help="PNG exemplars named by label")
+    icon_bank.add_argument("--fallback-icon-dir", type=Path,
+                           help="fill missed toolbar icons with row-supported PNG exemplars")
 
     t = sub.add_parser("trace", help="convert a Qt probe trace (motionspec.qt_probe) into a spec")
     t.add_argument("trace")
@@ -156,7 +159,7 @@ def main(argv: list[str] | None = None) -> int:
             result = measure_overlays(
                 args.source, frame=args.frame, only=args.only, icon_dir=args.icon_dir,
                 subtitle_region=args.subtitle_region, icon_region=args.icon_region,
-                player_toolbar=args.player_toolbar,
+                player_toolbar=args.player_toolbar, fallback_icon_dir=args.fallback_icon_dir,
             )
         except ImportError as exc:
             overlays.exit(2, f"install svsg[overlays] for screen recognition: {exc}\n")
