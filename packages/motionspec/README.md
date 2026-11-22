@@ -387,4 +387,4 @@ Tests are in `tests/`; run `python -m pytest` in this directory.
 
 ## License
 
-MIT
+[MIT](../../LICENSE)
