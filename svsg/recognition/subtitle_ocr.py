@@ -9,15 +9,64 @@ from typing import Any
 from svsg.recognition.geometry import Box, iou
 
 
-def split_caption_band(lines: list[dict], height: int) -> tuple[list[dict], list[dict]]:
-    """Separate detached upper text only when another caption-sized line anchors the lower band."""
+def _player_readouts(lines: list[dict], height: int) -> set[int]:
+    clocks = r"\d{1,2}:\d{2}(?::\d{2})?(?:\s*/\s*\d{1,2}:\d{2}(?::\d{2})?)?"
+    scales = []
+    detached: set[int] = set()
+    for i, line in enumerate(lines):
+        x, y, right, bottom = line["bbox_px"]
+        center_y = (y + bottom) / 2
+        if center_y >= 0.82 * height and re.fullmatch(clocks, line["text"]):
+            detached.add(i)
+        if re.fullmatch(r"[xX×]\s*\d+(?:[.,]\d+)?", line["text"]):
+            scales.append((i, (x + right) / 2, center_y, bottom - y))
+    # Playback test cards can have several simultaneous speed readouts.
+    # A lone cue such as "x2" or a line of dialogue mentioning a time stays eligible.
+    for i, x, y, h in scales:
+        if not any(abs(y - yy) < 0.45 * h and abs(x - xx) > 2 * h for _, xx, yy, _ in scales):
+            continue
+        detached.add(i)
+        for j, line in enumerate(lines):
+            a, b, c, d = line["bbox_px"]
+            if (
+                re.fullmatch(r"\d+", line["text"])
+                and abs((a + c) / 2 - x) < h
+                and 0 < y - (b + d) / 2 <= 1.8 * max(h, d - b)
+            ):
+                detached.add(j)
+    return detached
+
+
+def split_caption_band(
+    lines: list[dict], height: int, *, player_toolbar: bool = False
+) -> tuple[list[dict], list[dict]]:
+    """Keep connected lower captions and separate high, display-sized title lettering."""
+    readouts = _player_readouts(lines, height) if player_toolbar else set()
+    detached = [line for i, line in enumerate(lines) if i in readouts]
+    lines = [line for i, line in enumerate(lines) if i not in readouts]
     lower = []
     for line in lines:
         _, top, _, bottom = line["bbox_px"]
         if 0.70 * height <= (top + bottom) / 2 <= 0.95 * height:
             lower.append(line)
     if not lower:
-        return lines, []
+        captions = []
+        for line in lines:
+            left, top, right, bottom = line["bbox_px"]
+            letters = "".join(line["text"].split())
+            size = bottom - top
+            display_caps = (
+                len(letters) >= 4
+                and letters.isupper()
+                and (right - left) >= 0.63 * size * len(letters)
+                and size >= 0.05 * height
+            )
+            high = (top + bottom) / 2 <= 0.63 * height
+            if high and (display_caps or size >= 0.085 * height):
+                detached.append(line)
+            else:
+                captions.append(line)
+        return captions, detached
     _, band_top, _, band_bottom = min(lower, key=lambda row: row["bbox_px"][1])["bbox_px"]
     adjacent_height = band_bottom - band_top
     # Walk the connected block upward so the first line of a tall bilingual or
@@ -26,7 +75,7 @@ def split_caption_band(lines: list[dict], height: int) -> tuple[list[dict], list
         _, top, _, bottom = line["bbox_px"]
         if top < band_top and band_top - bottom <= 1.5 * max(bottom - top, adjacent_height):
             band_top, adjacent_height = top, bottom - top
-    captions, detached = [], []
+    captions = []
     for line in lines:
         _, top, _, bottom = line["bbox_px"]
         if (top + bottom) / 2 <= 0.65 * height and bottom < band_top:
@@ -153,6 +202,105 @@ def _review_typography(engine, bgr, line: dict) -> dict:
     }
 
 
+def _word_cuts(gray, bright: bool) -> list[int]:
+    """Propose wide blank columns between glyphs, stable at two ink thresholds."""
+    import cv2
+    import numpy as np
+
+    ink = gray if bright else 255 - gray
+    h, w = ink.shape
+    # The outside of an OCR box can include a bright video border around a
+    # dark subtitle plate. Estimate contrast from the interior of the line.
+    dy, dx = min(h // 8, 3), min(w // 10, 4)
+    low, high = np.percentile(ink[dy : h - dy, dx : w - dx], [25, 93])
+    if high - low < 65:
+        return []
+    cuts: list[int] = []
+    for fraction in (0.50, 0.68):
+        mask = np.asarray(ink >= low + fraction * (high - low), dtype=np.uint8)
+        _, _, stats, _ = cv2.connectedComponentsWithStats(mask)
+        columns = np.zeros(w, dtype=bool)
+        heights = []
+        for x, y, width, height, area in stats[1:]:
+            if (
+                height < max(3, h * 0.28)
+                or width > height * 1.5
+                or area < height
+                or y == 0
+                or y + height == h
+            ):
+                continue
+            columns[x : x + width] = True
+            heights.append(height)
+        if len(heights) < 3:
+            return []
+        xs = np.flatnonzero(columns)
+        gaps = np.diff(xs) - 1
+        typical = np.median(gaps[gaps > 0]) if np.any(gaps > 0) else 0
+        minimum = max(3, 0.30 * np.median(heights), typical + 1.5)
+        centers = [int(xs[i] + 1 + gaps[i] // 2) for i in np.flatnonzero(gaps >= minimum)]
+        if fraction == 0.50:
+            cuts = centers
+        else:
+            cuts = [x for x in cuts if any(abs(x - other) <= 1 for other in centers)]
+    return cuts
+
+
+def _review_code_spaces(engine, bgr, line: dict) -> dict:
+    """Insert a space at a measured gap only when both substrings decode independently."""
+    import cv2
+
+    original = line["text"]
+    boundaries = {
+        match.start() + 1 for match in re.finditer(r"(?=([A-Za-z][0-9]|[0-9][A-Za-z]))", original)
+    }
+    if not boundaries:
+        return line
+    boundaries.update(match.start() + 1 for match in re.finditer(r"[a-z][A-Z]", original))
+    left, top, right, bottom = line["bbox_px"]
+    crop = bgr[top:bottom, left:right]
+    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    cuts = sorted(set(_word_cuts(gray, True)) | set(_word_cuts(gray, False)))
+    spaces: dict[int, int] = {}
+    confidence = line["score"]
+    for cut in cuts:
+        a, _ = engine(crop[:, :cut], use_det=False, use_cls=False)
+        if not a or len(a) != 1:
+            continue
+        prefix, sa = a[0]
+        pos = len(prefix)
+        if (
+            pos not in boundaries
+            or not original.startswith(prefix)
+            or not isfinite(sa)
+            or sa < 0.90
+        ):
+            continue
+        b, _ = engine(crop[:, cut:], use_det=False, use_cls=False)
+        if not b or len(b) != 1:
+            continue
+        suffix, sb = b[0]
+        if suffix != original[pos:] or not isfinite(sb):
+            continue
+        if sb < 0.90 and len(suffix) == 1 and min(crop.shape[0], right - left - cut) >= 9:
+            # A digit by itself is sensitive to the edge of its subtitle plate.
+            # Keep the word boundary and ask for the same digit inside that edge.
+            again, _ = engine(crop[2:-2, cut:-2], use_det=False, use_cls=False)
+            if again and len(again) == 1 and again[0][0] == suffix:
+                sb = again[0][1]
+        if isfinite(sb) and sb >= 0.90:
+            spaces[pos] = left + cut
+            confidence = min(confidence, float(sa), float(sb))
+    if not spaces:
+        return line
+    return {
+        **line,
+        "text": "".join((" " if i in spaces else "") + c for i, c in enumerate(original)),
+        "score": confidence,
+        "spacing_review": {"original_text": original, "gap_x_px": list(spaces.values())},
+    }
+
+
 class SubtitleReader:
     def __init__(self) -> None:
         from rapidocr_onnxruntime import RapidOCR
@@ -198,8 +346,12 @@ class SubtitleReader:
             if all(iou(line["bbox_px"], other["bbox_px"]) < 0.45 for other in kept):
                 kept.append(line)
         reviewed = [
-            _review_typography(
-                self.engine, bgr, _review_edges(self.engine, bgr, region, line, kept)
+            _review_code_spaces(
+                self.engine,
+                bgr,
+                _review_typography(
+                    self.engine, bgr, _review_edges(self.engine, bgr, region, line, kept)
+                ),
             )
             for line in kept
         ]

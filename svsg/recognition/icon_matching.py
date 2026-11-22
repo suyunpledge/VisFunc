@@ -19,6 +19,8 @@ class Icon:
     template_sha256: str
     foreground_bgr: Any = None
     template_id: str | None = None
+    # The speaker-cross variant shares its left side with a loudspeaker.
+    detail_from_x: float | None = None
 
 
 def _icon(label, image):
@@ -50,7 +52,7 @@ def _icon(label, image):
     )
 
 
-def load_icons(directory: Path | None = None) -> list[Icon]:
+def load_icons(directory: Path | None = None, *, player_toolbar: bool = False) -> list[Icon]:
     from PIL import Image, ImageDraw
 
     if directory is not None:
@@ -104,6 +106,49 @@ def load_icons(directory: Path | None = None) -> list[Icon]:
             for left, right in ((8, 56), (56, 8)):
                 draw.line([(left, 8), (right, 56)], fill="white", width=8)
         icons.append(_icon(label, image))
+    if player_toolbar:
+        # Common transport-control constructions. Keep these extra hypotheses
+        # scoped to the toolbar, where their semantics and size are constrained.
+        for label, style in (
+            ("fullscreen", "diagonal-arrows"),
+            ("fullscreen", "triangular-corners"),
+            ("mute", "speaker-cross"),
+            ("volume", "wide-speaker"),
+            ("pause", "wide-bars"),
+        ):
+            image = Image.new("RGBA", (64, 64))
+            draw = ImageDraw.Draw(image)
+            if style == "diagonal-arrows":
+                for a, b in ((7, 55), (55, 7)):
+                    direction = 1 if a == 7 else -1
+                    draw.polygon(
+                        [(a, b), (a + 21 * direction, b), (a, b - 21 * direction)], fill="white"
+                    )
+                    draw.line(
+                        [(a, b), (a + 19 * direction, b - 19 * direction)], fill="white", width=6
+                    )
+            elif style == "triangular-corners":
+                for x, dx in ((5, 1), (58, -1)):
+                    for y, dy in ((5, 1), (58, -1)):
+                        draw.polygon([(x, y), (x + dx * 20, y), (x, y + dy * 20)], fill="white")
+            elif style == "wide-bars":
+                for x in (9, 37):
+                    draw.rectangle((x, 6, x + 16, 57), fill="white")
+            else:
+                draw.polygon(
+                    [(3, 23), (14, 23), (34, 6), (34, 57), (14, 40), (3, 40)], fill="white"
+                )
+                if style == "speaker-cross":
+                    for a, b in ((24, 40), (40, 24)):
+                        draw.line([(43, a), (58, b)], fill="white", width=5)
+                else:
+                    for bounds in ((12, 10, 60, 54), (28, 19, 48, 44)):
+                        draw.arc(bounds, -51, 51, fill="white", width=6)
+            icon = _icon(label, image)
+            icon.template_id = f"{label}/{style}"
+            if style == "speaker-cross":
+                icon.detail_from_x = 0.62
+            icons.append(icon)
     return icons
 
 
@@ -143,7 +188,9 @@ def match_icons(
     secondary: list[dict] = []
     for icon in icons:
         h, w = icon.pixels.shape[:2]
-        scales = sizes or sorted({*range(8, 21), 24, 28, 32, 40, 48, 64, max(w, h)})
+        scales = sizes or sorted(
+            {*range(8, 29 if review_row else 21), 24, 28, 32, 40, 48, 64, max(w, h)}
+        )
         for size in scales:
             tw, th = max(2, round(size * w / max(w, h))), max(2, round(size * h / max(w, h)))
             pad = max(2, round(size / 6)) if icon.silhouette else 0
@@ -188,6 +235,20 @@ def match_icons(
                     patch = gray[y : y + th + 2 * pad, x : x + tw + 2 * pad]
                     if patch.max().item() - patch.min().item() < 32:
                         continue
+                    if icon.detail_from_x is not None:
+                        # The speaker body is shared with volume. Verify the X
+                        # separately, in the same polarity as the complete glyph.
+                        detail = round(tw * icon.detail_from_x)
+                        tail = patch[pad : pad + th, pad + detail : pad + tw]
+                        cross = template[:, detail:]
+                        agreement = float(
+                            cv2.matchTemplate(tail, cross, cv2.TM_CCOEFF_NORMED)[0, 0]
+                        )
+                        polarity = float(patch[glyph >= 192].mean()) - float(
+                            patch[glyph <= 24].mean()
+                        )
+                        if agreement * np.sign(polarity) < 0.78:
+                            continue
                     if weak or (size <= 12 and score < 0.92):
                         # A single bright pixel can give a dark texture a large range.
                         # Compare the interior ink to its surrounding background instead.

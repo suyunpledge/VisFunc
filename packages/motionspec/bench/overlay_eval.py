@@ -52,6 +52,7 @@ def native(reader, icons, bgr):
 
 def evaluate(folder, mixed_icons=None):
     reader, icons = SubtitleReader(), load_icons()
+    toolbar_icons = load_icons(player_toolbar=True)
     calibrated = load_icons(folder / "icons") if (folder / "icons").is_dir() else []
     mixed = load_icons(mixed_icons) if mixed_icons else []
     for row in json.loads((folder / "truth.json").read_text(encoding="utf-8")):
@@ -88,7 +89,7 @@ def evaluate(folder, mixed_icons=None):
         if result.get("detached_text_candidates"):
             entry["detached_text_candidates"] = result["detached_text_candidates"]
         for key, bank in (
-            ("toolbar", icons),
+            ("toolbar", toolbar_icons),
             ("calibrated_toolbar", calibrated),
             ("mixed_toolbar", mixed),
         ):

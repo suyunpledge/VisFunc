@@ -95,7 +95,10 @@ def main(argv: list[str] | None = None) -> int:
     overlays.add_argument("--subtitle-region", nargs=4, type=int, metavar=("L", "T", "R", "B"))
     icon_area = overlays.add_mutually_exclusive_group()
     icon_area.add_argument("--icon-region", nargs=4, type=int, metavar=("L", "T", "R", "B"))
-    icon_area.add_argument("--player-toolbar", action="store_true", help="search the bottom 15%% for icons")
+    icon_area.add_argument(
+        "--player-toolbar", action="store_true",
+        help="search the bottom 15%% for icons and separate player readouts from captions",
+    )
     overlays.add_argument("--icon-dir", type=Path, help="PNG exemplars named by label")
 
     t = sub.add_parser("trace", help="convert a Qt probe trace (motionspec.qt_probe) into a spec")

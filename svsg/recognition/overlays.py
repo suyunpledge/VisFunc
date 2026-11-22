@@ -64,7 +64,7 @@ def measure_overlays(
     if player_toolbar and icon_region is not None:
         raise ValueError("choose a player toolbar or an explicit icon region")
     reader = SubtitleReader() if only != "icons" else None
-    icons = load_icons(icon_dir) if only != "subtitles" else []
+    icons = load_icons(icon_dir, player_toolbar=player_toolbar) if only != "subtitles" else []
     frames = []
     previous = None
     measurements: dict = {}
@@ -85,7 +85,7 @@ def measure_overlays(
                     bgr, region, centered=subtitle_region is None
                 )
                 if subtitle_region is None:
-                    lines, detached = split_caption_band(lines, h)
+                    lines, detached = split_caption_band(lines, h, player_toolbar=player_toolbar)
                     if detached:
                         measurements["detached_text_candidates"] = detached
                 measurements["subtitles"] = lines
