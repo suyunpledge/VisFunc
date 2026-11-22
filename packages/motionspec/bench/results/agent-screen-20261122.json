@@ -1,0 +1,734 @@
+{
+ "machine": "32 logical cores, Windows 11, 2560x1600 display at 150%, Python 3.12, rapidocr-onnxruntime 1.4.4, Chrome 157",
+ "desktop_screenshots_text": {
+  "dialog-after": {
+   "overlays_subtitles": {
+    "seconds": 5.11,
+    "items": 22,
+    "found": 22,
+    "own_box": 22,
+    "lines": 24,
+    "conflicts": 3,
+    "conflict_examples": [
+     [
+      "Display name Morgan Lee",
+      "Morgan Lee"
+     ],
+     [
+      "Display name Morgan Lee",
+      " Display name"
+     ],
+     [
+      "Emailaddress morganlee@example.com",
+      "morgan.lee@example.com"
+     ]
+    ],
+    "misses": []
+   },
+   "plain_rapidocr": {
+    "seconds": 1.01,
+    "items": 22,
+    "found": 22,
+    "own_box": 22,
+    "lines": 22,
+    "conflicts": 0,
+    "conflict_examples": [],
+    "misses": []
+   },
+   "screen_text": {
+    "seconds": 0.9,
+    "items": 22,
+    "found": 22,
+    "own_box": 22,
+    "lines": 22,
+    "conflicts": 0,
+    "conflict_examples": [],
+    "misses": [],
+    "reachable": 22,
+    "unique": 22,
+    "unique_first_hit_correct": 22
+   }
+  },
+  "orders-table": {
+   "overlays_subtitles": {
+    "seconds": 8.31,
+    "items": 100,
+    "found": 99,
+    "own_box": 51,
+    "lines": 96,
+    "conflicts": 6,
+    "conflict_examples": [
+     [
+      "Order Customer Amount StatusUpdated",
+      "Order Customer Amount"
+     ],
+     [
+      "$86.50 Refunded 2026-11-03",
+      "Refunded 2026-11-03"
+     ],
+     [
+      "$197.50 Refunded 2026-11-06",
+      "Refunded 2026-11-06"
+     ],
+     [
+      "$308.50 Refunded 2026-11-09",
+      "Refunded 2026-11-09"
+     ]
+    ],
+    "misses": [
+     {
+      "truth": "#4815",
+      "near": [
+       "4815 Fischer",
+       "6"
+      ]
+     }
+    ]
+   },
+   "plain_rapidocr": {
+    "seconds": 2.03,
+    "items": 100,
+    "found": 100,
+    "own_box": 51,
+    "lines": 75,
+    "conflicts": 0,
+    "conflict_examples": [],
+    "misses": []
+   },
+   "screen_text": {
+    "seconds": 1.9,
+    "items": 100,
+    "found": 100,
+    "own_box": 51,
+    "lines": 75,
+    "conflicts": 0,
+    "conflict_examples": [],
+    "misses": [],
+    "reachable": 97,
+    "unique": 64,
+    "unique_first_hit_correct": 62
+   }
+  },
+  "settings-150pct": {
+   "overlays_subtitles": {
+    "seconds": 3.96,
+    "items": 18,
+    "found": 18,
+    "own_box": 18,
+    "lines": 21,
+    "conflicts": 5,
+    "conflict_examples": [
+     [
+      "Display name Morgan Lee",
+      "Display name"
+     ],
+     [
+      "Display name Morgan Lee",
+      "Morgan Lee"
+     ],
+     [
+      "Email address morganlee@example.com",
+      "morgan.lee@example.com"
+     ],
+     [
+      "Device 3 Laptap-103",
+      "Device 3: Laptop-103"
+     ]
+    ],
+    "misses": []
+   },
+   "plain_rapidocr": {
+    "seconds": 1.91,
+    "items": 18,
+    "found": 18,
+    "own_box": 16,
+    "lines": 17,
+    "conflicts": 0,
+    "conflict_examples": [],
+    "misses": []
+   },
+   "screen_text": {
+    "seconds": 1.73,
+    "items": 18,
+    "found": 18,
+    "own_box": 16,
+    "lines": 17,
+    "conflicts": 0,
+    "conflict_examples": [],
+    "misses": [],
+    "reachable": 18,
+    "unique": 18,
+    "unique_first_hit_correct": 18
+   }
+  },
+  "settings-dark": {
+   "overlays_subtitles": {
+    "seconds": 3.78,
+    "items": 18,
+    "found": 18,
+    "own_box": 14,
+    "lines": 18,
+    "conflicts": 0,
+    "conflict_examples": [],
+    "misses": []
+   },
+   "plain_rapidocr": {
+    "seconds": 1.52,
+    "items": 18,
+    "found": 18,
+    "own_box": 14,
+    "lines": 16,
+    "conflicts": 0,
+    "conflict_examples": [],
+    "misses": []
+   },
+   "screen_text": {
+    "seconds": 1.19,
+    "items": 18,
+    "found": 18,
+    "own_box": 14,
+    "lines": 16,
+    "conflicts": 0,
+    "conflict_examples": [],
+    "misses": [],
+    "reachable": 18,
+    "unique": 18,
+    "unique_first_hit_correct": 18
+   }
+  },
+  "settings-light": {
+   "overlays_subtitles": {
+    "seconds": 4.31,
+    "items": 18,
+    "found": 17,
+    "own_box": 17,
+    "lines": 21,
+    "conflicts": 4,
+    "conflict_examples": [
+     [
+      "Morgan Lee",
+      "Display name Morgan Lee"
+     ],
+     [
+      "Display name Morgan Lee",
+      "Display name "
+     ],
+     [
+      "Emailaddress morganJee@examle.com",
+      "morgan.lee@example.com"
+     ],
+     [
+      "Cancel[",
+      "Cancel"
+     ]
+    ],
+    "misses": [
+     {
+      "truth": "Profile",
+      "near": [
+       "Profle"
+      ]
+     }
+    ]
+   },
+   "plain_rapidocr": {
+    "seconds": 1.43,
+    "items": 18,
+    "found": 18,
+    "own_box": 18,
+    "lines": 18,
+    "conflicts": 0,
+    "conflict_examples": [],
+    "misses": []
+   },
+   "screen_text": {
+    "seconds": 1.31,
+    "items": 18,
+    "found": 18,
+    "own_box": 18,
+    "lines": 18,
+    "conflicts": 0,
+    "conflict_examples": [],
+    "misses": [],
+    "reachable": 18,
+    "unique": 18,
+    "unique_first_hit_correct": 18
+   }
+  },
+  "settings-zh": {
+   "overlays_subtitles": {
+    "seconds": 3.44,
+    "items": 18,
+    "found": 18,
+    "own_box": 13,
+    "lines": 17,
+    "conflicts": 1,
+    "conflict_examples": [
+     [
+      "设备4：笔记本-104",
+      "设备4："
+     ]
+    ],
+    "misses": []
+   },
+   "plain_rapidocr": {
+    "seconds": 1.21,
+    "items": 18,
+    "found": 18,
+    "own_box": 13,
+    "lines": 16,
+    "conflicts": 0,
+    "conflict_examples": [],
+    "misses": []
+   },
+   "screen_text": {
+    "seconds": 1.0,
+    "items": 18,
+    "found": 18,
+    "own_box": 13,
+    "lines": 16,
+    "conflicts": 0,
+    "conflict_examples": [],
+    "misses": [],
+    "reachable": 17,
+    "unique": 18,
+    "unique_first_hit_correct": 17
+   }
+  }
+ },
+ "chrome_pages_click_targets": {
+  "web-settings": {
+   "size_px": [
+    1920,
+    1080
+   ],
+   "read_s": 0.8,
+   "texts": 19,
+   "reachable": 19,
+   "unique": 19,
+   "unique_first_hit_correct": 19,
+   "icon_buttons": 3,
+   "icon_buttons_found_by_ocr": 0,
+   "misses": []
+  },
+  "web-orders": {
+   "size_px": [
+    1920,
+    1080
+   ],
+   "read_s": 2.42,
+   "texts": 164,
+   "reachable": 164,
+   "unique": 90,
+   "unique_first_hit_correct": 90,
+   "icon_buttons": 3,
+   "icon_buttons_found_by_ocr": 0,
+   "misses": []
+  },
+  "web-settings-zh": {
+   "size_px": [
+    1920,
+    1080
+   ],
+   "read_s": 0.74,
+   "texts": 19,
+   "reachable": 19,
+   "unique": 19,
+   "unique_first_hit_correct": 19,
+   "icon_buttons": 3,
+   "icon_buttons_found_by_ocr": 0,
+   "misses": []
+  },
+  "web-dashboard-dark": {
+   "size_px": [
+    1920,
+    1080
+   ],
+   "read_s": 0.89,
+   "texts": 19,
+   "reachable": 18,
+   "unique": 19,
+   "unique_first_hit_correct": 18,
+   "icon_buttons": 3,
+   "icon_buttons_found_by_ocr": 0,
+   "misses": [
+    {
+     "truth": "Nov 21 - API latency above 800 ms for 14 minutes",
+     "best": null
+    }
+   ]
+  },
+  "web-settings-150pct": {
+   "size_px": [
+    2880,
+    1620
+   ],
+   "read_s": 0.88,
+   "texts": 19,
+   "reachable": 19,
+   "unique": 19,
+   "unique_first_hit_correct": 19,
+   "icon_buttons": 3,
+   "icon_buttons_found_by_ocr": 0,
+   "misses": []
+  }
+ },
+ "settle_end_to_end": {
+  "full_frame_read_ms_after_dialog": 1407.1,
+  "scenarios": {
+   "A_modal": {
+    "state": "settled",
+    "last_change_ms": 533.333,
+    "true_end_ms": 350.0,
+    "decided_ms": 733.333,
+    "wait_after_true_end_ms": 383.3,
+    "per_frame_ms_mean": 5.96,
+    "per_frame_ms_max": 10.52,
+    "changed_regions": [
+     [
+      0,
+      0,
+      1920,
+      1080
+     ]
+    ],
+    "ambient_regions": [],
+    "text": {
+     "regions_read": [
+      [
+       0,
+       0,
+       1920,
+       1080
+      ]
+     ],
+     "read_ms": 625.4,
+     "found_exact": 4,
+     "of": 4,
+     "lines": 22
+    }
+   },
+   "B_modal_video_fresh_watcher": {
+    "state": "settled",
+    "last_change_ms": 3000.0,
+    "true_end_ms": 350.0,
+    "decided_ms": 3200.0,
+    "wait_after_true_end_ms": 2850.0,
+    "per_frame_ms_mean": 5.47,
+    "per_frame_ms_max": 9.9,
+    "changed_regions": [
+     [
+      0,
+      0,
+      1920,
+      1080
+     ]
+    ],
+    "ambient_regions": [
+     [
+      1440,
+      540,
+      1856,
+      826
+     ],
+     [
+      160,
+      64,
+      256,
+      192
+     ]
+    ],
+    "text": {
+     "regions_read": [
+      [
+       0,
+       0,
+       1920,
+       1080
+      ]
+     ],
+     "read_ms": 656.9,
+     "found_exact": 4,
+     "of": 4,
+     "lines": 22
+    }
+   },
+   "C_modal_video_rearmed_session": {
+    "state": "settled",
+    "last_change_ms": 833.333,
+    "true_end_ms": 650.0,
+    "decided_ms": 1033.333,
+    "wait_after_true_end_ms": 383.3,
+    "per_frame_ms_mean": 5.15,
+    "per_frame_ms_max": 9.72,
+    "changed_regions": [
+     [
+      0,
+      0,
+      1920,
+      1080
+     ]
+    ],
+    "ambient_regions": [
+     [
+      1440,
+      540,
+      1856,
+      826
+     ]
+    ],
+    "text": {
+     "regions_read": [
+      [
+       0,
+       0,
+       1920,
+       1080
+      ]
+     ],
+     "read_ms": 650.9,
+     "found_exact": 4,
+     "of": 4,
+     "lines": 22
+    }
+   },
+   "D_popup_no_dim": {
+    "state": "settled",
+    "last_change_ms": 533.333,
+    "true_end_ms": 350.0,
+    "decided_ms": 733.333,
+    "wait_after_true_end_ms": 383.3,
+    "per_frame_ms_mean": 6.43,
+    "per_frame_ms_max": 10.75,
+    "changed_regions": [
+     [
+      694,
+      414,
+      1226,
+      666
+     ],
+     [
+      200,
+      114,
+      214,
+      146
+     ]
+    ],
+    "ambient_regions": [],
+    "text": {
+     "regions_read": [
+      [
+       194,
+       108,
+       220,
+       152
+      ],
+      [
+       688,
+       408,
+       1232,
+       672
+      ]
+     ],
+     "read_ms": 467.4,
+     "found_exact": 4,
+     "of": 4,
+     "lines": 5
+    }
+   }
+  }
+ },
+ "mcp_live_qt_window": {
+  "steps": [
+   {
+    "call": "wait_for_settle (baseline)",
+    "ms": 876.9,
+    "state": "unchanged"
+   },
+   {
+    "call": "wait_for_settle (after change)",
+    "ms": 1619.1,
+    "state": "settled",
+    "first_change_ms": 932.342,
+    "decided_ms": 1145.377,
+    "changed": [
+     [
+      135,
+      310,
+      250,
+      336
+     ]
+    ],
+    "text": [
+     "Status: syncing 40%"
+    ]
+   },
+   {
+    "call": "wait_for_settle (after change)",
+    "ms": 1050.4,
+    "state": "settled",
+    "first_change_ms": 1283.988,
+    "decided_ms": 1491.635,
+    "changed": [
+     [
+      135,
+      310,
+      250,
+      336
+     ]
+    ],
+    "text": [
+     "Status: done"
+    ]
+   },
+   {
+    "call": "find_on_screen 'Back'",
+    "ms": 274.6,
+    "source": "ui_automation",
+    "enabled": true,
+    "correct": true,
+    "icon_only": true
+   },
+   {
+    "call": "find_on_screen 'Forward'",
+    "ms": 58.9,
+    "source": "ui_automation",
+    "enabled": true,
+    "correct": true,
+    "icon_only": true
+   },
+   {
+    "call": "find_on_screen 'Refresh'",
+    "ms": 58.3,
+    "source": "ui_automation",
+    "enabled": true,
+    "correct": true,
+    "icon_only": true
+   },
+   {
+    "call": "find_on_screen 'Save'",
+    "ms": 55.5,
+    "source": "ui_automation",
+    "enabled": true,
+    "correct": true,
+    "icon_only": true
+   },
+   {
+    "call": "find_on_screen 'Delete'",
+    "ms": 59.3,
+    "source": "ui_automation",
+    "enabled": true,
+    "correct": true,
+    "icon_only": true
+   },
+   {
+    "call": "find_on_screen 'Help'",
+    "ms": 40.4,
+    "source": "ui_automation",
+    "enabled": true,
+    "correct": true,
+    "icon_only": true
+   },
+   {
+    "call": "find_on_screen 'Server name'",
+    "ms": 29.6,
+    "source": "ui_automation",
+    "enabled": true,
+    "correct": true,
+    "icon_only": false
+   },
+   {
+    "call": "find_on_screen 'Sync on startup'",
+    "ms": 28.2,
+    "source": "ui_automation",
+    "enabled": true,
+    "correct": true,
+    "icon_only": false
+   },
+   {
+    "call": "find_on_screen 'Apply'",
+    "ms": 760.9,
+    "source": "ui_automation",
+    "enabled": false,
+    "correct": true,
+    "icon_only": false
+   },
+   {
+    "call": "find_on_screen 'Start sync'",
+    "ms": 61.6,
+    "source": "ui_automation",
+    "enabled": true,
+    "correct": true,
+    "icon_only": false
+   },
+   {
+    "call": "find_on_screen 'backup-server-07' (field value)",
+    "ms": 48.5,
+    "targets": [
+     {
+      "source": "ui_automation",
+      "text": "Server name",
+      "control_type": "edit",
+      "enabled": true,
+      "bbox_px": [
+       76,
+       225,
+       1183,
+       259
+      ],
+      "center_px": [
+       629,
+       242
+      ]
+     }
+    ]
+   },
+   {
+    "call": "read_screen_text",
+    "ms": 255.8,
+    "lines": [
+     "VisFunc agent test",
+     "Sync settings",
+     "backup-server-07",
+     "Sync on startup",
+     "Status: done",
+     "Apply",
+     "Start sync"
+    ]
+   },
+   {
+    "call": "list_ui_elements",
+    "ms": 71.1,
+    "count": 18
+   },
+   {
+    "call": "screenshot",
+    "ms": 20.4,
+    "info": {
+     "area_px": [
+      58,
+      60,
+      1202,
+      737
+     ],
+     "size_px": [
+      1144,
+      677
+     ],
+     "image_scale": 1.0,
+     "note": "image pixel / image_scale + area origin = screen pixel"
+    },
+    "png_bytes": 57033
+   }
+  ],
+  "initialize_ms": 337.0,
+  "protocol": "2025-06-18",
+  "tools": [
+   "wait_for_settle",
+   "find_on_screen",
+   "read_screen_text",
+   "list_ui_elements",
+   "screenshot"
+  ]
+ }
+}

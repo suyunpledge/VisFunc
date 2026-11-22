@@ -27,6 +27,8 @@ People and objects in a photo cannot be computed this way. That needs recognitio
 | Compile an image's regions, contours and spatial relations | `POST /v1/compile-functions`, or `svsg.image_functions` in Python |
 | Have a model answer from those parameters and check its claims | `POST /v1/analyze-image`, `POST /v1/analyze` |
 | Recognise objects, confirmed across several views | `POST /v1/recognize-image` |
+| Read the text on an application screenshot, with boxes and click points (for agents; needs `.[overlays]`) | `POST /v1/screen-text`; on the command line `motionspec screen-text` |
+| List a window's controls through Windows UI Automation and find click points by name (needs `.[uia]`) | `svsg.recognition.ui_elements`, or `list_ui_elements` and `find_on_screen` in `motionspec agent-mcp` |
 | Query kept video frames and motion functions | `svsg.video_functions.VideoRuntime`; on the command line through `motionspec query` |
 
 ## Image functions
@@ -132,6 +134,7 @@ It listens on `127.0.0.1:3002` by default.
 | `POST /v1/analyze-image` | upload `file` and a question `query`; answered as described above |
 | `POST /v1/analyze` | submit an existing `ir` with a new question |
 | `POST /v1/recognize-image` | upload `file`, optionally with a `labels` list and a video `frame` reference |
+| `POST /v1/screen-text` | upload `file`, optionally with `regions` (`[[l, t, r, b], ...]`); the OCR model loads on the first request and stays loaded |
 | `GET /healthz` | health check, no authentication |
 
 Settings go in `.env`; see [.env.example](../.env.example). The common ones:
@@ -153,7 +156,8 @@ On Windows, the [launch script](../scripts/start-svsg.cmd) loads settings from a
 svsg/
   image_functions/   raster encoding, regions, contours, spatial relations, function claims
   video_functions/   compiling, exporting and evaluating video functions
-  recognition/       multi-view recognition, coordinate mapping, agreement rules, video frame binding, evaluation
+  recognition/       multi-view recognition, coordinate mapping, agreement rules, video frame binding, evaluation;
+                     subtitle and screen text reading; UI Automation element lists
   contracts/         data formats for IR, image functions, video functions and recognition results
   l1_compiler/       detector adapters and IR compilation
   l15_verifier/      visual verification and fallback

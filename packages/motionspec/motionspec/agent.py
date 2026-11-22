@@ -1,0 +1,950 @@
+"""Screen tools for agents, kept resident so models and learned state survive between steps.
+
+`ScreenAgent` is the Python API; `serve_mcp()` exposes it as a Model Context Protocol server over
+stdio (``motionspec agent-mcp``), so agent frameworks can call it as tools. All coordinates are
+physical screen pixels [left, top, right, bottom], the space a click is sent in.
+
+Each step of an agent is one call: ``click_element`` or ``set_field_text`` takes a baseline
+frame, acts through UI Automation, waits until the window is still and returns what changed, the
+text there and any dialog that opened. ``wait_for_settle`` is for longer processes (a sync, a
+page load) and for changes made by the agent's own input tools; ``find_on_screen`` and
+``list_ui_elements`` locate targets.
+
+Areas that keep changing (video, animated backgrounds) are learned once per region and then
+ignored, because one `SettleWatcher` per region lives as long as the server.
+"""
+
+from __future__ import annotations
+
+import base64
+import json
+import sys
+from collections.abc import Callable, Iterator, Sequence
+from typing import Any
+
+import cv2
+import numpy as np
+
+from .settle import SettleWatcher, capture_screen
+
+Box = tuple[int, int, int, int]
+PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
+SERVER_VERSION = "0.1.0"
+
+
+def window_rect(title: str) -> Box:
+    """Screen rectangle covering every visible window whose title contains `title`.
+
+    Covering all of them keeps the capture area stable when the application opens a dialog with
+    a related title, so the dialog shows up as a change instead of starting a new baseline.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    from svsg.recognition.ui_elements import find_windows
+
+    handles = find_windows(title)
+    if not handles:
+        raise ValueError(f"no visible window title contains {title!r}")
+    boxes = []
+    for hwnd in handles:
+        rect = wintypes.RECT()
+        # Visible bounds, without the invisible resize border that GetWindowRect includes.
+        if ctypes.windll.dwmapi.DwmGetWindowAttribute(
+            hwnd, 9, ctypes.byref(rect), ctypes.sizeof(rect)
+        ):
+            ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(rect))
+        boxes.append((rect.left, rect.top, rect.right, rect.bottom))
+    return (
+        min(b[0] for b in boxes),
+        min(b[1] for b in boxes),
+        max(b[2] for b in boxes),
+        max(b[3] for b in boxes),
+    )
+
+
+def _offset(item: dict, dx: int, dy: int) -> dict:
+    out = dict(item)
+    for key in ("bbox_px", "center_px"):
+        if key in out:
+            v = out[key]
+            out[key] = (
+                [v[0] + dx, v[1] + dy, v[2] + dx, v[3] + dy]
+                if len(v) == 4
+                else [v[0] + dx, v[1] + dy]
+            )
+    if "words" in out:
+        out["words"] = [_offset(w, dx, dy) for w in out["words"]]
+    return out
+
+
+def _compact_element(element: dict | None) -> dict | None:
+    if not element:
+        return None
+    keep = ("name", "control_type", "enabled", "value", "toggle_state", "center_px")
+    return {k: element[k] for k in keep if k in element}
+
+
+def _control_changes(before: list[dict], after: list[dict]) -> list[dict]:
+    """What an action changed in a window's controls: states, values, controls added or removed."""
+
+    def key(c):
+        return (c.get("name", ""), c.get("control_type", ""))
+
+    old = {key(c): c for c in before}
+    new = {key(c): c for c in after}
+    changes = []
+    for k, c in new.items():
+        if k not in old:
+            changes.append({"name": k[0], "control_type": k[1], "appeared": True})
+            continue
+        for field in ("enabled", "value", "toggle_state"):
+            if old[k].get(field) != c.get(field):
+                changes.append(
+                    {
+                        "name": k[0],
+                        "control_type": k[1],
+                        field: c.get(field),
+                        "was": old[k].get(field),
+                    }
+                )
+    changes += [{"name": k[0], "control_type": k[1], "gone": True} for k in old if k not in new]
+    return changes[:20]
+
+
+CAPTION_NAMES = {
+    "最小化",
+    "最大化",
+    "还原",
+    "关闭",
+    "系统",
+    "Minimize",
+    "Maximize",
+    "Restore",
+    "Close",
+    "System",
+}
+BLOCKED_NOTE = (
+    "Screen capture of this window does not show changes (for example a browser screen "
+    "protection feature of security software), so screenshots and OCR of it are "
+    "unreliable; effects are read from UI Automation instead."
+)
+
+
+def _without_caption(elements: list[dict], window_box: Sequence[int] | None) -> list[dict]:
+    """Drop the title bar's system buttons and menu: always present, rarely what a task needs."""
+    if not window_box:
+        return elements
+    top = window_box[1]
+    return [
+        e
+        for e in elements
+        if not (
+            e.get("name") in CAPTION_NAMES
+            and e.get("bbox_px")
+            and e["bbox_px"][1] - top < 64
+            and e.get("control_type") in ("button", "menu_bar", "menu_item")
+        )
+    ]
+
+
+class ScreenAgent:
+    """Resident screen tools. Dependencies are injectable for tests."""
+
+    def __init__(
+        self,
+        *,
+        capture: Callable[..., Iterator[tuple[float, np.ndarray]]] = capture_screen,
+        reader_factory: Callable[[], Any] | None = None,
+        elements: Callable[..., dict] | None = None,
+        locate_window: Callable[[str], Box] = window_rect,
+        act: Callable[..., dict] | None = None,
+        windows: Callable[[str], list[dict]] | None = None,
+        click: Callable[..., dict] | None = None,
+        max_fps: float = 60.0,
+        allowed_windows: Sequence[str] = (),
+        max_wait_ms: float | None = None,
+        images: bool = True,
+    ) -> None:
+        self.capture = capture
+        self.max_fps = max_fps
+        self._act = act
+        self._windows = windows
+        self._click = click
+        self.blocked: set[str] = set()  # window titles whose capture never shows changes
+        self.allowed_windows = [w.casefold() for w in allowed_windows if w.strip()]
+        self.max_wait_ms = max_wait_ms
+        self.images = images
+        self._reader_factory = reader_factory
+        self._reader = None
+        self._elements = elements
+        self.locate_window = locate_window
+        self.watchers: dict[Box | None, SettleWatcher] = {}
+        self.streams: dict[Box | None, Iterator] = {}
+
+    # -- helpers ------------------------------------------------------------------------------
+    @property
+    def reader(self) -> Any:
+        if self._reader is None:
+            if self._reader_factory is None:
+                from svsg.recognition.screen_text import ScreenTextReader
+
+                self._reader_factory = ScreenTextReader
+            self._reader = self._reader_factory()
+        return self._reader
+
+    def _list_elements(self, **kw) -> dict:
+        if self._elements is None:
+            from svsg.recognition.ui_elements import list_elements
+
+            self._elements = list_elements
+        return self._elements(**kw)
+
+    def resolve_region(self, region: Sequence[int] | None, window_title: str | None) -> Box | None:
+        if region is not None and window_title is not None:
+            raise ValueError("give either region or window_title")
+        if window_title is not None:
+            return tuple(self.locate_window(window_title))
+        if region is not None:
+            if len(region) != 4 or region[0] >= region[2] or region[1] >= region[3]:
+                raise ValueError("region must be [left, top, right, bottom] with positive size")
+            return tuple(int(v) for v in region)
+        return None
+
+    def _frames(self, area: Box | None) -> Iterator[tuple[float, np.ndarray]]:
+        if area not in self.streams:
+            self.streams[area] = self.capture(area, max_fps=self.max_fps)
+        return self.streams[area]
+
+    def grab(self, area: Box | None) -> np.ndarray:
+        return next(self._frames(area))[1]
+
+    # -- tools --------------------------------------------------------------------------------
+    def wait_for_settle(
+        self,
+        *,
+        region: Sequence[int] | None = None,
+        window_title: str | None = None,
+        quiet_ms: float = 200.0,
+        expect_change_ms: float = 1000.0,
+        timeout_ms: float = 10_000.0,
+        ambient_ms: float = 3000.0,
+        read_text: bool = False,
+    ) -> dict:
+        area = self.resolve_region(region, window_title)
+        return self._settle(
+            area,
+            quiet_ms=quiet_ms,
+            expect_change_ms=expect_change_ms,
+            timeout_ms=timeout_ms,
+            ambient_ms=ambient_ms,
+            read_text=read_text,
+        )
+
+    def _watcher(self, area: Box | None, ambient_ms: float, waits: dict) -> tuple[Any, bool]:
+        watcher = self.watchers.get(area)
+        # Only ambient_ms changes what has been learned; the waits can change between calls.
+        fresh = watcher is None or watcher.ambient_ms != float(ambient_ms)
+        if fresh:
+            watcher = self.watchers[area] = SettleWatcher(ambient_ms=ambient_ms, **waits)
+        else:
+            watcher.update(**waits)
+        return watcher, fresh
+
+    def _mark_baseline(self, area: Box | None, ambient_ms: float = 3000.0) -> None:
+        """Make the current screen the baseline the next settle compares against."""
+        watcher, _ = self._watcher(area, ambient_ms, {})
+        t_ms, frame = next(self._frames(area))
+        watcher.push(frame, t_ms)
+        watcher.rearm()
+        self._armed = ("armed", area)
+
+    def _settle(
+        self,
+        area: Box | None,
+        *,
+        quiet_ms: float,
+        expect_change_ms: float,
+        timeout_ms: float,
+        ambient_ms: float,
+        read_text: bool,
+    ) -> dict:
+        if self.max_wait_ms is not None:  # e.g. the client gives up on a request after 10 s
+            timeout_ms = min(timeout_ms, self.max_wait_ms)
+            expect_change_ms = min(expect_change_ms, self.max_wait_ms)
+        waits = {
+            "quiet_ms": quiet_ms,
+            "expect_change_ms": expect_change_ms,
+            "timeout_ms": timeout_ms,
+        }
+        watcher, fresh = self._watcher(area, ambient_ms, waits)
+        if not fresh and getattr(self, "_armed", None) != ("armed", area):
+            watcher.rearm()  # otherwise _mark_baseline already set the baseline
+        self._armed = None
+        for t_ms, frame in self._frames(area):
+            if watcher.push(frame, t_ms):
+                break
+        result = watcher.result()
+        dx, dy = (area[0], area[1]) if area else (0, 0)
+        for key in ("changed_regions", "ambient_regions"):
+            result[key] = [_offset(r, dx, dy) for r in result[key]]
+        result["area_px"] = list(area) if area else None
+        result["baseline"] = "first_frame_of_this_call" if fresh else "last_frame_of_previous_call"
+        if read_text:
+            from svsg.recognition.screen_text import lines_touching, widen_regions
+
+            boxes = [
+                [
+                    r["bbox_px"][0] - dx,
+                    r["bbox_px"][1] - dy,
+                    r["bbox_px"][2] - dx,
+                    r["bbox_px"][3] - dy,
+                ]
+                for r in result["changed_regions"]
+            ]
+            result["text"] = None
+            if boxes:
+                frame = watcher.last_frame
+                text = self.reader.read(frame, widen_regions(boxes, frame.shape[1]))
+                result["text"] = [_offset(line, dx, dy) for line in lines_touching(text, boxes)]
+        return result
+
+    def read_screen_text(
+        self, *, region: Sequence[int] | None = None, window_title: str | None = None
+    ) -> dict:
+        area = self.resolve_region(region, window_title)
+        result = self.reader.read(self.grab(area))
+        dx, dy = (area[0], area[1]) if area else (0, 0)
+        out = {
+            "area_px": list(area) if area else None,
+            "lines": [_offset(line, dx, dy) for line in result["lines"]],
+            "elapsed_ms": result["elapsed_ms"],
+        }
+        if window_title and window_title.casefold() in self.blocked:
+            out["note"] = BLOCKED_NOTE
+        return out
+
+    def list_ui_elements(self, *, window_title: str | None = None) -> dict:
+        result = self._list_elements(title=window_title)
+        window = result.get("window") or {}
+        elements = _without_caption(result["elements"], window.get("bbox_px"))
+        out = {
+            "window": window,
+            "elements": [_compact_element(e) for e in elements],
+            "truncated": result.get("truncated", False),
+        }
+        if window_title and window_title.casefold() in self.blocked:
+            out["note"] = BLOCKED_NOTE
+        return out
+
+    def find_on_screen(
+        self,
+        *,
+        query: str,
+        window_title: str | None = None,
+        exact: bool = False,
+        use_ocr: bool = True,
+    ) -> dict:
+        """Click targets for `query`: UI Automation names first, then visible text."""
+        from svsg.recognition.screen_text import find_text
+        from svsg.recognition.ui_elements import find_element
+
+        targets: list[dict] = []
+        notes: list[str] = []
+        try:
+            elements = self._list_elements(title=window_title)
+            for e in find_element(elements, query, exact=exact)[:5]:
+                targets.append(
+                    {
+                        "source": "ui_automation",
+                        "text": e["name"],
+                        "control_type": e["control_type"],
+                        "enabled": e["enabled"],
+                        "bbox_px": e["bbox_px"],
+                        "center_px": e["center_px"],
+                    }
+                )
+        except (OSError, ValueError, ImportError) as exc:
+            notes.append(f"ui_automation unavailable: {exc}")
+        if use_ocr and not any(t["source"] == "ui_automation" and t["enabled"] for t in targets):
+            area = self.resolve_region(None, window_title) if window_title else None
+            text = self.reader.read(self.grab(area))
+            dx, dy = (area[0], area[1]) if area else (0, 0)
+            for hit in find_text(text, query, exact=exact)[:5]:
+                hit = _offset(hit, dx, dy)
+                targets.append(
+                    {
+                        "source": "ocr",
+                        "text": hit["text"],
+                        "bbox_px": hit["bbox_px"],
+                        "center_px": hit["center_px"],
+                        "score": hit["score"],
+                        "low_confidence": hit["low_confidence"],
+                    }
+                )
+        if window_title and window_title.casefold() in self.blocked and use_ocr:
+            notes.append(BLOCKED_NOTE)
+        return {"query": query, "targets": targets, "ambiguous": len(targets) > 1, "notes": notes}
+
+    def _act_on(self, window_title: str, query: str, action: str, **kw) -> dict:
+        """Act inside an allowed window, then wait and report the effect in the same call."""
+        if not self.allowed_windows:
+            raise PermissionError("actions are disabled; start the server with --allow-window")
+        if not window_title or not query:
+            raise ValueError("window_title and target are required")
+        if self._act is None:
+            from svsg.recognition import ui_elements
+
+            def act(query, action, *, title, **kw):
+                hwnd = ui_elements.find_window(title)
+                actual = ui_elements.window_title(hwnd)
+                if not any(allowed in actual.casefold() for allowed in self.allowed_windows):
+                    raise PermissionError(f"window {actual!r} is not in the allowed list")
+                return ui_elements.perform(query, action, hwnd=hwnd, **kw)
+
+            self._act = act
+        return self._with_effect(
+            window_title, lambda: self._act(query, action, title=window_title, **kw), query
+        )
+
+    def click_point(self, *, window_title: str, x: int, y: int) -> dict:
+        """Click at a screen point inside an allowed window, for controls without names."""
+        if not self.allowed_windows:
+            raise PermissionError("actions are disabled; start the server with --allow-window")
+        if not window_title:
+            raise ValueError("window_title is required")
+        x, y = int(x), int(y)
+        if self._click is None:
+            from svsg.recognition import ui_elements
+
+            def click(title, x, y):
+                hwnd = ui_elements.find_window(title)
+                actual = ui_elements.window_title(hwnd)
+                if not any(allowed in actual.casefold() for allowed in self.allowed_windows):
+                    raise PermissionError(f"window {actual!r} is not in the allowed list")
+                done = ui_elements.post_click(hwnd, x, y)
+                return {
+                    "performed": "click_at",
+                    "window": actual,
+                    "element": {"name": f"({x}, {y})"},
+                    "after": None,
+                    "target_window": done["target_window"],
+                }
+
+            self._click = click
+        return self._with_effect(
+            window_title, lambda: self._click(window_title, x, y), f"({x}, {y})"
+        )
+
+    def _with_effect(self, window_title: str, do, label: str) -> dict:
+        """Baseline, act, wait until the window is still, and report what the action did."""
+        area = self.resolve_region(None, window_title)
+        before = self._top_window(window_title)
+        blocked = window_title.casefold() in self.blocked
+        if not blocked:
+            self._mark_baseline(area)
+        outcome = do()
+        query = label
+        if blocked:
+            settle, top = self._settle_by_elements(window_title, before)
+        else:
+            settle = self._settle(
+                area,
+                quiet_ms=250.0,
+                expect_change_ms=1500.0,
+                timeout_ms=5000.0,
+                ambient_ms=3000.0,
+                read_text=True,
+            )
+            top = self._top_window(window_title)
+        report = {
+            "done": f"{outcome['performed']} {outcome['element']['name'] or query!r}",
+            "element_after": _compact_element(outcome.get("after")),
+            "screen": {
+                "state": settle["state"],
+                "settled_after_ms": settle["elapsed_ms"],
+                "changed_regions": [r["bbox_px"] for r in settle["changed_regions"][:6]],
+                "text_in_changed_regions": [
+                    {"text": line["text"], "center_px": line["center_px"]}
+                    for line in (settle.get("text") or [])[:20]
+                ],
+            },
+        }
+        if top and top["title"] != outcome.get("window"):
+            report["new_top_window"] = top
+        elif top and before and top["title"] == before["title"]:
+            report["controls_changed"] = _control_changes(before["controls"], top["controls"])
+        saw_change = bool(report.get("new_top_window") or report.get("controls_changed"))
+        if not blocked and settle["state"] == "unchanged" and saw_change:
+            # The application changed but the screen did not: capture is being blocked.
+            self.blocked.add(window_title.casefold())
+            blocked = True
+        if blocked:
+            report["screen"]["source"] = "ui_automation"
+            report["screen"]["note"] = BLOCKED_NOTE
+        return report
+
+    def _settle_by_elements(
+        self,
+        window_title: str,
+        before: dict | None,
+        *,
+        quiet_ms: float = 250.0,
+        timeout_ms: float = 3000.0,
+    ) -> tuple[dict, dict | None]:
+        """Wait until a window's controls stop changing, when its pixels can't be read."""
+        import time as _time
+
+        start = _time.perf_counter()
+        last, stable_since, changed = before, start, False
+        while True:
+            _time.sleep(0.12)
+            now = _time.perf_counter()
+            snapshot = self._top_window(window_title)
+            if snapshot != last:
+                last, stable_since, changed = snapshot, now, True
+            elif changed and (now - stable_since) * 1000 >= quiet_ms:
+                state = "settled"
+                break
+            elif not changed and (now - start) * 1000 >= 1000:
+                state = "unchanged"
+                break
+            if (now - start) * 1000 >= timeout_ms:
+                state = "timeout"
+                break
+        elapsed = round((_time.perf_counter() - start) * 1000, 1)
+        return {"state": state, "elapsed_ms": elapsed, "changed_regions": [], "text": []}, last
+
+    def _top_window(self, window_title: str) -> dict | None:
+        """The topmost window matching the title with its controls, e.g. a dialog that opened."""
+        if self._windows is None:
+            from svsg.recognition import ui_elements
+
+            def windows(title):
+                hwnd = ui_elements.find_window(title)
+                listed = ui_elements.list_elements(hwnd=hwnd)
+                controls = [
+                    _compact_element(e)
+                    for e in _without_caption(listed["elements"], listed["window"]["bbox_px"])
+                    if e["control_type"] in ui_elements.INTERACTIVE or e["control_type"] == "text"
+                ]
+                return {"title": listed["window"]["title"], "controls": controls[:30]}
+
+            self._windows = windows
+        try:
+            return self._windows(window_title)
+        except (OSError, ValueError):
+            return None
+
+    def click_element(
+        self, *, window_title: str, target: str, control_type: str | None = None
+    ) -> dict:
+        return self._act_on(window_title, target, "click", control_type=control_type)
+
+    def set_field_text(self, *, window_title: str, field: str, text: str) -> dict:
+        return self._act_on(window_title, field, "set_text", text=text)
+
+    def tool_specs(self) -> list[dict]:
+        tools = [t for t in TOOLS if t["name"] not in ACTION_TOOLS and t["name"] != "screenshot"]
+        if self.images:
+            tools += [t for t in TOOLS if t["name"] == "screenshot"]
+        if self.allowed_windows:
+            tools += [t for t in TOOLS if t["name"] in ACTION_TOOLS]
+        return tools
+
+    def screenshot(
+        self,
+        *,
+        region: Sequence[int] | None = None,
+        window_title: str | None = None,
+        max_side: int = 1568,
+    ) -> tuple[dict, bytes]:
+        area = self.resolve_region(region, window_title)
+        frame = self.grab(area)
+        h, w = frame.shape[:2]
+        scale = min(1.0, max_side / max(w, h))
+        if scale < 1.0:
+            frame = cv2.resize(
+                frame, (round(w * scale), round(h * scale)), interpolation=cv2.INTER_AREA
+            )
+        ok, png = cv2.imencode(".png", frame)
+        if not ok:
+            raise ValueError("could not encode the screenshot")
+        info = {
+            "area_px": list(area) if area else [0, 0, w, h],
+            "size_px": [w, h],
+            "image_scale": round(scale, 6),
+            "note": "image pixel / image_scale + area origin = screen pixel",
+        }
+        return info, png.tobytes()
+
+
+# -- MCP over stdio -------------------------------------------------------------------------
+_REGION = {
+    "type": "array",
+    "items": {"type": "integer"},
+    "minItems": 4,
+    "maxItems": 4,
+    "description": "[left, top, right, bottom] in physical screen pixels",
+}
+_WINDOW = {"type": "string", "description": "use the visible window whose title contains this"}
+TOOLS = [
+    {
+        "name": "wait_for_settle",
+        "description": (
+            "Wait until a window or region has been still for quiet_ms and report state "
+            "(settled, unchanged, timeout) and what changed since the previous call. Actions "
+            "already wait and report their own effect; use this for longer processes (a sync in "
+            "progress, a page loading; raise quiet_ms above the update interval) or after input "
+            "from other tools. Video and similar areas are ignored after ambient_ms."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "region": _REGION,
+                "window_title": _WINDOW,
+                "quiet_ms": {"type": "number", "default": 200},
+                "expect_change_ms": {"type": "number", "default": 1000},
+                "timeout_ms": {"type": "number", "default": 10000},
+                "ambient_ms": {
+                    "type": "number",
+                    "default": 3000,
+                    "description": "0 waits for everything, including loading spinners",
+                },
+                "read_text": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "also read the text inside the changed regions",
+                },
+            },
+        },
+    },
+    {
+        "name": "find_on_screen",
+        "description": (
+            "Find where to click for a control or text. Looks up UI Automation names first "
+            "(finds icon-only buttons, reports disabled controls), then visible text by OCR. "
+            "Returns targets with center_px, best first."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "window_title": _WINDOW,
+                "exact": {"type": "boolean", "default": False},
+                "use_ocr": {"type": "boolean", "default": True},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "read_screen_text",
+        "description": "Read all visible text in a region or window, with a box and click point "
+        "per line.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"region": _REGION, "window_title": _WINDOW},
+        },
+    },
+    {
+        "name": "list_ui_elements",
+        "description": (
+            "List a window's controls through Windows UI Automation: name, type, box, enabled, "
+            "checkbox state and field values. Defaults to the foreground window."
+        ),
+        "inputSchema": {"type": "object", "properties": {"window_title": _WINDOW}},
+    },
+    {
+        "name": "screenshot",
+        "description": "Capture a region or window as PNG, scaled so the longest side is at most "
+        "max_side.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "region": _REGION,
+                "window_title": _WINDOW,
+                "max_side": {"type": "integer", "default": 1568},
+            },
+        },
+    },
+]
+
+
+ACTION_TOOLS = ("click_element", "set_field_text", "click_point")
+TOOLS += [
+    {
+        "name": "click_element",
+        "description": (
+            "Press a button or link, toggle a checkbox, select a tab or list item, or open a menu, "
+            "by its name, through Windows UI Automation. No mouse input is sent. Works only in "
+            "windows the user allowed. Returns the effect: the control's new state, what changed "
+            "on screen with its text, and any dialog that opened (new_top_window, with controls)."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "window_title": _WINDOW,
+                "target": {
+                    "type": "string",
+                    "description": "the control's name, as listed by list_ui_elements or "
+                    "find_on_screen",
+                },
+                "control_type": {"type": "string", "description": "optional, e.g. button"},
+            },
+            "required": ["window_title", "target"],
+        },
+    },
+    {
+        "name": "set_field_text",
+        "description": (
+            "Replace the text of an input field, found by its name or current value, through "
+            "Windows UI Automation. Works only in windows the user allowed. Returns the effect "
+            "like click_element."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "window_title": _WINDOW,
+                "field": {"type": "string"},
+                "text": {"type": "string"},
+            },
+            "required": ["window_title", "field", "text"],
+        },
+    },
+]
+
+
+TOOLS.append(
+    {
+        "name": "click_point",
+        "description": (
+            "Click at a physical screen point inside an allowed window, for controls that have no "
+            "name in list_ui_elements (custom-drawn buttons, canvas items). Take the point from "
+            "find_on_screen or read_screen_text (center_px). The pointer does not move. Returns "
+            "the effect like click_element. Prefer click_element when the control has a name."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "window_title": _WINDOW,
+                "x": {"type": "integer"},
+                "y": {"type": "integer"},
+            },
+            "required": ["window_title", "x", "y"],
+        },
+    }
+)
+
+
+class McpServer:
+    def __init__(self, agent: ScreenAgent) -> None:
+        self.agent = agent
+
+    def call(self, name: str, args: dict) -> list[dict]:
+        if name == "screenshot":
+            info, png = self.agent.screenshot(**args)
+            return [
+                {"type": "text", "text": json.dumps(info)},
+                {"type": "image", "data": base64.b64encode(png).decode(), "mimeType": "image/png"},
+            ]
+        method = {
+            "wait_for_settle": self.agent.wait_for_settle,
+            "find_on_screen": self.agent.find_on_screen,
+            "read_screen_text": self.agent.read_screen_text,
+            "list_ui_elements": self.agent.list_ui_elements,
+            "click_element": self.agent.click_element,
+            "set_field_text": self.agent.set_field_text,
+            "click_point": self.agent.click_point,
+        }.get(name)
+        if method is None:
+            raise KeyError(name)
+        return [{"type": "text", "text": json.dumps(method(**args), ensure_ascii=False)}]
+
+    def handle(self, message: dict) -> dict | None:
+        """Answer one JSON-RPC message; notifications get no reply."""
+        method, mid = message.get("method"), message.get("id")
+        if mid is None:
+            return None
+        if method == "initialize":
+            asked = (message.get("params") or {}).get("protocolVersion")
+            result = {
+                "protocolVersion": asked if asked in PROTOCOL_VERSIONS else PROTOCOL_VERSIONS[0],
+                "capabilities": {"tools": {"listChanged": False}},
+                "serverInfo": {"name": "visfunc-screen", "version": SERVER_VERSION},
+                "instructions": __doc__.split("\n\n", 1)[1].strip(),
+            }
+        elif method == "ping":
+            result = {}
+        elif method == "tools/list":
+            result = {"tools": self.agent.tool_specs()}
+        elif method == "tools/call":
+            params = message.get("params") or {}
+            name, args = params.get("name"), params.get("arguments") or {}
+            if name not in {t["name"] for t in self.agent.tool_specs()}:
+                return {
+                    "jsonrpc": "2.0",
+                    "id": mid,
+                    "error": {"code": -32602, "message": f"unknown tool {name!r}"},
+                }
+            try:
+                result = {"content": self.call(name, args), "isError": False}
+            except Exception as exc:  # noqa: BLE001 - a failing tool must not end the server
+                result = {
+                    "content": [{"type": "text", "text": f"{type(exc).__name__}: {exc}"}],
+                    "isError": True,
+                }
+        else:
+            return {
+                "jsonrpc": "2.0",
+                "id": mid,
+                "error": {"code": -32601, "message": f"method not found: {method}"},
+            }
+        return {"jsonrpc": "2.0", "id": mid, "result": result}
+
+
+def serve_mcp(agent: ScreenAgent | None = None, stdin=None, stdout=None) -> None:
+    """Serve MCP over newline-delimited JSON-RPC on stdin/stdout until stdin closes."""
+    stdin = stdin or sys.stdin.buffer
+    stdout = stdout or sys.stdout.buffer
+    sys.stdout = sys.stderr  # Anything printed by libraries must not corrupt the protocol stream.
+    server = McpServer(agent or ScreenAgent())
+    for raw in stdin:
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            message = json.loads(raw)
+        except json.JSONDecodeError:
+            reply = {
+                "jsonrpc": "2.0",
+                "id": None,
+                "error": {"code": -32700, "message": "parse error"},
+            }
+        else:
+            reply = (
+                server.handle(message)
+                if isinstance(message, dict)
+                else {
+                    "jsonrpc": "2.0",
+                    "id": None,
+                    "error": {"code": -32600, "message": "invalid request"},
+                }
+            )
+        if reply is not None:
+            stdout.write(json.dumps(reply, ensure_ascii=False).encode("utf-8") + b"\n")
+            stdout.flush()
+
+
+MAX_REQUEST_BYTES = 1024 * 1024
+
+
+def serve_http(
+    agent: ScreenAgent | None = None,
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    *,
+    token: str = "",
+    ready=None,
+) -> None:
+    """Serve MCP over Streamable HTTP (JSON responses, no server-sent events) at /mcp.
+
+    Requests are handled one at a time, so tools never race over the screen or the watchers.
+    Only loopback browsers may call it (Origin check), and a bearer token can be required.
+    """
+    import hmac
+    import uuid
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from urllib.parse import urlsplit
+
+    server_logic = McpServer(agent or ScreenAgent())
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def log_message(self, fmt, *args):  # keep stdout clean; one line per request on stderr
+            sys.stderr.write("agent-mcp " + fmt % args + "\n")
+
+        def _reply(self, status: int, body: dict | None = None, headers: dict | None = None):
+            data = b"" if body is None else json.dumps(body, ensure_ascii=False).encode("utf-8")
+            self.send_response(status)
+            if body is not None:
+                self.send_header("Content-Type", "application/json")
+            for key, value in (headers or {}).items():
+                self.send_header(key, value)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def _allowed(self) -> bool:
+            origin = self.headers.get("Origin")
+            if origin and urlsplit(origin).hostname not in {"localhost", "127.0.0.1", "::1"}:
+                self._reply(403, {"error": "origin not allowed"})
+                return False
+            if token:
+                given = self.headers.get("Authorization", "")
+                if not hmac.compare_digest(given.encode(), f"Bearer {token}".encode()):
+                    self._reply(401, {"error": "unauthorized"})
+                    return False
+            if urlsplit(self.path).path not in ("/mcp", "/mcp/"):
+                self._reply(404, {"error": "use /mcp"})
+                return False
+            return True
+
+        def do_GET(self):
+            if self._allowed():
+                self._reply(
+                    405,
+                    {"error": "this server does not open event streams"},
+                    {"Allow": "POST, DELETE"},
+                )
+
+        def do_DELETE(self):
+            if self._allowed():
+                self._reply(200)
+
+        def do_POST(self):
+            if not self._allowed():
+                return
+            length = int(self.headers.get("Content-Length") or 0)
+            if length <= 0 or length > MAX_REQUEST_BYTES:
+                self._reply(413 if length > MAX_REQUEST_BYTES else 400, {"error": "bad length"})
+                return
+            try:
+                message = json.loads(self.rfile.read(length))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                self._reply(
+                    400,
+                    {
+                        "jsonrpc": "2.0",
+                        "id": None,
+                        "error": {"code": -32700, "message": "parse error"},
+                    },
+                )
+                return
+            if not isinstance(message, dict):
+                self._reply(
+                    400,
+                    {
+                        "jsonrpc": "2.0",
+                        "id": None,
+                        "error": {"code": -32600, "message": "batches are not supported"},
+                    },
+                )
+                return
+            reply = server_logic.handle(message)
+            if reply is None:
+                self._reply(202)
+                return
+            headers = {}
+            if message.get("method") == "initialize":
+                headers["Mcp-Session-Id"] = uuid.uuid4().hex
+            self._reply(200, reply, headers)
+
+    httpd = HTTPServer((host, port), Handler)
+    if ready is not None:
+        ready(httpd)
+    sys.stderr.write(f"agent-mcp listening on http://{host}:{httpd.server_port}/mcp\n")
+    try:
+        httpd.serve_forever()
+    finally:
+        httpd.server_close()

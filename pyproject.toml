@@ -35,6 +35,7 @@ llm = ["httpx>=0.27"]
 ml = ["ultralytics>=8.2", "opencv-python>=4.9"]
 crowd = ["onnxruntime>=1.18", "opencv-python>=4.9"]
 overlays = ["rapidocr-onnxruntime>=1.4.4,<2", "opencv-python>=4.9", "pillow>=10"]
+uia = ["comtypes>=1.4; sys_platform == 'win32'"]
 dev = [
     "pytest>=8",
     "ruff>=0.4",

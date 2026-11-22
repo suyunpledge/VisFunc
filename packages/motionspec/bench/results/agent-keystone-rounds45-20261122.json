@@ -1,0 +1,2242 @@
+{
+ "setup": "Keystone feature/ui-redesign: qt_frontend.conversation.run (Work mode, max_turns=100), McpHttp, run.py gateway -> api.openai.com; motionspec agent-mcp --http --no-images --allow-window for each task window",
+ "round4_no_turn_cap": [
+  {
+   "task": "settings",
+   "model": "gpt-6.1-sol",
+   "success": true,
+   "answer_mentions": true,
+   "seconds": 36.3,
+   "model_turns": 9,
+   "max_turns": 100,
+   "tool_calls": 8,
+   "tool_errors": 0,
+   "tool_ms_total": 7150,
+   "model_ms_total": 29121,
+   "tokens": {
+    "prompt_tokens": 25670,
+    "completion_tokens": 409,
+    "total_tokens": 26079
+   },
+   "state": {
+    "server_saved": "archive-02",
+    "port_saved": "8080",
+    "encrypt_saved": true,
+    "apply_clicks": 1,
+    "sync_started": 1,
+    "sync_cancelled": 0,
+    "synced_to": "archive-02",
+    "synced_encrypted": true,
+    "files": 48,
+    "completed": true,
+    "deleted": false,
+    "delete_prompts": 0,
+    "sync_failures": 0,
+    "events": [
+     "apply",
+     "start_pressed",
+     "sync_started",
+     "sync_done"
+    ],
+    "server_field": "archive-02",
+    "encrypt_checked": true
+   },
+   "answer": "设置已保存，同步已完成：\n- 同步文件数：48 个\n- 目标服务器：archive-02\n- 加密传输：已启用，本次同步已加密\n\n未执行任何删除操作。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 534,
+     "result_bytes": 2367
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "field": "Server name",
+      "text": "archive-02"
+     },
+     "ok": true,
+     "ms": 1517,
+     "result_bytes": 796
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Encrypt transfers",
+      "control_type": "checkbox"
+     },
+     "ok": true,
+     "ms": 588,
+     "result_bytes": 542
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Save",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 652,
+     "result_bytes": 789
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Start sync",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 1921,
+     "result_bytes": 1326
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - confirm",
+      "target": "Start",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 710,
+     "result_bytes": 511
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "quiet_ms": 1500,
+      "timeout_ms": 20000,
+      "ambient_ms": 0,
+      "read_text": true
+     },
+     "ok": true,
+     "ms": 1117,
+     "result_bytes": 600
+    },
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 111,
+     "result_bytes": 2404
+    }
+   ]
+  },
+  {
+   "task": "settings",
+   "model": "gpt-6.1-terra",
+   "success": true,
+   "answer_mentions": true,
+   "seconds": 40.1,
+   "model_turns": 9,
+   "max_turns": 100,
+   "tool_calls": 9,
+   "tool_errors": 0,
+   "tool_ms_total": 10672,
+   "model_ms_total": 29406,
+   "tokens": {
+    "prompt_tokens": 39049,
+    "completion_tokens": 514,
+    "total_tokens": 39563
+   },
+   "state": {
+    "server_saved": "archive-02",
+    "port_saved": "8080",
+    "encrypt_saved": true,
+    "apply_clicks": 1,
+    "sync_started": 1,
+    "sync_cancelled": 0,
+    "synced_to": "archive-02",
+    "synced_encrypted": true,
+    "files": 48,
+    "completed": true,
+    "deleted": false,
+    "delete_prompts": 0,
+    "sync_failures": 0,
+    "events": [
+     "apply",
+     "start_pressed",
+     "sync_started",
+     "sync_done"
+    ],
+    "server_field": "archive-02",
+    "encrypt_checked": true
+   },
+   "answer": "同步已完成：共同步 **48 个文件**到服务器 **archive-02**，传输已加密。未删除任何数据。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 80,
+     "result_bytes": 2367
+    },
+    {
+     "tool": "read_screen_text",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 1248,
+     "result_bytes": 3219
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "field": "Server name",
+      "text": "archive-02"
+     },
+     "ok": true,
+     "ms": 580,
+     "result_bytes": 772
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Encrypt transfers",
+      "control_type": "checkbox"
+     },
+     "ok": true,
+     "ms": 586,
+     "result_bytes": 542
+    },
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 85,
+     "result_bytes": 2359
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Apply",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 602,
+     "result_bytes": 831
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Start sync",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 1049,
+     "result_bytes": 1324
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - confirm",
+      "target": "Start",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 687,
+     "result_bytes": 511
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "quiet_ms": 3000,
+      "timeout_ms": 30000,
+      "read_text": true
+     },
+     "ok": true,
+     "ms": 5755,
+     "result_bytes": 2595
+    }
+   ]
+  },
+  {
+   "task": "recovery",
+   "model": "gpt-6.1-sol",
+   "success": true,
+   "answer_mentions": true,
+   "seconds": 59.6,
+   "model_turns": 14,
+   "max_turns": 100,
+   "tool_calls": 13,
+   "tool_errors": 0,
+   "tool_ms_total": 11503,
+   "model_ms_total": 48016,
+   "tokens": {
+    "prompt_tokens": 61001,
+    "completion_tokens": 738,
+    "total_tokens": 61739
+   },
+   "state": {
+    "server_saved": "archive-02",
+    "port_saved": "8443",
+    "encrypt_saved": true,
+    "apply_clicks": 2,
+    "sync_started": 2,
+    "sync_cancelled": 0,
+    "synced_to": "archive-02",
+    "synced_encrypted": true,
+    "files": 48,
+    "completed": true,
+    "deleted": false,
+    "delete_prompts": 0,
+    "sync_failures": 1,
+    "events": [
+     "apply",
+     "start_pressed",
+     "sync_started",
+     "sync_failed",
+     "error_closed",
+     "apply",
+     "start_pressed",
+     "sync_started",
+     "sync_done"
+    ],
+    "server_field": "archive-02",
+    "encrypt_checked": true
+   },
+   "answer": "同步已完成（100%）。\n\n- **文件数**：48 个\n- **目标服务器及端口**：`archive-02:8443`\n- **传输加密**：已开启，设置已保存\n- **中间问题**：首次使用原端口 `8080` 连接被拒绝；按窗口提示改为 `8443`，保存后重试成功。\n\n未删除任何数据。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 104,
+     "result_bytes": 2366
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "field": "Server name",
+      "text": "archive-02"
+     },
+     "ok": true,
+     "ms": 644,
+     "result_bytes": 772
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Encrypt transfers",
+      "control_type": "checkbox"
+     },
+     "ok": true,
+     "ms": 596,
+     "result_bytes": 542
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Save",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 591,
+     "result_bytes": 789
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Start sync",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 1031,
+     "result_bytes": 1325
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - confirm",
+      "target": "Start",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 705,
+     "result_bytes": 510
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "quiet_ms": 1500,
+      "timeout_ms": 20000,
+      "read_text": true
+     },
+     "ok": true,
+     "ms": 2337,
+     "result_bytes": 3775
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - error",
+      "target": "OK",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 828,
+     "result_bytes": 610
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "field": "Port",
+      "text": "8443"
+     },
+     "ok": true,
+     "ms": 596,
+     "result_bytes": 721
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Save",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 623,
+     "result_bytes": 796
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Start sync",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 1011,
+     "result_bytes": 1325
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - confirm",
+      "target": "Start",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 651,
+     "result_bytes": 511
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "quiet_ms": 1500,
+      "timeout_ms": 20000,
+      "read_text": true
+     },
+     "ok": true,
+     "ms": 1786,
+     "result_bytes": 2424
+    }
+   ]
+  },
+  {
+   "task": "recovery",
+   "model": "gpt-6.1-terra",
+   "success": true,
+   "answer_mentions": true,
+   "seconds": 62.2,
+   "model_turns": 15,
+   "max_turns": 100,
+   "tool_calls": 15,
+   "tool_errors": 0,
+   "tool_ms_total": 11503,
+   "model_ms_total": 50571,
+   "tokens": {
+    "prompt_tokens": 87234,
+    "completion_tokens": 791,
+    "total_tokens": 88025
+   },
+   "state": {
+    "server_saved": "archive-02",
+    "port_saved": "8443",
+    "encrypt_saved": true,
+    "apply_clicks": 2,
+    "sync_started": 2,
+    "sync_cancelled": 0,
+    "synced_to": "archive-02",
+    "synced_encrypted": true,
+    "files": 48,
+    "completed": true,
+    "deleted": false,
+    "delete_prompts": 0,
+    "sync_failures": 1,
+    "events": [
+     "apply",
+     "start_pressed",
+     "sync_started",
+     "sync_failed",
+     "error_closed",
+     "apply",
+     "start_pressed",
+     "sync_started",
+     "sync_done"
+    ],
+    "server_field": "archive-02",
+    "encrypt_checked": true
+   },
+   "answer": "同步已完成，共 **48 个文件**，目标为 **archive-02:8443**，传输已加密。\n\n首次同步时，服务器拒绝了 8080 端口的连接。根据窗口提示，将端口改为 8443 并保存后重试，最终同步成功。未删除任何数据。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "read_screen_text",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 381,
+     "result_bytes": 3218
+    },
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 105,
+     "result_bytes": 2367
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "field": "Server name",
+      "text": "archive-02"
+     },
+     "ok": true,
+     "ms": 667,
+     "result_bytes": 772
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Encrypt transfers",
+      "control_type": "checkbox"
+     },
+     "ok": true,
+     "ms": 664,
+     "result_bytes": 542
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Apply",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 665,
+     "result_bytes": 791
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Start sync",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 1034,
+     "result_bytes": 1324
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - confirm",
+      "target": "Start",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 679,
+     "result_bytes": 511
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "quiet_ms": 1500,
+      "timeout_ms": 20000,
+      "read_text": true
+     },
+     "ok": true,
+     "ms": 1847,
+     "result_bytes": 3771
+    },
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task - error"
+     },
+     "ok": true,
+     "ms": 76,
+     "result_bytes": 1024
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - error",
+      "target": "OK",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 690,
+     "result_bytes": 610
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "field": "Port",
+      "text": "8443"
+     },
+     "ok": true,
+     "ms": 646,
+     "result_bytes": 720
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Apply",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 637,
+     "result_bytes": 798
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Start sync",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 950,
+     "result_bytes": 1324
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - confirm",
+      "target": "Start",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 677,
+     "result_bytes": 400
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "quiet_ms": 1500,
+      "timeout_ms": 20000,
+      "read_text": true
+     },
+     "ok": true,
+     "ms": 1785,
+     "result_bytes": 2424
+    }
+   ]
+  },
+  {
+   "task": "web",
+   "model": "gpt-6.1-sol",
+   "success": true,
+   "answer_mentions": true,
+   "seconds": 51.3,
+   "model_turns": 10,
+   "max_turns": 100,
+   "tool_calls": 9,
+   "tool_errors": 0,
+   "tool_ms_total": 18631,
+   "model_ms_total": 32662,
+   "tokens": {
+    "prompt_tokens": 29938,
+    "completion_tokens": 443,
+    "total_tokens": 30381
+   },
+   "state": {
+    "submitted": {
+     "name": "Lin Chen",
+     "email": "lin.chen@example.com",
+     "plan": "Pro",
+     "seats": 3,
+     "terms": true
+    },
+    "attempts": 1,
+    "result": "Account created for Lin Chen: Pro plan, 3 seats.",
+    "seats": "3"
+   },
+   "answer": "已提交，页面显示创建成功：\n\n> Account created for Lin Chen: Pro plan, 3 seats.\n\n即：已为 Lin Chen 创建账户，套餐为 Pro，座位数为 3。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone web task"
+     },
+     "ok": true,
+     "ms": 3583,
+     "result_bytes": 3533
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "field": "Full name",
+      "text": "Lin Chen"
+     },
+     "ok": true,
+     "ms": 1080,
+     "result_bytes": 534
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "field": "Email",
+      "text": "lin.chen@example.com"
+     },
+     "ok": true,
+     "ms": 1845,
+     "result_bytes": 504
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "Plan",
+      "control_type": "combobox"
+     },
+     "ok": true,
+     "ms": 1895,
+     "result_bytes": 688
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "Pro",
+      "control_type": "list_item"
+     },
+     "ok": true,
+     "ms": 1872,
+     "result_bytes": 455
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "Add seat",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 1922,
+     "result_bytes": 794
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "Add seat",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 2262,
+     "result_bytes": 498
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "I agree to the terms",
+      "control_type": "checkbox"
+     },
+     "ok": true,
+     "ms": 2195,
+     "result_bytes": 535
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "Create account",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 1977,
+     "result_bytes": 495
+    }
+   ]
+  },
+  {
+   "task": "web",
+   "model": "gpt-6.1-terra",
+   "success": true,
+   "answer_mentions": true,
+   "seconds": 50.1,
+   "model_turns": 10,
+   "max_turns": 100,
+   "tool_calls": 10,
+   "tool_errors": 0,
+   "tool_ms_total": 19584,
+   "model_ms_total": 30464,
+   "tokens": {
+    "prompt_tokens": 45881,
+    "completion_tokens": 498,
+    "total_tokens": 46379
+   },
+   "state": {
+    "submitted": {
+     "name": "Lin Chen",
+     "email": "lin.chen@example.com",
+     "plan": "Pro",
+     "seats": 3,
+     "terms": true
+    },
+    "attempts": 1,
+    "result": "Account created for Lin Chen: Pro plan, 3 seats.",
+    "seats": "3"
+   },
+   "answer": "页面显示：“Account created for Lin Chen: Pro plan, 3 seats.”\n\n即账户已创建，套餐为 Pro，座位数为 3。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone web task"
+     },
+     "ok": true,
+     "ms": 3322,
+     "result_bytes": 3533
+    },
+    {
+     "tool": "read_screen_text",
+     "arguments": {
+      "window_title": "Keystone web task"
+     },
+     "ok": true,
+     "ms": 2812,
+     "result_bytes": 4387
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "field": "Full name",
+      "text": "Lin Chen"
+     },
+     "ok": true,
+     "ms": 978,
+     "result_bytes": 559
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "field": "Email",
+      "text": "lin.chen@example.com"
+     },
+     "ok": true,
+     "ms": 2174,
+     "result_bytes": 504
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "Plan",
+      "control_type": "combobox"
+     },
+     "ok": true,
+     "ms": 2424,
+     "result_bytes": 688
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "Pro",
+      "control_type": "list_item"
+     },
+     "ok": true,
+     "ms": 1511,
+     "result_bytes": 453
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "Add seat",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 917,
+     "result_bytes": 791
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "Add seat",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 1843,
+     "result_bytes": 499
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "I agree to the terms",
+      "control_type": "checkbox"
+     },
+     "ok": true,
+     "ms": 1794,
+     "result_bytes": 535
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "Create account",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 1809,
+     "result_bytes": 495
+    }
+   ]
+  },
+  {
+   "task": "canvas",
+   "model": "gpt-6.1-sol",
+   "success": true,
+   "answer_mentions": true,
+   "seconds": 20.7,
+   "model_turns": 6,
+   "max_turns": 100,
+   "tool_calls": 5,
+   "tool_errors": 0,
+   "tool_ms_total": 2825,
+   "model_ms_total": 17833,
+   "tokens": {
+    "prompt_tokens": 12747,
+    "completion_tokens": 251,
+    "total_tokens": 12998
+   },
+   "state": {
+    "priority": "High",
+    "notify": true,
+    "confirmed": true,
+    "clicks": [
+     "miss@353,265",
+     "High",
+     "Notify team",
+     "Confirm"
+    ],
+    "misses": 1,
+    "confirmed_with": {
+     "priority": "High",
+     "notify": true
+    }
+   },
+   "answer": "已将优先级设为 High，开启 Notify team，并点击 Confirm。\n\n窗口显示状态：**Confirmed: priority High, notify on**（已确认：优先级 High，通知已开启）。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone canvas task"
+     },
+     "ok": true,
+     "ms": 107,
+     "result_bytes": 836
+    },
+    {
+     "tool": "read_screen_text",
+     "arguments": {
+      "window_title": "Keystone canvas task"
+     },
+     "ok": true,
+     "ms": 671,
+     "result_bytes": 2052
+    },
+    {
+     "tool": "click_point",
+     "arguments": {
+      "window_title": "Keystone canvas task",
+      "x": 690,
+      "y": 366
+     },
+     "ok": true,
+     "ms": 925,
+     "result_bytes": 472
+    },
+    {
+     "tool": "click_point",
+     "arguments": {
+      "window_title": "Keystone canvas task",
+      "x": 290,
+      "y": 481
+     },
+     "ok": true,
+     "ms": 488,
+     "result_bytes": 296
+    },
+    {
+     "tool": "click_point",
+     "arguments": {
+      "window_title": "Keystone canvas task",
+      "x": 916,
+      "y": 622
+     },
+     "ok": true,
+     "ms": 634,
+     "result_bytes": 440
+    }
+   ]
+  },
+  {
+   "task": "canvas",
+   "model": "gpt-6.1-terra",
+   "success": true,
+   "answer_mentions": true,
+   "seconds": 14.9,
+   "model_turns": 5,
+   "max_turns": 100,
+   "tool_calls": 5,
+   "tool_errors": 0,
+   "tool_ms_total": 1970,
+   "model_ms_total": 12917,
+   "tokens": {
+    "prompt_tokens": 11312,
+    "completion_tokens": 238,
+    "total_tokens": 11550
+   },
+   "state": {
+    "priority": "High",
+    "notify": true,
+    "confirmed": true,
+    "clicks": [
+     "High",
+     "Notify team",
+     "Confirm"
+    ],
+    "misses": 0,
+    "confirmed_with": {
+     "priority": "High",
+     "notify": true
+    }
+   },
+   "answer": "已完成。窗口显示状态：**Confirmed: priority High, notify on**。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone canvas task"
+     },
+     "ok": true,
+     "ms": 110,
+     "result_bytes": 836
+    },
+    {
+     "tool": "read_screen_text",
+     "arguments": {
+      "window_title": "Keystone canvas task"
+     },
+     "ok": true,
+     "ms": 325,
+     "result_bytes": 2052
+    },
+    {
+     "tool": "click_point",
+     "arguments": {
+      "window_title": "Keystone canvas task",
+      "x": 690,
+      "y": 366
+     },
+     "ok": true,
+     "ms": 523,
+     "result_bytes": 424
+    },
+    {
+     "tool": "click_point",
+     "arguments": {
+      "window_title": "Keystone canvas task",
+      "x": 290,
+      "y": 481
+     },
+     "ok": true,
+     "ms": 504,
+     "result_bytes": 295
+    },
+    {
+     "tool": "click_point",
+     "arguments": {
+      "window_title": "Keystone canvas task",
+      "x": 916,
+      "y": 622
+     },
+     "ok": true,
+     "ms": 508,
+     "result_bytes": 440
+    }
+   ]
+  }
+ ],
+ "round5_after_optimizations": [
+  {
+   "task": "settings",
+   "model": "gpt-6.1-sol",
+   "success": true,
+   "answer_mentions": true,
+   "seconds": 39.9,
+   "model_turns": 9,
+   "max_turns": 100,
+   "tool_calls": 8,
+   "tool_errors": 0,
+   "tool_ms_total": 8042,
+   "model_ms_total": 31861,
+   "tokens": {
+    "prompt_tokens": 25993,
+    "completion_tokens": 402,
+    "total_tokens": 26395
+   },
+   "state": {
+    "server_saved": "archive-02",
+    "port_saved": "8080",
+    "encrypt_saved": true,
+    "apply_clicks": 1,
+    "sync_started": 1,
+    "sync_cancelled": 0,
+    "synced_to": "archive-02",
+    "synced_encrypted": true,
+    "files": 48,
+    "completed": true,
+    "deleted": false,
+    "delete_prompts": 0,
+    "sync_failures": 0,
+    "events": [
+     "apply",
+     "start_pressed",
+     "sync_started",
+     "sync_done"
+    ],
+    "server_field": "archive-02",
+    "encrypt_checked": true
+   },
+   "answer": "设置已保存，同步已完成（100%）：\n\n- 同步文件：48 个\n- 目标服务器：archive-02\n- 传输加密：已启用\n\n未执行任何删除操作。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 780,
+     "result_bytes": 1860
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "field": "Server name",
+      "text": "archive-02"
+     },
+     "ok": true,
+     "ms": 1500,
+     "result_bytes": 884
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Encrypt transfers",
+      "control_type": "checkbox"
+     },
+     "ok": true,
+     "ms": 548,
+     "result_bytes": 542
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Save",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 646,
+     "result_bytes": 845
+    },
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 104,
+     "result_bytes": 1863
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Start sync",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 1680,
+     "result_bytes": 1251
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - confirm",
+      "target": "Start",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 681,
+     "result_bytes": 511
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "quiet_ms": 1500,
+      "timeout_ms": 20000,
+      "read_text": true
+     },
+     "ok": true,
+     "ms": 2103,
+     "result_bytes": 2422
+    }
+   ]
+  },
+  {
+   "task": "settings",
+   "model": "gpt-6.1-terra",
+   "success": true,
+   "answer_mentions": true,
+   "seconds": 36.0,
+   "model_turns": 9,
+   "max_turns": 100,
+   "tool_calls": 9,
+   "tool_errors": 0,
+   "tool_ms_total": 7465,
+   "model_ms_total": 28538,
+   "tokens": {
+    "prompt_tokens": 36982,
+    "completion_tokens": 473,
+    "total_tokens": 37455
+   },
+   "state": {
+    "server_saved": "archive-02",
+    "port_saved": "8080",
+    "encrypt_saved": true,
+    "apply_clicks": 1,
+    "sync_started": 1,
+    "sync_cancelled": 0,
+    "synced_to": "archive-02",
+    "synced_encrypted": true,
+    "files": 48,
+    "completed": true,
+    "deleted": false,
+    "delete_prompts": 0,
+    "sync_failures": 0,
+    "events": [
+     "apply",
+     "start_pressed",
+     "sync_started",
+     "sync_done"
+    ],
+    "server_field": "archive-02",
+    "encrypt_checked": true
+   },
+   "answer": "同步已完成：共同步 **48 个文件**至服务器 **archive-02**，传输已加密。未删除任何数据。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 143,
+     "result_bytes": 1860
+    },
+    {
+     "tool": "read_screen_text",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 1376,
+     "result_bytes": 3219
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "field": "Server name",
+      "text": "archive-02"
+     },
+     "ok": true,
+     "ms": 586,
+     "result_bytes": 884
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Encrypt transfers",
+      "control_type": "checkbox"
+     },
+     "ok": true,
+     "ms": 699,
+     "result_bytes": 542
+    },
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 139,
+     "result_bytes": 1852
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Save",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 659,
+     "result_bytes": 845
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Start sync",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 978,
+     "result_bytes": 1251
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - confirm",
+      "target": "Start",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 621,
+     "result_bytes": 511
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "quiet_ms": 2000,
+      "expect_change_ms": 3000,
+      "timeout_ms": 30000,
+      "read_text": true
+     },
+     "ok": true,
+     "ms": 2264,
+     "result_bytes": 2424
+    }
+   ]
+  },
+  {
+   "task": "recovery",
+   "model": "gpt-6.1-sol",
+   "success": true,
+   "answer_mentions": true,
+   "seconds": 58.4,
+   "model_turns": 14,
+   "max_turns": 100,
+   "tool_calls": 13,
+   "tool_errors": 0,
+   "tool_ms_total": 11612,
+   "model_ms_total": 46788,
+   "tokens": {
+    "prompt_tokens": 59410,
+    "completion_tokens": 708,
+    "total_tokens": 60118
+   },
+   "state": {
+    "server_saved": "archive-02",
+    "port_saved": "8443",
+    "encrypt_saved": true,
+    "apply_clicks": 2,
+    "sync_started": 2,
+    "sync_cancelled": 0,
+    "synced_to": "archive-02",
+    "synced_encrypted": true,
+    "files": 48,
+    "completed": true,
+    "deleted": false,
+    "delete_prompts": 0,
+    "sync_failures": 1,
+    "events": [
+     "apply",
+     "start_pressed",
+     "sync_started",
+     "sync_failed",
+     "error_closed",
+     "apply",
+     "start_pressed",
+     "sync_started",
+     "sync_done"
+    ],
+    "server_field": "archive-02",
+    "encrypt_checked": true
+   },
+   "answer": "同步已完成（100%）。\n\n- **文件数**：48 个\n- **目标服务器**：`archive-02`\n- **端口**：`8443`\n- **加密传输**：已开启，设置已保存\n- **中间问题**：首次使用原端口 `8080` 连接被拒绝；窗口提示服务器仅接受 `8443` 端口。已按提示修改端口、保存并重试，最终成功。\n\n整个过程中未删除任何数据。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 96,
+     "result_bytes": 1860
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "field": "Server name",
+      "text": "archive-02"
+     },
+     "ok": true,
+     "ms": 713,
+     "result_bytes": 884
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Encrypt transfers",
+      "control_type": "checkbox"
+     },
+     "ok": true,
+     "ms": 580,
+     "result_bytes": 542
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Save",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 568,
+     "result_bytes": 845
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Start sync",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 1063,
+     "result_bytes": 1251
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - confirm",
+      "target": "Start",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 703,
+     "result_bytes": 510
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "quiet_ms": 1500,
+      "timeout_ms": 20000,
+      "read_text": true
+     },
+     "ok": true,
+     "ms": 2354,
+     "result_bytes": 3775
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - error",
+      "target": "OK",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 850,
+     "result_bytes": 610
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "field": "Port",
+      "text": "8443"
+     },
+     "ok": true,
+     "ms": 634,
+     "result_bytes": 825
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Save",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 553,
+     "result_bytes": 852
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Start sync",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 1033,
+     "result_bytes": 1251
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - confirm",
+      "target": "Start",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 703,
+     "result_bytes": 511
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "quiet_ms": 1500,
+      "timeout_ms": 20000,
+      "read_text": true
+     },
+     "ok": true,
+     "ms": 1762,
+     "result_bytes": 2424
+    }
+   ]
+  },
+  {
+   "task": "recovery",
+   "model": "gpt-6.1-terra",
+   "success": true,
+   "answer_mentions": true,
+   "seconds": 64.9,
+   "model_turns": 15,
+   "max_turns": 100,
+   "tool_calls": 15,
+   "tool_errors": 0,
+   "tool_ms_total": 11185,
+   "model_ms_total": 53718,
+   "tokens": {
+    "prompt_tokens": 85057,
+    "completion_tokens": 787,
+    "total_tokens": 85844
+   },
+   "state": {
+    "server_saved": "archive-02",
+    "port_saved": "8443",
+    "encrypt_saved": true,
+    "apply_clicks": 2,
+    "sync_started": 2,
+    "sync_cancelled": 0,
+    "synced_to": "archive-02",
+    "synced_encrypted": true,
+    "files": 48,
+    "completed": true,
+    "deleted": false,
+    "delete_prompts": 0,
+    "sync_failures": 1,
+    "events": [
+     "apply",
+     "start_pressed",
+     "sync_started",
+     "sync_failed",
+     "error_closed",
+     "apply",
+     "start_pressed",
+     "sync_started",
+     "sync_done"
+    ],
+    "server_field": "archive-02",
+    "encrypt_checked": true
+   },
+   "answer": "同步已完成：**48 个文件**已加密同步至 **archive-02:8443**。\n\n首次同步时，8080 端口的连接被拒绝；窗口提示服务器只接受 8443 端口。已按提示修改并保存端口，重试后同步成功。未删除任何数据。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 98,
+     "result_bytes": 1860
+    },
+    {
+     "tool": "read_screen_text",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 468,
+     "result_bytes": 3218
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "field": "Server name",
+      "text": "archive-02"
+     },
+     "ok": true,
+     "ms": 529,
+     "result_bytes": 883
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Encrypt transfers",
+      "control_type": "checkbox"
+     },
+     "ok": true,
+     "ms": 560,
+     "result_bytes": 542
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Save",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 627,
+     "result_bytes": 845
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Start sync",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 872,
+     "result_bytes": 1251
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - confirm",
+      "target": "Start",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 651,
+     "result_bytes": 511
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "quiet_ms": 1500,
+      "timeout_ms": 20000,
+      "read_text": true
+     },
+     "ok": true,
+     "ms": 1792,
+     "result_bytes": 3776
+    },
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task - error"
+     },
+     "ok": true,
+     "ms": 73,
+     "result_bytes": 718
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - error",
+      "target": "OK",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 742,
+     "result_bytes": 610
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "field": "Port",
+      "text": "8443"
+     },
+     "ok": true,
+     "ms": 753,
+     "result_bytes": 825
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Save",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 671,
+     "result_bytes": 852
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Start sync",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 964,
+     "result_bytes": 1251
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - confirm",
+      "target": "Start",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 632,
+     "result_bytes": 356
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "quiet_ms": 1500,
+      "timeout_ms": 20000,
+      "read_text": true
+     },
+     "ok": true,
+     "ms": 1753,
+     "result_bytes": 2424
+    }
+   ]
+  },
+  {
+   "task": "web",
+   "model": "gpt-6.1-sol",
+   "success": true,
+   "answer_mentions": true,
+   "seconds": 43.1,
+   "model_turns": 10,
+   "max_turns": 100,
+   "tool_calls": 9,
+   "tool_errors": 0,
+   "tool_ms_total": 8790,
+   "model_ms_total": 34275,
+   "tokens": {
+    "prompt_tokens": 30071,
+    "completion_tokens": 471,
+    "total_tokens": 30542
+   },
+   "state": {
+    "submitted": {
+     "name": "Lin Chen",
+     "email": "lin.chen@example.com",
+     "plan": "Pro",
+     "seats": 3,
+     "terms": true
+    },
+    "attempts": 1,
+    "result": "Account created for Lin Chen: Pro plan, 3 seats.",
+    "seats": "3"
+   },
+   "answer": "已填写指定姓名和邮箱，选择 Pro 套餐、将座位数设为 3，勾选同意条款并提交。\n\n页面显示：**“Account created for Lin Chen: Pro plan, 3 seats.”**\n\n即：Lin Chen 的账户已创建，套餐为 Pro，共 3 个座位。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone web task"
+     },
+     "ok": true,
+     "ms": 147,
+     "result_bytes": 3124
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "field": "Full name",
+      "text": "Lin Chen"
+     },
+     "ok": true,
+     "ms": 879,
+     "result_bytes": 559
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "field": "Email",
+      "text": "lin.chen@example.com"
+     },
+     "ok": true,
+     "ms": 1827,
+     "result_bytes": 764
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "Plan",
+      "control_type": "combobox"
+     },
+     "ok": true,
+     "ms": 1052,
+     "result_bytes": 865
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "Pro",
+      "control_type": "list_item"
+     },
+     "ok": true,
+     "ms": 1099,
+     "result_bytes": 711
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "Add seat",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 1025,
+     "result_bytes": 967
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "Add seat",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 931,
+     "result_bytes": 754
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "I agree to the terms",
+      "control_type": "checkbox"
+     },
+     "ok": true,
+     "ms": 902,
+     "result_bytes": 790
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "Create account",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 928,
+     "result_bytes": 750
+    }
+   ]
+  },
+  {
+   "task": "web",
+   "model": "gpt-6.1-terra",
+   "success": true,
+   "answer_mentions": true,
+   "seconds": 39.5,
+   "model_turns": 10,
+   "max_turns": 100,
+   "tool_calls": 9,
+   "tool_errors": 0,
+   "tool_ms_total": 8147,
+   "model_ms_total": 31311,
+   "tokens": {
+    "prompt_tokens": 30619,
+    "completion_tokens": 438,
+    "total_tokens": 31057
+   },
+   "state": {
+    "submitted": {
+     "name": "Lin Chen",
+     "email": "lin.chen@example.com",
+     "plan": "Pro",
+     "seats": 3,
+     "terms": true
+    },
+    "attempts": 1,
+    "result": "Account created for Lin Chen: Pro plan, 3 seats.",
+    "seats": "3"
+   },
+   "answer": "提交成功。页面显示：“Account created for Lin Chen: Pro plan, 3 seats.”（已为 Lin Chen 创建账户，Pro 套餐，3 个座位。）",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone web task"
+     },
+     "ok": true,
+     "ms": 196,
+     "result_bytes": 3353
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "field": "Full name",
+      "text": "Lin Chen"
+     },
+     "ok": true,
+     "ms": 1000,
+     "result_bytes": 747
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "field": "Email",
+      "text": "lin.chen@example.com"
+     },
+     "ok": true,
+     "ms": 925,
+     "result_bytes": 759
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "Plan",
+      "control_type": "combobox"
+     },
+     "ok": true,
+     "ms": 1043,
+     "result_bytes": 865
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "Pro",
+      "control_type": "list_item"
+     },
+     "ok": true,
+     "ms": 1023,
+     "result_bytes": 711
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "Add seat",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 975,
+     "result_bytes": 967
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "Add seat",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 923,
+     "result_bytes": 754
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "I agree to the terms",
+      "control_type": "checkbox"
+     },
+     "ok": true,
+     "ms": 963,
+     "result_bytes": 790
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone web task",
+      "target": "Create account",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 1099,
+     "result_bytes": 750
+    }
+   ]
+  },
+  {
+   "task": "canvas",
+   "model": "gpt-6.1-sol",
+   "success": true,
+   "answer_mentions": true,
+   "seconds": 20.2,
+   "model_turns": 6,
+   "max_turns": 100,
+   "tool_calls": 5,
+   "tool_errors": 0,
+   "tool_ms_total": 2700,
+   "model_ms_total": 17477,
+   "tokens": {
+    "prompt_tokens": 12044,
+    "completion_tokens": 251,
+    "total_tokens": 12295
+   },
+   "state": {
+    "priority": "High",
+    "notify": true,
+    "confirmed": true,
+    "clicks": [
+     "High",
+     "Notify team",
+     "Confirm"
+    ],
+    "misses": 0,
+    "confirmed_with": {
+     "priority": "High",
+     "notify": true
+    }
+   },
+   "answer": "已将优先级设为 High，开启 Notify team，并点击 Confirm。\n\n窗口显示状态：**Confirmed: priority High, notify on**（已确认：优先级 High，通知已开启）。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone canvas task"
+     },
+     "ok": true,
+     "ms": 77,
+     "result_bytes": 324
+    },
+    {
+     "tool": "read_screen_text",
+     "arguments": {
+      "window_title": "Keystone canvas task"
+     },
+     "ok": true,
+     "ms": 905,
+     "result_bytes": 2052
+    },
+    {
+     "tool": "click_point",
+     "arguments": {
+      "window_title": "Keystone canvas task",
+      "x": 690,
+      "y": 366
+     },
+     "ok": true,
+     "ms": 620,
+     "result_bytes": 523
+    },
+    {
+     "tool": "click_point",
+     "arguments": {
+      "window_title": "Keystone canvas task",
+      "x": 290,
+      "y": 481
+     },
+     "ok": true,
+     "ms": 480,
+     "result_bytes": 350
+    },
+    {
+     "tool": "click_point",
+     "arguments": {
+      "window_title": "Keystone canvas task",
+      "x": 916,
+      "y": 622
+     },
+     "ok": true,
+     "ms": 618,
+     "result_bytes": 440
+    }
+   ]
+  },
+  {
+   "task": "canvas",
+   "model": "gpt-6.1-terra",
+   "success": true,
+   "answer_mentions": true,
+   "seconds": 19.6,
+   "model_turns": 6,
+   "max_turns": 100,
+   "tool_calls": 5,
+   "tool_errors": 0,
+   "tool_ms_total": 3333,
+   "model_ms_total": 16247,
+   "tokens": {
+    "prompt_tokens": 12080,
+    "completion_tokens": 244,
+    "total_tokens": 12324
+   },
+   "state": {
+    "priority": "High",
+    "notify": true,
+    "confirmed": true,
+    "clicks": [
+     "High",
+     "Notify team",
+     "Confirm"
+    ],
+    "misses": 0,
+    "confirmed_with": {
+     "priority": "High",
+     "notify": true
+    }
+   },
+   "answer": "已完成。窗口显示状态：**Confirmed: priority High, notify on**。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone canvas task"
+     },
+     "ok": true,
+     "ms": 80,
+     "result_bytes": 324
+    },
+    {
+     "tool": "read_screen_text",
+     "arguments": {
+      "window_title": "Keystone canvas task"
+     },
+     "ok": true,
+     "ms": 381,
+     "result_bytes": 2052
+    },
+    {
+     "tool": "click_point",
+     "arguments": {
+      "window_title": "Keystone canvas task",
+      "x": 690,
+      "y": 366
+     },
+     "ok": true,
+     "ms": 700,
+     "result_bytes": 523
+    },
+    {
+     "tool": "click_point",
+     "arguments": {
+      "window_title": "Keystone canvas task",
+      "x": 290,
+      "y": 481
+     },
+     "ok": true,
+     "ms": 1417,
+     "result_bytes": 350
+    },
+    {
+     "tool": "click_point",
+     "arguments": {
+      "window_title": "Keystone canvas task",
+      "x": 916,
+      "y": 622
+     },
+     "ok": true,
+     "ms": 755,
+     "result_bytes": 440
+    }
+   ]
+  }
+ ],
+ "finding": "ESET Internet Security browser screen protection replaces captures of browser windows with a placeholder; pixel settle and OCR cannot see Chrome on this machine, UI Automation can"
+}

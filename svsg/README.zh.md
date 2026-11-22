@@ -24,6 +24,8 @@ VisFunc-Image 把一张图片编译成一组可以计算的参数：每个像素
 | 编译图片的区域、轮廓和空间关系 | `POST /v1/compile-functions`，或 Python 里的 `svsg.image_functions` |
 | 让模型根据参数回答问题，并核对它的结论 | `POST /v1/analyze-image`、`POST /v1/analyze` |
 | 识别图片里的物体，多个视图交叉确认 | `POST /v1/recognize-image` |
+| 读出应用界面截图上的文字，带框和点击点（给 Agent 用，需要 `.[overlays]`） | `POST /v1/screen-text`，命令行 `motionspec screen-text` |
+| 通过 Windows UI Automation 列出窗口控件，按名字找点击位置（需要 `.[uia]`） | `svsg.recognition.ui_elements`，或 `motionspec agent-mcp` 的 `list_ui_elements`、`find_on_screen` |
 | 查询视频的保留帧和运动函数 | `svsg.video_functions.VideoRuntime`，命令行经由 `motionspec query` |
 
 ## 图像函数
@@ -116,6 +118,7 @@ python -m svsg
 | `POST /v1/analyze-image` | 上传 `file` 和问题 `query`；按上面的流程作答 |
 | `POST /v1/analyze` | 提交已有的 `ir` 和新问题 |
 | `POST /v1/recognize-image` | 上传 `file`，可带类别列表 `labels` 和视频帧引用 `frame` |
+| `POST /v1/screen-text` | 上传 `file`，可带区域列表 `regions`（`[[l, t, r, b], ...]`）；OCR 模型首次请求时加载，之后常驻 |
 | `GET /healthz` | 健康检查，不需要鉴权 |
 
 配置写在 `.env`，模板见 [.env.example](../.env.example)。常用项：
@@ -137,7 +140,8 @@ Windows 下可以用 [启动脚本](../scripts/start-svsg.cmd) 从单独的运�
 svsg/
   image_functions/   光栅编码、区域、轮廓、空间关系、函数断言
   video_functions/   视频函数的编译、导出与查询求值
-  recognition/       多视图识别、坐标映射、一致性判定、视频帧绑定、评测
+  recognition/       多视图识别、坐标映射、一致性判定、视频帧绑定、评测；字幕与界面文字读取；
+                     UI Automation 控件列表
   contracts/         IR、图像函数、视频函数、识别结果的数据格式
   l1_compiler/       检测器适配与 IR 编译
   l15_verifier/      视觉复核与降级

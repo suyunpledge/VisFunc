@@ -59,6 +59,19 @@ verdict = check(spec, [{"segment": "s1", "field": "easing", "value": "ease-out"}
 | `--no-sheets`、`--no-raw-frames` | 不输出标注图；不输出原分辨率证据帧 |
 | `--functions`、`--evidence-every-ms`、`--function-max-frames` | 导出函数；按时间间隔补充证据帧；函数包的帧数上限 |
 
+### 等界面稳定（给 Agent 用）
+
+`analyze` 要拟合曲线，一段 0.6 秒的片段要算 1～3 秒，不适合 Agent 每次点击后等待。`settle` 只回答"停下来没有、哪里变了"：边收帧边判断，静止 `--quiet-ms`（默认 200）后返回 `settled`，`--expect-ms` 内没变化返回 `unchanged`，并列出相对第一帧净变化的区域。每帧判断约 6 ms。
+
+```bash
+motionspec settle --screen --region 0 0 1920 1080 --read-text   # 点击后运行，读出变化区域里的文字
+motionspec settle recording.mp4                                  # 也接受录好的视频或图片目录
+```
+
+一直在变的区域（视频、动画背景）满 `--ambient-ms` 后不再算作变化。加载圈和它们分不开，需要等加载完成时设 `--ambient-ms 0`；时钟之类用 `--ignore` 排除。
+
+给 Agent 用时，更方便的是常驻的 MCP 服务 `motionspec agent-mcp`：它保留截屏流、OCR 模型和学到的背景区域，提供 `wait_for_settle`、`find_on_screen`（先查 Windows UI Automation，再查 OCR）、`read_screen_text`、`list_ui_elements` 和 `screenshot`；加 `--allow-window 标题` 后还有 `click_element`、`set_field_text`。默认走 stdio，`--http 主机:端口` 改为 HTTP，接 Pledge Keystone 时再加 `--no-images`。截屏装了 mss（`pip install -e ".[capture]"`）时更快。[用法与评测](../../docs/agent-screen-20261122.md)
+
 ## 输出
 
 | 文件 | 内容 |
@@ -307,6 +320,8 @@ motionspec/
   spec.py         规格格式、校验、文字摘要
   claims.py       断言校验
   functions.py    函数导出、查询目录、批量查询（调用 VisFunc-Image）
+  settle.py       等界面稳定：边收帧边判断，列出变化区域；实时截屏
+  agent.py        给 Agent 的屏幕工具和 MCP 服务
   qt_probe.py     Qt 探针的应用内部分
   trace.py        Qt 探针的离线部分；trace_contract.py 校验轨迹格式
   synth.py        合成动画，用于测试和演示
@@ -321,6 +336,7 @@ bench/
   run.py、run_hard.py、report*.py      模型实测与汇总
   providers.py、client.py、canary.py   读取本机模型配置、调用封装、确认收到视频
   pedestrian_*.py                     MOT17 行人实验（进行中）
+  agent_*.py                          Agent 场景：桌面截图与读字、Chrome 网页、真实窗口上的 MCP 调用
 ```
 
 测试在 `tests/`，在本目录运行 `python -m pytest`。

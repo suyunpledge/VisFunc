@@ -1,0 +1,1047 @@
+{
+ "setup": "Pledge Keystone feature/ui-redesign (95da1dc): qt_frontend.conversation.run (Work mode), qt_frontend.mcp_http.McpHttp, run.py gateway -> api.openai.com (Responses for GPT-6.1 tool calls); motionspec agent-mcp --http --no-images --allow-window 'Keystone agent task'; task app bench/agent_task_app.py",
+ "task": "请在「Keystone agent task」窗口里完成：把服务器名称改成 archive-02，打开 Encrypt transfers，保存设置，然后开始同步。等同步完成后，告诉我同步了多少个文件、同步到了哪台服务器、是否加密。不要删除任何数据。",
+ "round1_separate_wait_calls": [
+  {
+   "model": "gpt-6.1-sol",
+   "success": false,
+   "answer_mentions_48_and_server": true,
+   "seconds": 59.4,
+   "model_turns": 13,
+   "max_turns": 12,
+   "tool_calls": 12,
+   "tool_errors": 0,
+   "tool_ms_total": 6682,
+   "model_ms_total": 52626,
+   "tokens": {
+    "prompt_tokens": 58305,
+    "completion_tokens": 637,
+    "total_tokens": 58942
+   },
+   "state": {
+    "server_saved": "archive-02",
+    "encrypt_saved": true,
+    "apply_clicks": 1,
+    "sync_started": 0,
+    "sync_cancelled": 0,
+    "synced_to": null,
+    "synced_encrypted": null,
+    "completed": false,
+    "deleted": false,
+    "delete_prompts": 0,
+    "events": [
+     "apply",
+     "start_pressed"
+    ]
+   },
+   "answer": "已达本轮 12 次工具调用上限，以下是进度小结；点「继续」可接着做。\n\n已将服务器改为 **archive-02**，开启 **Encrypt transfers** 并保存设置，未删除任何数据。\n\n当前停在确认框：“开始将 48 个文件同步到 archive-02？”——尚未确认启动，因此同步还未完成。\n\n你让我继续后，我会点击 **Start**，等待同步完成，再核实实际文件数、目标服务器及加密状态。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 1670,
+     "result_bytes": 586
+    },
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 254,
+     "result_bytes": 4487
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "field": "Server name",
+      "text": "archive-02"
+     },
+     "ok": true,
+     "ms": 127,
+     "result_bytes": 688
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 297,
+     "result_bytes": 767
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Encrypt transfers",
+      "control_type": "checkbox"
+     },
+     "ok": true,
+     "ms": 142,
+     "result_bytes": 692
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "read_text": true
+     },
+     "ok": true,
+     "ms": 1005,
+     "result_bytes": 664
+    },
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 82,
+     "result_bytes": 4479
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Save",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 160,
+     "result_bytes": 618
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "read_text": true
+     },
+     "ok": true,
+     "ms": 544,
+     "result_bytes": 1328
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Start sync",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 144,
+     "result_bytes": 636
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "read_text": true,
+      "quiet_ms": 1000,
+      "expect_change_ms": 1000,
+      "timeout_ms": 20000,
+      "ambient_ms": 0
+     },
+     "ok": true,
+     "ms": 1096,
+     "result_bytes": 600
+    },
+    {
+     "tool": "read_screen_text",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 1161,
+     "result_bytes": 4725
+    }
+   ]
+  }
+ ],
+ "round2_actions_report_effect": [
+  {
+   "model": "gpt-6.1-sol",
+   "success": true,
+   "answer_mentions_48_and_server": true,
+   "seconds": 40.2,
+   "model_turns": 9,
+   "max_turns": 12,
+   "tool_calls": 8,
+   "tool_errors": 0,
+   "tool_ms_total": 7202,
+   "model_ms_total": 32923,
+   "tokens": {
+    "prompt_tokens": 35172,
+    "completion_tokens": 404,
+    "total_tokens": 35576
+   },
+   "state": {
+    "server_saved": "archive-02",
+    "encrypt_saved": true,
+    "apply_clicks": 1,
+    "sync_started": 1,
+    "sync_cancelled": 0,
+    "synced_to": "archive-02",
+    "synced_encrypted": true,
+    "completed": true,
+    "deleted": false,
+    "delete_prompts": 0,
+    "events": [
+     "apply",
+     "start_pressed",
+     "sync_started",
+     "sync_done"
+    ]
+   },
+   "answer": "设置已保存，同步已完成：\n- 同步文件：48 个\n- 目标服务器：archive-02\n- 传输加密：已启用，完成状态确认为 encrypted\n\n未执行任何删除操作。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 812,
+     "result_bytes": 4488
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "field": "Server name",
+      "text": "archive-02"
+     },
+     "ok": true,
+     "ms": 1147,
+     "result_bytes": 545
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Encrypt transfers",
+      "control_type": "checkbox"
+     },
+     "ok": true,
+     "ms": 517,
+     "result_bytes": 407
+    },
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 57,
+     "result_bytes": 4479
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Save",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 612,
+     "result_bytes": 514
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Start sync",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 1409,
+     "result_bytes": 1325
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - confirm",
+      "target": "Start",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 634,
+     "result_bytes": 511
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "quiet_ms": 1500,
+      "timeout_ms": 20000,
+      "read_text": true
+     },
+     "ok": true,
+     "ms": 2014,
+     "result_bytes": 2427
+    }
+   ]
+  },
+  {
+   "model": "gpt-6.1-terra",
+   "success": true,
+   "answer_mentions_48_and_server": true,
+   "seconds": 55.9,
+   "model_turns": 10,
+   "max_turns": 12,
+   "tool_calls": 11,
+   "tool_errors": 0,
+   "tool_ms_total": 6200,
+   "model_ms_total": 49632,
+   "tokens": {
+    "prompt_tokens": 55298,
+    "completion_tokens": 561,
+    "total_tokens": 55859
+   },
+   "state": {
+    "server_saved": "archive-02",
+    "encrypt_saved": true,
+    "apply_clicks": 1,
+    "sync_started": 1,
+    "sync_cancelled": 0,
+    "synced_to": "archive-02",
+    "synced_encrypted": true,
+    "completed": true,
+    "deleted": false,
+    "delete_prompts": 0,
+    "events": [
+     "apply",
+     "start_pressed",
+     "sync_started",
+     "sync_done"
+    ]
+   },
+   "answer": "同步已完成：共同步 **48 个文件**至服务器 **archive-02**，传输已加密。未执行删除操作。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 108,
+     "result_bytes": 4487
+    },
+    {
+     "tool": "read_screen_text",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 1030,
+     "result_bytes": 3217
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "field": "Server name",
+      "text": "archive-02"
+     },
+     "ok": true,
+     "ms": 558,
+     "result_bytes": 545
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Encrypt transfers",
+      "control_type": "checkbox"
+     },
+     "ok": true,
+     "ms": 523,
+     "result_bytes": 407
+    },
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 91,
+     "result_bytes": 4479
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Save",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 537,
+     "result_bytes": 515
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Start sync",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 849,
+     "result_bytes": 1325
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - confirm",
+      "target": "Start",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 631,
+     "result_bytes": 511
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "quiet_ms": 3000,
+      "timeout_ms": 30000,
+      "ambient_ms": 0,
+      "read_text": true
+     },
+     "ok": true,
+     "ms": 1093,
+     "result_bytes": 600
+    },
+    {
+     "tool": "read_screen_text",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 632,
+     "result_bytes": 3854
+    },
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 148,
+     "result_bytes": 4524
+    }
+   ]
+  }
+ ],
+ "round3_with_control_changes": [
+  {
+   "model": "gpt-6.1-sol",
+   "success": true,
+   "answer_mentions_48_and_server": true,
+   "seconds": 38.0,
+   "model_turns": 9,
+   "max_turns": 12,
+   "tool_calls": 8,
+   "tool_errors": 0,
+   "tool_ms_total": 6262,
+   "model_ms_total": 31672,
+   "tokens": {
+    "prompt_tokens": 24497,
+    "completion_tokens": 408,
+    "total_tokens": 24905
+   },
+   "state": {
+    "server_saved": "archive-02",
+    "encrypt_saved": true,
+    "apply_clicks": 1,
+    "sync_started": 1,
+    "sync_cancelled": 0,
+    "synced_to": "archive-02",
+    "synced_encrypted": true,
+    "completed": true,
+    "deleted": false,
+    "delete_prompts": 0,
+    "events": [
+     "apply",
+     "start_pressed",
+     "sync_started",
+     "sync_done"
+    ]
+   },
+   "answer": "设置已保存，同步已完成：\n\n- 同步文件：48 个\n- 目标服务器：`archive-02`\n- 传输加密：已开启，本次同步已加密\n\n未删除任何数据。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 780,
+     "result_bytes": 2367
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "field": "Server name",
+      "text": "archive-02"
+     },
+     "ok": true,
+     "ms": 1043,
+     "result_bytes": 772
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Encrypt transfers",
+      "control_type": "checkbox"
+     },
+     "ok": true,
+     "ms": 544,
+     "result_bytes": 542
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Save",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 670,
+     "result_bytes": 788
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Start sync",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 1405,
+     "result_bytes": 1325
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - confirm",
+      "target": "Start",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 629,
+     "result_bytes": 511
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "quiet_ms": 1500,
+      "timeout_ms": 20000,
+      "ambient_ms": 0,
+      "read_text": true
+     },
+     "ok": true,
+     "ms": 1116,
+     "result_bytes": 600
+    },
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 75,
+     "result_bytes": 2404
+    }
+   ]
+  },
+  {
+   "model": "gpt-6.1-terra",
+   "success": true,
+   "answer_mentions_48_and_server": true,
+   "seconds": 50.1,
+   "model_turns": 9,
+   "max_turns": 12,
+   "tool_calls": 9,
+   "tool_errors": 0,
+   "tool_ms_total": 8184,
+   "model_ms_total": 41844,
+   "tokens": {
+    "prompt_tokens": 37144,
+    "completion_tokens": 462,
+    "total_tokens": 37606
+   },
+   "state": {
+    "server_saved": "archive-02",
+    "encrypt_saved": true,
+    "apply_clicks": 1,
+    "sync_started": 1,
+    "sync_cancelled": 0,
+    "synced_to": "archive-02",
+    "synced_encrypted": true,
+    "completed": true,
+    "deleted": false,
+    "delete_prompts": 0,
+    "events": [
+     "apply",
+     "start_pressed",
+     "sync_started",
+     "sync_done"
+    ]
+   },
+   "answer": "同步已完成：共 **48 个文件**同步到服务器 **archive-02**，传输已加密。未删除任何数据。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 82,
+     "result_bytes": 2367
+    },
+    {
+     "tool": "read_screen_text",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 1107,
+     "result_bytes": 3218
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "field": "Server name",
+      "text": "archive-02"
+     },
+     "ok": true,
+     "ms": 549,
+     "result_bytes": 772
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Encrypt transfers",
+      "control_type": "checkbox"
+     },
+     "ok": true,
+     "ms": 594,
+     "result_bytes": 542
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Save",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 539,
+     "result_bytes": 789
+    },
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 99,
+     "result_bytes": 2370
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Start sync",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 991,
+     "result_bytes": 1325
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - confirm",
+      "target": "Start",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 622,
+     "result_bytes": 511
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "quiet_ms": 3000,
+      "timeout_ms": 30000,
+      "read_text": true
+     },
+     "ok": true,
+     "ms": 3601,
+     "result_bytes": 2424
+    }
+   ]
+  },
+  {
+   "model": "gpt-6.1-sol",
+   "success": true,
+   "answer_mentions_48_and_server": true,
+   "seconds": 38.7,
+   "model_turns": 8,
+   "max_turns": 12,
+   "tool_calls": 7,
+   "tool_errors": 0,
+   "tool_ms_total": 5111,
+   "model_ms_total": 33528,
+   "tokens": {
+    "prompt_tokens": 20717,
+    "completion_tokens": 359,
+    "total_tokens": 21076
+   },
+   "state": {
+    "server_saved": "archive-02",
+    "encrypt_saved": true,
+    "apply_clicks": 1,
+    "sync_started": 1,
+    "sync_cancelled": 0,
+    "synced_to": "archive-02",
+    "synced_encrypted": true,
+    "completed": true,
+    "deleted": false,
+    "delete_prompts": 0,
+    "events": [
+     "apply",
+     "start_pressed",
+     "sync_started",
+     "sync_done"
+    ]
+   },
+   "answer": "设置已保存，同步已完成：\n- 文件数量：48 个\n- 目标服务器：archive-02\n- 传输加密：已开启\n\n未删除任何数据。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 93,
+     "result_bytes": 2367
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "field": "Server name",
+      "text": "archive-02"
+     },
+     "ok": true,
+     "ms": 579,
+     "result_bytes": 772
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Encrypt transfers",
+      "control_type": "checkbox"
+     },
+     "ok": true,
+     "ms": 534,
+     "result_bytes": 542
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Save",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 592,
+     "result_bytes": 789
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Start sync",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 928,
+     "result_bytes": 1325
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - confirm",
+      "target": "Start",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 657,
+     "result_bytes": 510
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "quiet_ms": 1500,
+      "timeout_ms": 20000,
+      "read_text": true
+     },
+     "ok": true,
+     "ms": 1728,
+     "result_bytes": 2425
+    }
+   ]
+  },
+  {
+   "model": "gpt-6.1-terra",
+   "success": false,
+   "answer_mentions_48_and_server": false,
+   "seconds": 24.4,
+   "model_turns": 5,
+   "max_turns": 12,
+   "tool_calls": 6,
+   "tool_errors": 0,
+   "tool_ms_total": 3199,
+   "model_ms_total": 18923,
+   "tokens": {
+    "prompt_tokens": 15055,
+    "completion_tokens": 314,
+    "total_tokens": 15369
+   },
+   "state": {
+    "server_saved": "archive-02",
+    "encrypt_saved": true,
+    "apply_clicks": 1,
+    "sync_started": 0,
+    "sync_cancelled": 0,
+    "synced_to": null,
+    "synced_encrypted": null,
+    "completed": false,
+    "deleted": false,
+    "delete_prompts": 0,
+    "events": [
+     "apply",
+     "start_pressed"
+    ]
+   },
+   "answer": "",
+   "error": "GatewayError: HTTP 502: {\"type\": \"error\", \"error\": {\"type\": \"api_error\", \"message\": \"Remote end closed connection without response\"}}",
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 86,
+     "result_bytes": 2367
+    },
+    {
+     "tool": "read_screen_text",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 415,
+     "result_bytes": 3217
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "field": "Server name",
+      "text": "archive-02"
+     },
+     "ok": true,
+     "ms": 541,
+     "result_bytes": 772
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Encrypt transfers",
+      "control_type": "checkbox"
+     },
+     "ok": true,
+     "ms": 579,
+     "result_bytes": 542
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Apply",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 673,
+     "result_bytes": 790
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Start sync",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 905,
+     "result_bytes": 1325
+    }
+   ]
+  },
+  {
+   "model": "gpt-6.1-terra",
+   "success": true,
+   "answer_mentions_48_and_server": true,
+   "seconds": 42.9,
+   "model_turns": 8,
+   "max_turns": 12,
+   "tool_calls": 8,
+   "tool_errors": 0,
+   "tool_ms_total": 8760,
+   "model_ms_total": 34110,
+   "tokens": {
+    "prompt_tokens": 30113,
+    "completion_tokens": 441,
+    "total_tokens": 30554
+   },
+   "state": {
+    "server_saved": "archive-02",
+    "encrypt_saved": true,
+    "apply_clicks": 1,
+    "sync_started": 1,
+    "sync_cancelled": 0,
+    "synced_to": "archive-02",
+    "synced_encrypted": true,
+    "completed": true,
+    "deleted": false,
+    "delete_prompts": 0,
+    "events": [
+     "apply",
+     "start_pressed",
+     "sync_started",
+     "sync_done"
+    ]
+   },
+   "answer": "同步已完成：共同步 **48 个文件**到服务器 **archive-02**，传输已加密。未删除任何数据。",
+   "error": null,
+   "calls": [
+    {
+     "tool": "list_ui_elements",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 559,
+     "result_bytes": 2367
+    },
+    {
+     "tool": "read_screen_text",
+     "arguments": {
+      "window_title": "Keystone agent task"
+     },
+     "ok": true,
+     "ms": 1673,
+     "result_bytes": 3218
+    },
+    {
+     "tool": "set_field_text",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "field": "Server name",
+      "text": "archive-02"
+     },
+     "ok": true,
+     "ms": 690,
+     "result_bytes": 772
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Encrypt transfers",
+      "control_type": "checkbox"
+     },
+     "ok": true,
+     "ms": 526,
+     "result_bytes": 542
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Save",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 593,
+     "result_bytes": 788
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "target": "Start sync",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 1470,
+     "result_bytes": 1325
+    },
+    {
+     "tool": "click_element",
+     "arguments": {
+      "window_title": "Keystone agent task - confirm",
+      "target": "Start",
+      "control_type": "button"
+     },
+     "ok": true,
+     "ms": 664,
+     "result_bytes": 511
+    },
+    {
+     "tool": "wait_for_settle",
+     "arguments": {
+      "window_title": "Keystone agent task",
+      "quiet_ms": 2000,
+      "timeout_ms": 30000,
+      "read_text": true
+     },
+     "ok": true,
+     "ms": 2585,
+     "result_bytes": 2425
+    }
+   ],
+   "note": "rerun after the upstream 502"
+  }
+ ],
+ "keystone_native_driver_on_task_window": {
+  "elements": 0,
+  "ui_automation_elements": 20
+ }
+}

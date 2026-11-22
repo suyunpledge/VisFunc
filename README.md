@@ -97,6 +97,28 @@ motionspec overlays screenshot.png
 motionspec overlays slide-out/functions.json --player-toolbar
 ```
 
+These rules were tuned on video captions and player toolbars. On ordinary application screens they report a forward arrow as a play button and can give several different readings for the same text; use `screen-text` below instead.
+
+### For agents: wait for the screen, find where to click, read the text
+
+`motionspec agent-mcp` is a resident MCP server. Once an agent client registers it, the agent can call these tools:
+
+- `wait_for_settle`: call it after clicking. It returns once the screen has been still for 200 ms, lists the regions that changed since the previous step, and can read the text inside them.
+- `find_on_screen`: finds where to click by name or visible text. It checks Windows UI Automation first, which names icon-only buttons and knows which controls are disabled or checked, then OCR.
+- `click_element`, `set_field_text`: press buttons and fill fields through UI Automation, only in windows allowed with `--allow-window` at start. Each action returns its effect directly.
+- `read_screen_text`, `list_ui_elements`, `screenshot`.
+
+Coordinates are physical screen pixels, the ones a click uses. The server learns areas that never stop changing, such as video or an animated background, once, and they no longer slow down the wait. Without MCP, use `motionspec settle --screen --read-text`, `motionspec screen-text` or the HTTP endpoint `POST /v1/screen-text`.
+
+```bash
+python -m pip install -e ".[overlays,uia]" -e "./packages/motionspec[capture]"
+motionspec agent-mcp
+```
+
+On a real Qt window on the desktop, all 10 controls (6 of them icon-only) were found by name, most lookups in under 60 ms. After a status text changed, the screen was judged settled about 210 ms later and the whole line was read. On four kinds of web page rendered by Chrome, 239 of 240 pieces of text could be clicked by their text, including every cell of a 25-row table. Icon-only buttons in a browser are not found by OCR, and UI Automation on a Chrome window has not been checked yet. [Usage and evaluation](docs/agent-screen-20261122.md) (Chinese)
+
+Connected to Pledge Keystone (`--http`), GPT-6.1 sol and terra completed four kinds of desktop task: a Qt settings window with a confirmation dialog, retrying a failed sync after fixing the port named in an error dialog, a sign-up form in Chrome, and a custom-drawn window that can only be clicked by coordinates. The latest 16 runs, with no turn limit, all succeeded in 20 to 65 seconds each. The retry task needs 13 to 15 tool calls, more than the 12 that Keystone's default config allows. Keystone's own window driver sees no controls in Qt windows. On this machine, ESET's browser screen protection blocks screenshots of browser windows; the server then judges effects through UI Automation instead. [Keystone test](docs/agent-keystone-20261122.md) (Chinese)
+
 ## Results
 
 | Test | Result |

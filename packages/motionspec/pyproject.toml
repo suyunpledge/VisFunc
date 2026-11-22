@@ -17,6 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+capture = ["mss>=9"]
 
 [project.scripts]
 motionspec = "motionspec.cli:main"

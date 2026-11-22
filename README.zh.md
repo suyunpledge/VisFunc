@@ -87,6 +87,28 @@ motionspec overlays screenshot.png
 motionspec overlays slide-out/functions.json --player-toolbar
 ```
 
+这一套规则是按视频字幕和播放器底栏调出来的。用在普通应用界面上，会把前进箭头报成播放键，也会对同一处文字给出几条不同的读数，请改用下面的 `screen-text`。
+
+### 给 Agent 用：等界面稳定、找点击位置、读界面文字
+
+`motionspec agent-mcp` 是一个常驻的 MCP 服务，Agent 客户端登记后就能调用这些工具：
+
+- `wait_for_settle`：点击之后调用，界面静止 200 ms 就返回，列出相对上一步变化的区域，可顺便读出其中的文字；
+- `find_on_screen`：按名字或可见文字找点击位置，先查 Windows UI Automation（只有图标的按钮也有名字，禁用和勾选状态都知道），再查 OCR；
+- `click_element`、`set_field_text`：通过 UI Automation 点按钮、填输入框，只对启动时 `--allow-window` 允许的窗口生效，每次操作直接带回效果；
+- `read_screen_text`、`list_ui_elements`、`screenshot`。
+
+坐标都是屏幕物理像素，即点击用的坐标。视频、动画背景这类一直在变的区域，服务只需认识一次，之后不再拖慢等待。不用 MCP 时，也可以直接用命令行 `motionspec settle --screen --read-text`、`motionspec screen-text`，或 HTTP 接口 `POST /v1/screen-text`。
+
+```bash
+python -m pip install -e ".[overlays,uia]" -e "./packages/motionspec[capture]"
+motionspec agent-mcp
+```
+
+在真实桌面的 Qt 窗口上，10 个控件（其中 6 个只有图标）全部按名字找到，单次查找多数在 60 ms 以内；状态文字变化后约 210 ms 判定稳定，并读出完整的一行。在 Chrome 渲染的四类网页上，240 段文字里 239 段能按文字点中，包括 25 行表格的全部单元格。浏览器里只有图标的按钮 OCR 找不到，Chrome 窗口的 UI Automation 还没验证。[用法与评测](docs/agent-screen-20261122.md)
+
+接入 Pledge Keystone（`--http`）后，GPT-6.1 sol 和 terra 完成了四类桌面任务：Qt 设置窗口（带确认弹窗）、同步失败后按错误提示改端口重试、Chrome 里的注册表单、只能按坐标点击的自绘界面。不设回合上限的最近 16 次全部完成，单个任务 20～65 秒；出错重试的任务要 13～15 次工具调用，超过 Keystone 默认配置的 12 次。Keystone 自带的窗口驱动在 Qt 窗口里看不到任何控件。本机的 ESET 浏览器屏幕保护会挡住浏览器截屏，此时服务改用 UI Automation 判断操作效果。[Keystone 实测](docs/agent-keystone-20261122.md)
+
 ## 结果汇总
 
 | 测试 | 结果 |

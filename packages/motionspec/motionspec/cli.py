@@ -3,6 +3,9 @@
     motionspec analyze clip.mp4 -o out/        分析视频，写出 spec.json / summary.md / 标注图
     motionspec check out/spec.json claims.json 用规格校验一组结构化断言
     motionspec demo -o demo/                   生成合成动效并分析，用来快速看输出长什么样
+    motionspec settle --screen --read-text     等屏幕停止变化，报告变化区域和其中的文字
+    motionspec screen-text shot.png            读出截图上所有文字，带框和点击点
+    motionspec agent-mcp                       以 MCP 服务提供屏幕工具，供 Agent 调用
 """
 
 from __future__ import annotations
@@ -104,6 +107,47 @@ def main(argv: list[str] | None = None) -> int:
     icon_bank.add_argument("--fallback-icon-dir", type=Path,
                            help="fill missed toolbar icons with row-supported PNG exemplars")
 
+    st = sub.add_parser("settle", help="wait until the screen (or a recording) stops changing")
+    st_source = st.add_mutually_exclusive_group(required=True)
+    st_source.add_argument("source", nargs="?",
+                           help="video file or frame directory recorded after an action")
+    st_source.add_argument("--screen", action="store_true", help="capture the live screen")
+    st.add_argument("--region", nargs=4, type=int, metavar=("L", "T", "R", "B"),
+                    help="screen area to capture, in physical pixels")
+    st.add_argument("--fps", type=float, help="frame rate of a frame directory")
+    st.add_argument("--max-fps", type=float, default=30.0, help="screen capture rate limit")
+    st.add_argument("--quiet-ms", type=float, default=200.0,
+                    help="stillness required after the last change")
+    st.add_argument("--expect-ms", type=float, default=1000.0,
+                    help="report 'unchanged' if nothing changes within this time")
+    st.add_argument("--timeout-ms", type=float, default=10_000.0)
+    st.add_argument("--ambient-ms", type=float, default=3000.0,
+                    help="ignore areas that keep changing this long (video, caret); "
+                         "0 waits for everything")
+    st.add_argument("--ignore", nargs=4, type=int, action="append", default=[],
+                    metavar=("L", "T", "R", "B"),
+                    help="area to exclude, such as a clock; repeatable")
+    st.add_argument("--read-text", action="store_true",
+                    help="also read the text inside the changed regions")
+    st.add_argument("--save-frame", type=Path, help="write the final frame as PNG")
+
+    sc = sub.add_parser("screen-text",
+                        help="read all text on a screenshot with boxes and click points")
+    sc.add_argument("image", type=Path)
+    sc.add_argument("--region", nargs=4, type=int, action="append", metavar=("L", "T", "R", "B"),
+                    help="read only this area; repeatable")
+
+    am = sub.add_parser("agent-mcp", help="serve screen tools for agents over MCP (stdio)")
+    am.add_argument("--max-fps", type=float, default=60.0, help="screen capture rate limit")
+    am.add_argument("--http", metavar="HOST:PORT",
+                    help="serve Streamable HTTP at http://HOST:PORT/mcp instead of stdio")
+    am.add_argument("--allow-window", action="append", default=[], metavar="TITLE",
+                    help="enable click/text tools in windows titled with TITLE; repeatable")
+    am.add_argument("--no-images", action="store_true",
+                    help="omit the screenshot tool (for clients that pass images as text)")
+    am.add_argument("--max-wait-ms", type=float,
+                    help="cap waits per call; defaults to 8000 over HTTP for 10 s client timeouts")
+
     t = sub.add_parser("trace", help="convert a Qt probe trace (motionspec.qt_probe) into a spec")
     t.add_argument("trace")
     t.add_argument("-o", "--out", default="motionspec-out")
@@ -150,6 +194,80 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, ValueError) as exc:
             f.exit(2, f"motionspec functions: {exc}\n")
         print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.command == "settle":
+        from .frames import FrameSource, write_image
+        from .settle import capture_screen, watch
+
+        try:
+            if args.region and not args.screen:
+                raise ValueError("--region applies to --screen; "
+                                 "use --ignore to exclude parts of a recording")
+            reader = None
+            if args.read_text:  # Load OCR before watching so the wait is not delayed afterwards.
+                from svsg.recognition.screen_text import ScreenTextReader
+
+                reader = ScreenTextReader()
+            if args.screen:
+                area = tuple(args.region) if args.region else None
+                frames = capture_screen(area, max_fps=args.max_fps)
+            else:
+                source = FrameSource(args.source, fps=args.fps)
+                frames = ((t_ms, frame) for _, t_ms, frame in source.selected_raw())
+            result, last = watch(
+                frames, quiet_ms=args.quiet_ms, expect_change_ms=args.expect_ms,
+                timeout_ms=args.timeout_ms,
+                ambient_ms=args.ambient_ms, ignore=[tuple(b) for b in args.ignore],
+            )
+            if reader is not None:
+                from svsg.recognition.screen_text import lines_touching, widen_regions
+
+                regions = [r["bbox_px"] for r in result["changed_regions"]]
+                result["text"] = None
+                if regions:
+                    text = reader.read(last, widen_regions(regions, last.shape[1]))
+                    text["lines"] = lines_touching(text, regions)
+                    result["text"] = text
+            if args.save_frame is not None:
+                write_image(args.save_frame, last)
+                result["frame_path"] = str(args.save_frame)
+        except ImportError as exc:
+            st.exit(2, f"install svsg[overlays] to read text: {exc}\n")
+        except (OSError, ValueError) as exc:
+            st.exit(2, f"motionspec settle: {exc}\n")
+        print(json.dumps(result, ensure_ascii=False, allow_nan=False))
+        return 0 if result["state"] in ("settled", "unchanged") else 1
+
+    if args.command == "agent-mcp":
+        import os
+
+        from .agent import ScreenAgent, serve_http, serve_mcp
+
+        max_wait = args.max_wait_ms
+        if max_wait is None and args.http:
+            max_wait = 8000.0
+        agent = ScreenAgent(max_fps=args.max_fps, allowed_windows=args.allow_window,
+                            max_wait_ms=max_wait, images=not args.no_images)
+        if args.http:
+            host, _, port = args.http.rpartition(":")
+            if not host or not port.isdigit():
+                am.exit(2, "motionspec agent-mcp: --http needs HOST:PORT\n")
+            serve_http(agent, host, int(port), token=os.environ.get("VISFUNC_MCP_TOKEN", ""))
+        else:
+            serve_mcp(agent)
+        return 0
+
+    if args.command == "screen-text":
+        try:
+            from svsg.recognition.screen_text import ScreenTextReader
+
+            result = ScreenTextReader().read(args.image, args.region)
+        except ImportError as exc:
+            sc.exit(2, f"install svsg[overlays] to read text: {exc}\n")
+        except (OSError, ValueError) as exc:
+            sc.exit(2, f"motionspec screen-text: {exc}\n")
+        print(json.dumps(result, ensure_ascii=False, allow_nan=False))
         return 0
 
     if args.command == "overlays":

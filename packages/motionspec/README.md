@@ -60,6 +60,19 @@ Common options:
 | `--no-sheets`, `--no-raw-frames` | skip the annotated images; skip the source-resolution evidence frames |
 | `--functions`, `--evidence-every-ms`, `--function-max-frames` | export functions; add evidence frames at a fixed interval; frame limit for the function bundle |
 
+### Waiting for the screen to settle (for agents)
+
+`analyze` fits curves and takes 1 to 3 seconds for a 0.6 second clip, too slow for an agent waiting after each click. `settle` only answers whether the screen has stopped and what changed. It judges frames as they arrive, returns `settled` after `--quiet-ms` (default 200) of stillness or `unchanged` if nothing changed within `--expect-ms`, and lists the regions that differ from the first frame. Each frame takes about 6 ms.
+
+```bash
+motionspec settle --screen --region 0 0 1920 1080 --read-text   # run after clicking; reads text in changed regions
+motionspec settle recording.mp4                                  # also takes a recorded video or frame directory
+```
+
+Areas that keep changing (video, an animated background) stop counting after `--ambient-ms`. A loading spinner looks the same, so set `--ambient-ms 0` when you must wait for loading to finish; exclude a clock or similar with `--ignore`.
+
+For agents, the resident MCP server `motionspec agent-mcp` is easier. It keeps the capture stream, the OCR model and the learned background areas, and offers `wait_for_settle`, `find_on_screen` (Windows UI Automation first, then OCR), `read_screen_text`, `list_ui_elements` and `screenshot`, plus `click_element` and `set_field_text` with `--allow-window TITLE`. It uses stdio by default; `--http HOST:PORT` serves HTTP instead, and Pledge Keystone also needs `--no-images`. Capture is faster with mss installed (`pip install -e ".[capture]"`). [Usage and evaluation](../../docs/agent-screen-20261122.md) (Chinese)
+
 ## Output
 
 | File | Contents |
@@ -345,6 +358,8 @@ motionspec/
   spec.py         spec format, validation, text summary
   claims.py       claim checking
   functions.py    function export, query catalogue, batch queries (via VisFunc-Image)
+  settle.py       waiting for the screen to settle: judges frames as they arrive, lists changed regions; screen capture
+  agent.py        screen tools for agents and the MCP server
   qt_probe.py     the in-app part of the Qt probe
   trace.py        the offline part of the Qt probe; trace_contract.py validates the trace format
   synth.py        synthetic animations for tests and demos
@@ -359,6 +374,7 @@ bench/
   run.py, run_hard.py, report*.py      model benchmarks and summaries
   providers.py, client.py, canary.py   local model configuration, API calls, video receipt check
   pedestrian_*.py                     MOT17 pedestrian experiment (in progress)
+  agent_*.py                          agent scenarios: desktop screenshots and text, Chrome pages, MCP calls on a real window
 ```
 
 Tests are in `tests/`; run `python -m pytest` in this directory.

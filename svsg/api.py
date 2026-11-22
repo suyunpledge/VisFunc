@@ -267,6 +267,7 @@ def create_app(
     settings: Settings | None = None,
     compiler: ImageCompiler | None = None,
     recognizer: RecognitionService | None = None,
+    screen_reader: Any | None = None,
 ) -> FastAPI:
     """应用工厂（测试注入编排器/编译器，生产走配置装配）。"""
     settings = settings or get_settings()
@@ -277,6 +278,9 @@ def create_app(
     app.state.orchestrator = orchestrator or build_orchestrator(settings)
     app.state.compiler = compiler or build_compiler(settings)
     app.state.recognizer = recognizer or build_recognizer(settings)
+    # 界面文字读取：OCR 模型首次请求时加载，之后常驻（每次加载约 2 秒）
+    app.state.screen_reader = screen_reader
+    screen_reader_lock = asyncio.Lock()
     app.state.trace_store = TraceStore(
         SamplingPolicy(mode=SampleMode(settings.sample_mode)),
         sink_path=settings.trace_file,
@@ -369,6 +373,39 @@ def create_app(
         logger.info("recognize_image.done", extra={
             "status": result.status, "image_sha256": result.image_sha256,
             "objects": len(result.observations), "evidence_mode": "multimodal",
+        })
+        return result
+
+    @app.post("/v1/screen-text", dependencies=[Depends(require_api_key)])
+    async def screen_text(
+        file: Annotated[UploadFile, File()],
+        regions: Annotated[str, Form()] = "null",
+    ) -> dict[str, Any]:
+        """读出界面截图上的文字，带源像素框和点击点；regions 为 [[l,t,r,b], ...] 时只读这些区域。"""
+        if len(regions.encode()) > MAX_QUERY_BYTES:
+            raise HTTPException(status_code=413, detail="区域参数过长")
+        try:
+            boxes = TypeAdapter(list[tuple[int, int, int, int]] | None).validate_json(regions)
+        except ValidationError as exc:
+            raise HTTPException(status_code=422, detail="无效的区域参数") from exc
+        data, _, _ = await _read_image(file)
+        async with screen_reader_lock:
+            if app.state.screen_reader is None:
+                try:
+                    from svsg.recognition.screen_text import ScreenTextReader
+
+                    app.state.screen_reader = await asyncio.to_thread(ScreenTextReader)
+                except ImportError as exc:
+                    raise HTTPException(
+                        status_code=503, detail="界面文字读取需要安装 svsg[overlays]"
+                    ) from exc
+        try:
+            result = await asyncio.to_thread(app.state.screen_reader.read, data, boxes)
+        except (OSError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail=f"无法读取图片文字: {exc}") from exc
+        logger.info("screen_text.done", extra={
+            "lines": len(result["lines"]), "regions": len(result["regions_px"]),
+            "elapsed_ms": result["elapsed_ms"],
         })
         return result
 
