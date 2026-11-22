@@ -26,6 +26,7 @@ def run(
     adaptive=False,
     crowd_weights=None,
     compare_overlap=False,
+    head_focus=True,
 ):
     model = YoloDetector(str(weights), imgsz=1280)
     digest = sha256(weights.read_bytes()).hexdigest()
@@ -58,6 +59,7 @@ def run(
                 output=dest,
                 crowd_detector=specialist if profile in ("crowd", "before", "after") else None,
                 overlap_review=profile != "before",
+                head_focus=head_focus,
             )
             seconds = perf_counter() - start
             packet = read(dest / "candidates-px.json")
@@ -142,6 +144,9 @@ if __name__ == "__main__":
     )
     parser.add_argument("--auto", action="store_true", help="also evaluate automatic cropping")
     parser.add_argument(
+        "--no-head-focus", action="store_true", help="skip close-ups of unassigned heads"
+    )
+    parser.add_argument(
         "--crowd-weights", type=Path, help="compare automatic crops with/without CrowdHuman ONNX"
     )
     parser.add_argument(
@@ -160,4 +165,5 @@ if __name__ == "__main__":
         adaptive=args.auto,
         crowd_weights=args.crowd_weights,
         compare_overlap=args.compare_overlap,
+        head_focus=not args.no_head_focus,
     )

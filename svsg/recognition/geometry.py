@@ -25,7 +25,13 @@ def context_box(box: Box, width: int, height: int) -> Box:
 
 
 def iou(a: Box, b: Box) -> float:
-    area = max(0, min(a[2], b[2]) - max(a[0], b[0])) * max(0, min(a[3], b[3]) - max(a[1], b[1]))
+    width = min(a[2], b[2]) - max(a[0], b[0])
+    if width <= 0:
+        return 0.0
+    height = min(a[3], b[3]) - max(a[1], b[1])
+    if height <= 0:
+        return 0.0
+    area = width * height
     union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - area
     return area / union if union else 0.0
 

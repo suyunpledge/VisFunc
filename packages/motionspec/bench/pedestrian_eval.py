@@ -153,12 +153,14 @@ def score(folder, predictions_px):
         if i in used:
             continue
         best = max((iou(p["bbox_px"], g["bbox_px"]) for g in gt), default=0)
-        if best < 0.5 and any(iou(p["bbox_px"], b) >= 0.5 for b in ignore):
+        best_ignore = max((iou(p["bbox_px"], b) for b in ignore), default=0)
+        if best < 0.5 and best_ignore >= 0.5:
             continue
         errors.append(
             {
                 "bbox_px": p["bbox_px"],
                 "best_iou": best,
+                "best_ignore_iou": best_ignore,
                 "kind": "duplicate"
                 if best >= 0.5
                 else "localization"
@@ -175,6 +177,9 @@ def score(folder, predictions_px):
         "tp": len(matches),
         "fp": len(errors),
         "duplicates": sum(e["kind"] == "duplicate" for e in errors),
+        "duplicates_on_ignore": sum(
+            e["kind"] == "duplicate" and e["best_ignore_iou"] >= 0.5 for e in errors
+        ),
         "overlap_pairs": len(overlapping),
         "both_matched": sum(i in hit and j in hit for i, j in overlapping),
         "fn": len(gt) - len(matches),

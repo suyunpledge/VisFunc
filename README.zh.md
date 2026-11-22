@@ -77,6 +77,16 @@ python -m motionspec query slide-out/functions.json query.json
 
 返回 `[41, 45, 49, 255]`，附帧号、时间和像素哈希；以及 `261.0`，单位 `source_px`，来源 `motion_estimate`。
 
+### 读取字幕和界面图标
+
+安装本地 OCR 后，可从截图或已导出的源像素帧读取中英字幕和已知图标。视频结果带帧号、时间、像素哈希和源画面坐标。播放器底栏可用 `--player-toolbar` 限定搜索；自定义图标可用 `--icon-dir` 提供按类别命名的 PNG 样本。[评测与用法](docs/subtitle-icon-evaluation-20261122.md)
+
+```bash
+python -m pip install -e ".[overlays]" -e "./packages/motionspec"
+motionspec overlays screenshot.png
+motionspec overlays slide-out/functions.json --player-toolbar
+```
+
 ## 结果汇总
 
 | 测试 | 结果 |
@@ -93,7 +103,8 @@ python -m motionspec query slide-out/functions.json query.json
 不算独立验证。测试数据、判分规则和原始回答见 [模型实测记录](packages/motionspec/bench/results/README.md)、
 [纯参数复测](docs/timing-protocol-retest-20261117.md)、[采样率消融](docs/evidence-ablation-20261116.md)、
 [识别评测](docs/recognition-evaluation-20261116.md)。
-另有一组在 MOT17 真实街景视频上做行人检测的实验正在进行。
+在四段 MOT20 实拍录像的八个新取样时刻，本地行人检测多找回了 3 个重遮挡行人（514 → 517，共 740 个标注），
+两版误报均为 36 个。小目标命中和复核耗时详见[配对评测](docs/pedestrian-focused-review-20261122.md)。
 
 ## 目前做不到的
 

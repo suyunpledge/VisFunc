@@ -44,6 +44,7 @@ def _add_crowd_candidates(
     *,
     crops: bool,
     overlap_review: bool,
+    head_focus: bool,
 ) -> None:
     full = (0, 0, current.width, current.height)
     observations = detector.detect_raster(current)
@@ -84,7 +85,14 @@ def _add_crowd_candidates(
         boxes.append(entry)
     if overlap_review and previous is not None:
         review_overlaps(
-            detector, current, previous, boxes, observations, prior_observations, crops=crops
+            detector,
+            current,
+            previous,
+            boxes,
+            observations,
+            prior_observations,
+            crops=crops,
+            head_focus=head_focus,
         )
 
 
@@ -97,6 +105,7 @@ def frame_candidates(
     detail: bool | None = None,
     crowd_detector: CrowdHumanDetector | None = None,
     overlap_review: bool = True,
+    head_focus: bool = True,
 ) -> dict:
     label = canonical_label(label)
     if crowd_detector is not None and label != "person":
@@ -154,6 +163,7 @@ def frame_candidates(
             boxes,
             crops=detail is not False,
             overlap_review=overlap_review,
+            head_focus=head_focus,
         )
     result = {
         "label": label,

@@ -79,11 +79,24 @@ def main(argv: list[str] | None = None) -> int:
     candidates.add_argument("--weights", type=Path, required=True)
     candidates.add_argument("--crowd-weights", type=Path, help="optional CrowdHuman person/head ONNX weights")
     candidates.add_argument("--no-overlap-review", action="store_true", help="skip the second-person review")
+    candidates.add_argument(
+        "--no-head-focus", action="store_true", help="skip extra close-ups of unassigned heads"
+    )
     candidates.add_argument("--label", default="person")
     views = candidates.add_mutually_exclusive_group()
     views.add_argument("--whole-frame", dest="detail", action="store_false", help="skip detail crops")
     views.add_argument("--detail-always", dest="detail", action="store_true", help="always inspect detail crops")
     candidates.set_defaults(detail=None)
+
+    overlays = sub.add_parser("overlays", help="read subtitles and locate UI icons on sampled frames")
+    overlays.add_argument("source", type=Path, help="image or exported functions.json")
+    overlays.add_argument("--frame", type=int, help="read one exported frame (default: all)")
+    overlays.add_argument("--only", choices=("both", "subtitles", "icons"), default="both")
+    overlays.add_argument("--subtitle-region", nargs=4, type=int, metavar=("L", "T", "R", "B"))
+    icon_area = overlays.add_mutually_exclusive_group()
+    icon_area.add_argument("--icon-region", nargs=4, type=int, metavar=("L", "T", "R", "B"))
+    icon_area.add_argument("--player-toolbar", action="store_true", help="search the bottom 15%% for icons")
+    overlays.add_argument("--icon-dir", type=Path, help="PNG exemplars named by label")
 
     t = sub.add_parser("trace", help="convert a Qt probe trace (motionspec.qt_probe) into a spec")
     t.add_argument("trace")
@@ -133,6 +146,22 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
 
+    if args.command == "overlays":
+        try:
+            from svsg.recognition.overlays import measure_overlays
+
+            result = measure_overlays(
+                args.source, frame=args.frame, only=args.only, icon_dir=args.icon_dir,
+                subtitle_region=args.subtitle_region, icon_region=args.icon_region,
+                player_toolbar=args.player_toolbar,
+            )
+        except ImportError as exc:
+            overlays.exit(2, f"install svsg[overlays] for screen recognition: {exc}\n")
+        except (OSError, ValueError) as exc:
+            overlays.exit(2, f"motionspec overlays: {exc}\n")
+        print(json.dumps(result, ensure_ascii=False, allow_nan=False))
+        return 0
+
     if args.command == "candidates":
         try:
             from svsg.l1_compiler.detector_adapter import YoloDetector
@@ -149,9 +178,11 @@ def main(argv: list[str] | None = None) -> int:
             prior = rt.raster(args.previous_frame) if args.previous_frame is not None else None
             detector = YoloDetector(str(args.weights), imgsz=1280)
             crowd_detector = CrowdHumanDetector(args.crowd_weights) if args.crowd_weights else None
-            result = frame_candidates(detector, target, prior, args.label,
-                                      detail=args.detail, crowd_detector=crowd_detector,
-                                      overlap_review=not args.no_overlap_review)
+            result = frame_candidates(
+                detector, target, prior, args.label,
+                detail=args.detail, crowd_detector=crowd_detector,
+                overlap_review=not args.no_overlap_review, head_focus=not args.no_head_focus,
+            )
             result.update(sequence_id=rt.bundle.sequence_id, frame_index=args.frame,
                           previous_frame_index=args.previous_frame)
         except (OSError, ValueError, ImportError) as exc:

@@ -21,6 +21,7 @@ def make(
     output=None,
     crowd_detector=None,
     overlap_review=True,
+    head_focus=True,
 ):
     output = folder if output is None else output
     cap = cv2.VideoCapture(str(folder / "clip.mp4"))
@@ -46,6 +47,7 @@ def make(
         detail=detail,
         crowd_detector=crowd_detector,
         overlap_review=overlap_review,
+        head_focus=head_focus,
     )
     data.update(
         model=Path(detector.model_name.split("::", 1)[-1]).name,

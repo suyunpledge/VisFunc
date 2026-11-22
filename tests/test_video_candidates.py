@@ -261,3 +261,102 @@ def test_two_new_neighbors_keep_distinct_tracks_and_merge_repeated_crop_observat
     assert not _same_observation(a, b)
     jittered = observation((11, 6, 43, 54), (18, 7, 26, 16), (5, 0, 55, 60))
     assert _same_observation(a, jittered)
+
+
+@pytest.mark.parametrize(
+    ("body_score", "head_score", "prior_score", "shift", "kept"),
+    [
+        (0.40, 0.60, 0.55, 0, True),
+        (0.39, 0.90, 0.90, 0, False),
+        (0.50, 0.59, 0.80, 0, False),
+        (0.50, 0.70, 0.54, 0, False),
+        (0.50, 0.70, 0.80, 10, False),  # prior IoU 0.52
+    ],
+)
+def test_weaker_overlap_requires_both_strong_head_and_stable_prior(
+    body_score, head_score, prior_score, shift, kept
+):
+    from svsg.recognition.crowd_pairs import _review_view
+    from svsg.recognition.video_evidence import _Box
+
+    full = (0, 0, 100, 60)
+    first = RawDetection("person", (10, 5, 42, 55), 0.85)
+    neighbor = RawDetection("person", (21, 5, 53, 55), body_score)
+    now = [
+        first,
+        neighbor,
+        RawDetection("head", (17, 6, 26, 15), 0.80),
+        RawDetection("head", (36, 6, 45, 15), head_score),
+    ]
+    prior = [first, RawDetection("person", (21 + shift, 5, 53 + shift, 55), prior_score)]
+    pairs = _review_view([_Box(first.bbox, 0.80, full)], now, lambda: prior, full, (100, 60))
+    assert [p.body.bbox for p in pairs] == ([neighbor.bbox] if kept else [])
+
+
+@pytest.mark.parametrize("evidence", ["complete", "one_frame_head", "head_only", "focus_off"])
+def test_persistent_unassigned_head_triggers_local_body_review(evidence):
+    size = (400, 240)
+    first = RawDetection("person", (174, 35, 215, 155), 0.88)
+    neighbor = RawDetection("person", (192, 35, 233, 155), 0.73)
+    head = RawDetection("head", (186, 36, 199, 48), 0.80)
+    second_head = RawDetection("head", (209, 37, 222, 49), 0.76)
+
+    class Main:
+        model_name = "full"
+
+        def detect_raster(self, frame):
+            return [first] if frame.width == size[0] else []
+
+    class Crowd(CrowdFixture):
+        def detect_raster(self, frame):
+            previous = frame.samples[0] == 2
+            if frame.width == size[0]:
+                if previous and evidence == "one_frame_head":
+                    return [first, head]
+                return [first, head, second_head]
+            assert (frame.width, frame.height) == (192, 192)
+            self.crops.append(previous)
+            observations = [first, head, second_head]
+            if evidence != "head_only":
+                observations.append(neighbor)
+            # The close-up is x=120..312, y=0..192.
+            local = []
+            for d in observations:
+                left, top, right, bottom = d.bbox
+                local.append(
+                    RawDetection(d.label, (left - 120, top, right - 120, bottom), d.detection_score)
+                )
+            return local
+
+    crowd = Crowd([])
+    crowd.crops = []
+    now, prior = [RasterFunction(*size, bytes([v]) * (400 * 240 * 4)) for v in (1, 2)]
+    results = frame_candidates(
+        Main(), now, prior, "person", crowd_detector=crowd, head_focus=evidence != "focus_off"
+    )["boxes"]
+    if evidence == "complete":
+        assert [r["bbox_px"] for r in results] == [list(first.bbox), list(neighbor.bbox)]
+        assert results[1]["review_view"] == "head_focus"
+        assert results[1]["head_bbox_px"] == list(second_head.bbox)
+        assert results[1]["prior_bbox_px"] == list(neighbor.bbox)
+        assert results[1]["view_px"] == [120, 0, 312, 192]
+        assert crowd.crops == [False, True]
+    else:
+        assert [r["bbox_px"] for r in results] == [list(first.bbox)]
+        assert crowd.crops == ([False] if evidence == "head_only" else [])
+
+
+def test_head_closeups_prioritize_confidence_clip_to_frame_and_bound_extra_views():
+    from svsg.recognition.crowd_pairs import _head_focus_views
+    from svsg.recognition.video_evidence import _Box
+
+    full = (0, 0, 1000, 300)
+    bodies, heads = [], []
+    for x, score in ((100, 0.60), (500, 0.75), (930, 0.85)):
+        bodies.append(_Box((x - 25, 20, x + 25, 150), 0.8, full))
+        heads.append(_Box((x - 5, 25, x + 5, 35), 0.90, full))
+        heads.append(_Box((x + 25, 26, x + 35, 36), score, full))
+    assert _head_focus_views(bodies, heads, heads, (1000, 300)) == [
+        (808, 0, 1000, 192),
+        (434, 0, 626, 192),
+    ]

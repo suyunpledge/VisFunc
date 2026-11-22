@@ -83,6 +83,16 @@ python -m motionspec query slide-out/functions.json query.json
 The result is `[41, 45, 49, 255]` with the frame index, timestamp and pixel hash, and `261.0` with unit `source_px` and
 provenance `motion_estimate`.
 
+### Read subtitles and UI icons
+
+Install local OCR to read Chinese and English captions and locate known icons in a screenshot or exported video frames. Results include source-pixel boxes and frame provenance. Use `--player-toolbar` to search the bottom control bar, or `--icon-dir` to supply labeled PNG exemplars. [Evaluation and options](docs/subtitle-icon-evaluation-20261122.md)
+
+```bash
+python -m pip install -e ".[overlays]" -e "./packages/motionspec"
+motionspec overlays screenshot.png
+motionspec overlays slide-out/functions.json --player-toolbar
+```
+
 ## Results
 
 | Test | Result |
@@ -100,7 +110,9 @@ real screen recordings have had little testing. The nine harder scenes were used
 independent validation. Data, scoring rules and raw answers are in the [model benchmark notes](packages/motionspec/bench/results/README.md),
 the [parameter-only retest](docs/timing-protocol-retest-20261117.md), the [sampling-rate ablation](docs/evidence-ablation-20261116.md)
 and the [recognition evaluation](docs/recognition-evaluation-20261116.md) (all in Chinese).
-An experiment on pedestrian detection in MOT17 street videos is in progress.
+On eight new sample times from four MOT20 videos, the local pedestrian detector recovered three
+more heavily occluded people (514 → 517 of 740), with 36 false positives in each version.
+The [paired evaluation](docs/pedestrian-focused-review-20261122.md) includes timing and separate results for small targets.
 
 ## Current limits
 
