@@ -1,9 +1,10 @@
 from copy import deepcopy
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
-from svsg.recognition.subtitle_sequence import review_caption_sequence
+from svsg.recognition.subtitle_sequence import display_lettering, review_caption_sequence
 
 
 def observation(word, box):
@@ -82,3 +83,53 @@ def test_target_frame_reads_only_time_bounded_context(monkeypatch, tmp_path):
     source = tmp_path / "functions.json"
     assert [row[1] for row in _frames(source, 2, context_ms=800)] == [1, 2, 3]
     assert [row[1] for row in _frames(source, 2)] == [2]
+
+
+@pytest.mark.parametrize(
+    "gap,polarity,expected", [(5, True, True), (5, False, True), (2, True, False)]
+)
+def test_display_lettering_measures_inner_gaps_on_raised_capitals(gap, polarity, expected):
+    frame = np.zeros((400, 600, 3), np.uint8)
+    line = observation("MILL ROAD", (235, 220, 365, 246))
+    x = 250
+    for i in range(8):
+        frame[223:241, x : x + 6] = 230
+        x += 6 + (15 if i == 3 else gap)
+    if not polarity:
+        frame = 255 - frame
+    metrics = display_lettering(frame, line)
+    assert bool(metrics) == expected
+    if expected:
+        assert metrics["glyph_count"] == 8
+    assert display_lettering(frame, {**line, "text": "Mill Road"}) is None
+
+
+@pytest.mark.parametrize(
+    "mode,moved",
+    [
+        ("tracked", True),
+        ("brief", False),
+        ("duplicate", False),
+        ("no_measurement", False),
+        ("cut", False),
+    ],
+)
+def test_repeated_display_lettering_needs_three_distinct_observations(mode, moved):
+    frames = series()[:3]
+    for i, frame in enumerate(frames):
+        line = observation("MILL ROAD", (41, 55, 141, 64))
+        if mode != "no_measurement" or i != 0:
+            line["display_lettering"] = {"glyph_count": 8, "median_gap_over_height": 0.28}
+        frame.update(subtitles=[line], detached_text_candidates=[])
+    if mode == "brief":
+        frames[-1]["timestamp_ms"] = 350
+    if mode == "duplicate":
+        frames[1]["pixel_sha256"] = frames[0]["pixel_sha256"]
+    if mode == "cut":
+        frames[1]["subtitles"] = []
+    target = review_caption_sequence(frames, 10)[0]
+    assert bool(target["detached_text_candidates"]) == moved
+    if moved:
+        assert target["detached_text_candidates"][0]["temporal_review"][
+            "support_frame_indices"
+        ] == [0, 5]

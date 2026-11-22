@@ -10,7 +10,12 @@ from svsg.image_functions.raster import RasterFunction
 from svsg.recognition.geometry import Box
 from svsg.recognition.icon_matching import load_icons, match_icons, supplement_toolbar
 from svsg.recognition.subtitle_ocr import SubtitleReader, split_caption_band
-from svsg.recognition.subtitle_sequence import CONTEXT_MS, review_caption_sequence, within_window
+from svsg.recognition.subtitle_sequence import (
+    CONTEXT_MS,
+    display_lettering,
+    review_caption_sequence,
+    within_window,
+)
 
 
 def toolbar_region(w: int, h: int) -> Box:
@@ -104,6 +109,11 @@ def measure_overlays(
                 lines = reader.read(bgr, region, centered=subtitle_region is None)
                 if subtitle_region is None:
                     lines, detached = split_caption_band(lines, h, player_toolbar=player_toolbar)
+                    if temporal:
+                        for line in lines:
+                            lettering = display_lettering(bgr, line)
+                            if lettering is not None:
+                                line["display_lettering"] = lettering
                     if detached:
                         measurements["detached_text_candidates"] = detached
                 measurements["subtitles"] = lines

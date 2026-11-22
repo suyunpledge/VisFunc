@@ -22,6 +22,7 @@ class Icon:
     # The speaker-cross variant shares its left side with a loudspeaker.
     detail_from_x: float | None = None
     check_speaker_margin: bool = False
+    outline_speaker: bool = False
 
 
 def _icon(label, image):
@@ -78,6 +79,18 @@ def _transport_variants() -> list[Icon]:
         draw.line([(x, y), (x + 23 * d, y - 23 * d)], fill="white", width=8)
     icon = _icon("fullscreen", image)
     icon.template_id = "fullscreen/open-arrows"
+    variants.append(icon)
+
+    image = Image.new("RGBA", (64, 64))
+    # Some toolbars draw an unfilled speaker with a closed back and no waves.
+    ImageDraw.Draw(image).polygon(
+        [(4, 19), (25, 19), (44, 4), (44, 58), (25, 43), (4, 43)],
+        outline="white",
+        width=4,
+    )
+    icon = _icon("volume", image)
+    icon.template_id = "volume/outline-speaker"
+    icon.check_speaker_margin = icon.outline_speaker = True
     variants.append(icon)
 
     for style in ("speaker-only", "adjacent-cross", "diagonal-strike", "outline-cross"):
@@ -268,6 +281,26 @@ def supplement_toolbar(primary: list[dict], references: list[dict]) -> list[dict
     return kept
 
 
+def _gradient_shape(patch, glyph, pad: int) -> float | None:
+    """Remove a vertical backdrop ramp only when both glyph margins agree on it."""
+    import cv2
+    import numpy as np
+
+    a = np.median(patch[:, :pad], axis=1)
+    b = np.median(patch[:, -pad:], axis=1)
+    background = (a + b) / 2
+    if np.ptp(background) < 32 or np.quantile(np.abs(a - b), 0.8) > 15:
+        return None
+    signal = patch.astype(np.float32) - background.astype(np.float32)[:, None]
+    corr = float(cv2.matchTemplate(signal, glyph.astype(np.float32), cv2.TM_CCOEFF_NORMED)[0, 0])
+    if abs(corr) < 0.88:
+        return None
+    blurred = cv2.GaussianBlur(signal, (3, 3), 0.8)
+    model = cv2.GaussianBlur(glyph.astype(np.float32), (3, 3), 0.8)
+    smooth = float(cv2.matchTemplate(blurred, model, cv2.TM_CCOEFF_NORMED)[0, 0])
+    return abs(corr) if corr * np.sign(smooth) > 0 and abs(smooth) >= 0.94 else None
+
+
 def match_icons(
     bgr: Any,
     region: Box,
@@ -330,6 +363,7 @@ def match_icons(
             for y, x in zip(ys.tolist(), xs.tolist(), strict=True):
                 score = float(similarity[y, x])
                 weak = soften and score < threshold
+                gradient = None
                 if icon.silhouette:
                     patch = gray[y : y + th + 2 * pad, x : x + tw + 2 * pad]
                     if patch.max().item() - patch.min().item() < 32:
@@ -337,13 +371,17 @@ def match_icons(
                     if icon.check_speaker_margin:
                         # Waves or a slash just outside the speaker body would
                         # turn a partial match into a false mute. Require free space.
-                        start = x + pad + tw
+                        # Thin outline strokes bleed a pixel past the measured edge.
+                        start = x + pad + tw + int(icon.outline_speaker)
                         margin = max(3, round(th * 0.70))
                         tail = gray[y + pad : y + pad + th, start : start + margin]
                         if tail.shape[1] != margin:
                             continue
                         bg = float(np.median(patch[glyph <= 24]))
-                        delta = float(np.median(patch[glyph >= 192])) - bg
+                        ink = glyph >= max(96, 0.8 * int(template.max()))
+                        if not ink.any():
+                            continue
+                        delta = float(np.median(patch[ink])) - bg
                         if (
                             abs(delta) < 64
                             or np.count_nonzero((tail.astype(float) - bg) / delta > 0.4) > 1
@@ -385,7 +423,9 @@ def match_icons(
                                 ]
                             )
                         )
-                        if agreement < 0.93:
+                        if icon.label in ("volume", "fullscreen") and score >= 0.78:
+                            gradient = _gradient_shape(patch, glyph, pad)
+                        if agreement < 0.93 and gradient is None:
                             continue
                 left, top = x0 + x + pad, y0 + y + pad
                 if icon.foreground_bgr is not None:
@@ -400,8 +440,11 @@ def match_icons(
                 )
                 if icon.template_id:
                     row["template_id"] = icon.template_id
-                if weak:
-                    row["smoothed_shape_score"] = agreement
+                if weak or icon.outline_speaker:
+                    if weak:
+                        row["smoothed_shape_score"] = agreement
+                    if gradient is not None:
+                        row["gradient_shape_score"] = gradient
                     secondary.append(row)
                 else:
                     proposals.append(row)
@@ -419,7 +462,10 @@ def match_icons(
     for row in sorted(secondary, key=rank, reverse=True):
         if any(iou(row["bbox_px"], other["bbox_px"]) >= 0.35 for other in kept):
             continue
-        support = _row_support(row["bbox_px"], anchors)
-        if len(support) == 2:
+        corrected = "gradient_shape_score" in row
+        witnesses = [a for a in anchors if a["label"] != row["label"]] if corrected else anchors
+        support = _row_support(row["bbox_px"], witnesses)
+        required = 1 if corrected else 2
+        if len(support) >= required:
             kept.append({**row, "row_support_px": support})
     return kept

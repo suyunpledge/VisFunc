@@ -2,9 +2,61 @@
 
 from __future__ import annotations
 
+from itertools import pairwise
+
 from svsg.recognition.geometry import Box, iou
 
 CONTEXT_MS = 800
+
+
+def display_lettering(bgr, row: dict) -> dict | None:
+    """Measure separated capital glyphs in a raised, centered line."""
+    import cv2
+    import numpy as np
+
+    text = "".join(row["text"].split())
+    left, top, right, bottom = row["bbox_px"]
+    h, w = bgr.shape[:2]
+    if not (
+        len(text) >= 5
+        and text.isascii()
+        and text.isalpha()
+        and text.isupper()
+        and 0.53 * h <= (top + bottom) / 2 <= 0.61 * h
+        and abs((left + right - w) / 2) <= w * 0.075
+        and bottom - top >= h * 0.048
+    ):
+        return None
+    gray = cv2.cvtColor(bgr[top:bottom, left:right], cv2.COLOR_BGR2GRAY)
+    # Count actual, similarly tall strokes. Letter advance alone misreads narrow
+    # glyphs such as I, and spaces between words would overstate letter spacing.
+    for ink in (gray, 255 - gray):
+        lo, hi = np.percentile(ink, [25, 94])
+        if hi - lo < 65:
+            continue
+        ratios = []
+        for fraction in (0.5, 0.68):
+            mask = np.asarray(ink >= lo + fraction * (hi - lo), dtype=np.uint8)
+            stats = cv2.connectedComponentsWithStats(mask)[2][1:]
+            letters = sorted(
+                (int(x), int(x + width), int(height))
+                for x, y, width, height, _ in stats
+                if 0 < y
+                and y + height < gray.shape[0]
+                and height >= 0.037 * h
+                and width <= height * 1.45
+            )
+            if len(letters) != len(text):
+                break
+            gaps = [b[0] - a[1] for a, b in pairwise(letters)]
+            # Drop the widest intervals, one per visible word break.
+            inner = sorted(gaps)[: len(text) - len(row["text"].split())]
+            if not inner or min(gaps) <= 0:
+                break
+            ratios.append(float(np.median(inner) / np.median([v[2] for v in letters])))
+        if len(ratios) == 2 and min(ratios) >= 0.20:
+            return {"glyph_count": len(text), "median_gap_over_height": round(min(ratios), 3)}
+    return None
 
 
 def within_window(stamp: float, other: float, window_ms: float) -> bool:
@@ -27,7 +79,7 @@ def _same_line_role(frame: dict, text: str, box: Box) -> str | None:
                 and c <= right + height / 2
                 and abs((b + d - top - bottom) / 2) <= 0.3 * height
             ):
-                fragments.append((a, b, c, d, row["text"], key))
+                fragments.append((a, b, c, d, row["text"], key, bool(row.get("display_lettering"))))
     if not fragments:
         return None
     fragments.sort()
@@ -42,6 +94,8 @@ def _same_line_role(frame: dict, text: str, box: Box) -> str | None:
         return None
     if all(part[5] == "detached_text_candidates" for part in fragments):
         return "detached"
+    if len(fragments) == 1 and fragments[0][6]:
+        return "letterspaced"
     return "present"
 
 
@@ -63,6 +117,7 @@ def _title_support(frames: list[dict], index: int, row: dict) -> list[int]:
     ):
         return []
     support: dict[str, int] = {}
+    lettering: dict[str, tuple[int, float]] = {}
     for direction in (-1, 1):
         stamp = frame["timestamp_ms"]
         j = index + direction
@@ -82,8 +137,20 @@ def _title_support(frames: list[dict], index: int, row: dict) -> list[int]:
                 support.setdefault(near["pixel_sha256"], near["frame_index"])
                 if len(support) == 2:
                     return sorted(support.values())
+            if (
+                role == "letterspaced"
+                and row.get("display_lettering")
+                and near["pixel_sha256"] != frame["pixel_sha256"]
+            ):
+                lettering.setdefault(
+                    near["pixel_sha256"], (near["frame_index"], near["timestamp_ms"])
+                )
             stamp = near["timestamp_ms"]
             j += direction
+    if len(lettering) >= 2:
+        times = [frame["timestamp_ms"], *(t for _, t in lettering.values())]
+        if max(times) - min(times) >= 400 - 1e-6:
+            return sorted(i for i, _ in lettering.values())
     return []
 
 

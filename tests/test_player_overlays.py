@@ -99,7 +99,7 @@ def test_english_word_space_uses_pixel_gap_and_exact_letters(gap, second, expect
 
 
 def test_bare_speaker_rejects_wave_outside_template():
-    icon = next(i for i in load_icons(player_toolbar=True) if i.check_speaker_margin)
+    icon = next(i for i in load_icons(player_toolbar=True) if i.template_id == "mute/speaker-only")
     frame = np.full((44, 80, 3), 18, np.uint8)
     h, w = icon.pixels.shape
     glyph = cv2.resize(icon.pixels, (round(24 * w / h), 24), interpolation=cv2.INTER_AREA)
@@ -150,3 +150,47 @@ def test_word_boundary_cannot_pass_through_clipped_ascender():
     (gap,) = _word_cuts(crop, True)
     crop[:15, gap : gap + 2] = 235
     assert _word_cuts(crop, True) == []
+
+
+def test_volume_outline_requires_controls_on_the_same_row_and_clear_right_edge():
+    bank = load_icons(player_toolbar=True)
+    icons = [
+        next(i for i in bank if i.label == "play"),
+        next(i for i in bank if i.label == "fullscreen"),
+        next(i for i in bank if i.outline_speaker),
+    ]
+    frame = np.full((52, 160, 3), 16, np.uint8)
+
+    def draw(icon, x):
+        h, w = icon.pixels.shape
+        shape = (round(24 * w / max(h, w)), round(24 * h / max(h, w)))
+        glyph = cv2.resize(icon.pixels, shape, interpolation=cv2.INTER_AREA)
+        frame[14 : 14 + shape[1], x : x + shape[0]] = (16 + 0.85 * glyph)[:, :, None]
+        return x + shape[0]
+
+    def labels():
+        return [
+            row["label"]
+            for row in match_icons(frame, (0, 0, 160, 52), icons, sizes=(24,), review_row=True)
+        ]
+
+    end = draw(icons[-1], 65)
+    assert "volume" not in labels()
+    draw(icons[0], 15)
+    draw(icons[1], 120)
+    assert labels().count("volume") == 1
+    frame[20:32, end + 3 : end + 5] = 224
+    assert "volume" not in labels()
+
+
+def test_gradient_shape_needs_matching_margins_and_a_matching_glyph():
+    from svsg.recognition.icon_matching import _gradient_shape
+
+    icon = next(i for i in load_icons() if i.label == "fullscreen")
+    glyph = np.pad(cv2.resize(icon.pixels, (16, 16), interpolation=cv2.INTER_AREA), 3)
+    background = np.linspace(20, 140, len(glyph))[:, None]
+    observed = np.uint8(background + glyph * 0.4)
+    assert _gradient_shape(observed, glyph, 3) > 0.99
+    observed[:, :3] += 25
+    assert _gradient_shape(observed, glyph, 3) is None
+    assert _gradient_shape(np.uint8(np.broadcast_to(background, glyph.shape)), glyph, 3) is None

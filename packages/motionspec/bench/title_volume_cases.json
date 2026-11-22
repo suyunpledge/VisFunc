@@ -1,0 +1,30 @@
+{
+  "clappr": [
+    ["bunny", 13, 672, "NIGHT SHIFT", "", true, false, true],
+    ["oceans", 22, 744, "", "MOVE BACK", true, true, true, "raised"],
+    ["sintel", 33, 808, "HARBOR ROAD", "Turn here.", false, false, true],
+    ["bunny", 21, 712, "", "Keep moving.", true, false, true],
+    ["sintel", 26, 784, "", "", true, false, false]
+  ],
+  "fluid": [
+    ["sintel", 43, 696, "HILL COUNTRY", "", true, false, true],
+    ["bunny", 16, 744, "", "STAY HERE", true, false, true, "raised"],
+    ["oceans", 26, 792, "EAST BANK", "Go on.", false, true, true],
+    ["sintel", 17, 728, "", "Signal lost.", true, false, true],
+    ["bunny", 25, 816, "", "", true, false, false]
+  ],
+  "op": [
+    ["oceans", 6, 704, "CIVIC HALL", "", true, false, true],
+    ["sintel", 19, 760, "", "WAIT HERE", true, true, true, "raised"],
+    ["bunny", 24, 824, "MILE POST", "Doors closing.", false, false, true],
+    ["oceans", 28, 712, "", "This way.", true, false, true],
+    ["sintel", 39, 768, "", "", true, false, false]
+  ],
+  "chrome-ui": [
+    ["bunny", 19, 680, "RIVER VALLEY", "", true, false, true],
+    ["oceans", 12, 736, "", "FALL BACK", true, true, true, "raised"],
+    ["sintel", 45, 800, "FERRY POINT", "Stay close.", false, false, true],
+    ["bunny", 23, 720, "", "All aboard.", true, false, true],
+    ["oceans", 16, 776, "", "", true, false, false]
+  ]
+}

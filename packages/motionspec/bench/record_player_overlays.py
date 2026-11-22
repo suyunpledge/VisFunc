@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 from functools import partial
@@ -88,6 +89,13 @@ CASES = {
         ("bunny", 10, 720, "", "", True, False, True),
         ("oceans", 31, 656, "", "", True, False, False),
     ],
+    "shaka": [
+        ("bunny", 14, 688, "STILL WATERS", "", True, False, True),
+        ("sintel", 22, 736, "", "TURN LEFT", True, True, True, "raised"),
+        ("oceans", 21, 792, "DUNE FIELD", "This is it.", False, False, True),
+        ("bunny", 20, 720, "", "Hold tight.", True, False, True),
+        ("oceans", 18, 784, "", "", True, False, False),
+    ],
 }
 CONTROLS = {
     "dplayer": [".dplayer-play-icon", ".dplayer-volume-icon", ".dplayer-full-icon"],
@@ -98,6 +106,7 @@ CONTROLS = {
     "chrome-ui": ["media-play-button", "media-mute-button", "media-fullscreen-button"],
     "op": [".op-controls__playpause", ".op-controls__mute", ".op-controls__fullscreen"],
     "fluid": [".fluid_control_playpause", ".fluid_control_mute", ".fluid_control_fullscreen"],
+    "shaka": [".shaka-small-play-button", ".shaka-mute-button i", ".shaka-fullscreen-button"],
 }
 
 
@@ -117,7 +126,11 @@ def prepare_clip(folder, assets, case):
         )
         ass += f"Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,{style}{title}\n"
     if text:
-        ass += f"Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,{text}\n"
+        layout = case[8] if len(case) > 8 else "lower"
+        if layout not in ("raised", "lower"):
+            raise ValueError(f"unknown subtitle placement: {layout}")
+        position = rf"{{\an5\pos({w // 2},{round(h * 0.575)})}}" if layout == "raised" else ""
+        ass += f"Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,{position}{text}\n"
     (folder / "cue.ass").write_text(ass, encoding="utf-8-sig")
     subprocess.run(
         [
@@ -200,13 +213,24 @@ def label_glyph(renderer, element, label, templates):
     )
 
 
-def label_css_glyph(element, selector, label, templates):
-    """Difference the actual CSS pseudo-element against the same button with its ink hidden."""
+def label_css_glyph(element, selector, label, templates, *, font_icon=False):
+    """Difference the actual glyph against the same control with its ink hidden."""
     box = element.bounding_box()
     x, y = box["x"], box["y"]
     backdrop = selector + "{background:black!important}"
+    if font_icon:
+        backdrop += (
+            "video{visibility:hidden!important}.shaka-controls-container,"
+            ".shaka-bottom-controls{background:black!important}"
+            "*{transition:none!important;animation:none!important}"
+        )
     raw = element.screenshot(style=backdrop)
-    blank = element.screenshot(style=backdrop + selector + "::before{visibility:hidden!important}")
+    hide = (
+        "{color:transparent!important;text-shadow:none!important}"
+        if font_icon
+        else "::before{visibility:hidden!important}"
+    )
+    blank = element.screenshot(style=backdrop + selector + hide)
     lit = np.asarray(Image.open(BytesIO(raw)).convert("RGB"), dtype=np.int16)
     dark = np.asarray(Image.open(BytesIO(blank)).convert("RGB"), dtype=np.int16)
     contrast = np.max(np.abs(lit - dark), axis=2)
@@ -231,7 +255,7 @@ def label_css_glyph(element, selector, label, templates):
 
 
 def record(browser, renderer, folder, url, player, size, case, name, templates):
-    source, seconds, _, title, text, playing, muted, visible = case
+    source, seconds, _, title, text, playing, muted, visible = case[:8]
     context = browser.new_context(viewport=size, record_video_dir=folder, record_video_size=size)
     if player == "fluid":
         sprite = "583850a426583410ea8e.svg"
@@ -256,10 +280,24 @@ def record(browser, renderer, folder, url, player, size, case, name, templates):
         "op": "new OpenPlayerJS('app',{alwaysVisible:true})",
         "fluid": "fluidPlayer('app',{layoutControls:{fillToContainer:true,"
         "controlBar:{autoHide:false}}})",
+        "shaka": "new shaka.Player()",
     }[player]
     page.evaluate("window.player=" + init + "; true")
     if player == "op":
         page.evaluate("player.init()")
+    if player == "shaka":
+        page.evaluate("""async () => {
+            const v=document.querySelector('video');
+            await player.attach(v);
+            const ui=new shaka.ui.Overlay(player, document.querySelector('#app'), v);
+            ui.configure({controlPanelElements:['play_pause','time_and_duration','spacer','mute','fullscreen'],
+                          fadeDelay:20});
+            // A blob URL is seekable with the local recording server as well.
+            const src = URL.createObjectURL(await (await fetch('clip.mp4')).blob());
+            await player.load(src, 0, 'video/mp4');
+            if (!(await document.fonts.load('24px "Material Icons Round"')).length)
+                throw new Error("missing Material Icons Round");
+        }""")
     if player not in ("mejs", "clappr"):
         page.wait_for_function("document.querySelector('video')?.readyState >= 2")
     page.evaluate(
@@ -282,7 +320,8 @@ def record(browser, renderer, folder, url, player, size, case, name, templates):
     if not visible:
         page.add_style_tag(
             content=".dplayer-controller,.art-bottom,.mejs__controls,.xgplayer-controls,"
-            ".media-control,media-control-bar,.op-controls,.fluid_controls_container{display:none!important}"
+            ".media-control,media-control-bar,.op-controls,.fluid_controls_container,"
+            ".shaka-controls-container{display:none!important}"
         )
     page.wait_for_timeout(1100)
     state = page.locator("video").evaluate("v=>[!v.paused, v.muted || v.volume===0]")
@@ -290,12 +329,23 @@ def record(browser, renderer, folder, url, player, size, case, name, templates):
     labels = ["pause" if playing else "play", "mute" if muted else "volume", "fullscreen"]
     icons = []
     for selector, label in zip(CONTROLS[player], labels, strict=True):
-        css_icon = player in ("op", "fluid")
+        css_icon = player in ("op", "fluid", "shaka")
         glyph = page.locator(selector + (":visible" if css_icon else " svg:visible"))
         if visible:
             assert glyph.count() == 1, (player, selector, glyph.count())
+            if player == "shaka":
+                ligature = dict(
+                    play="play_arrow",
+                    pause="pause",
+                    mute="volume_off",
+                    volume="volume_up",
+                    fullscreen="fullscreen",
+                )[label]
+                assert glyph.text_content().strip() == ligature, (name, label, glyph.text_content())
             if css_icon:
-                item = label_css_glyph(glyph, selector, label, templates)
+                item = label_css_glyph(
+                    glyph, selector, label, templates, font_icon=player == "shaka"
+                )
             else:
                 item = label_glyph(renderer, glyph, label, templates)
             x, y, right, bottom = item["bbox_px"]
@@ -304,7 +354,7 @@ def record(browser, renderer, folder, url, player, size, case, name, templates):
             icons.append(item)
         else:
             assert glyph.count() == 0
-    if player in ("op", "fluid") and visible:
+    if player in ("op", "fluid", "shaka") and visible:
         # All five scored frames follow the temporary CSS used for ground truth.
         page.mouse.move(size["width"] // 2 + 1, size["height"] - 45)
         page.wait_for_timeout(1150)
@@ -333,6 +383,7 @@ def record(browser, renderer, folder, url, player, size, case, name, templates):
         source_seek_s=seconds,
         title=title,
         text=text,
+        subtitle_layout=case[8] if len(case) > 8 else "lower",
         icons=icons,
         frame_index=index - 1,
         fps=fps,
@@ -340,7 +391,7 @@ def record(browser, renderer, folder, url, player, size, case, name, templates):
     )
 
 
-def prepare(assets, folder, players):
+def prepare(assets, folder, players, cases_by_player=CASES):
     folder.mkdir(parents=True, exist_ok=True)
     server = ThreadingHTTPServer(("127.0.0.1", 0), partial(Quiet, directory=str(folder)))
     Thread(target=server.serve_forever, daemon=True).start()
@@ -355,7 +406,7 @@ def prepare(assets, folder, players):
             )
             renderer = browser.new_page(viewport=dict(width=96, height=96))
             for player in players:
-                cases = CASES[player]
+                cases = cases_by_player[player]
                 shutil.copyfile(assets / f"{player}.js", folder / f"{player}.js")
                 html = (
                     "<!doctype html><meta charset=utf-8><style>body{margin:0;background:black}"
@@ -390,6 +441,25 @@ def prepare(assets, folder, players):
                         "<video id=app playsinline><source src=clip.mp4 type=video/mp4></video>",
                     )
                     html = html.replace("body{margin:0;", "html,body{height:100%;margin:0;")
+                elif player == "shaka":
+                    for name in ("shaka.css", "material-round.otf", "roboto.ttf"):
+                        shutil.copyfile(assets / name, folder / name)
+                    # The distributed CSS references two Google fonts. Use the exact
+                    # local files so that offline runs render glyphs rather than ligature text.
+                    css_file = folder / "shaka.css"
+                    css = css_file.read_text(encoding="utf8")
+                    for suffix, filename in (("otf", "material-round.otf"), ("ttf", "roboto.ttf")):
+                        css, replaced = re.subn(
+                            r"https://fonts\.gstatic\.com/[^)]+\." + suffix, filename, css
+                        )
+                        if replaced != 1:
+                            raise ValueError("unexpected Shaka font URLs")
+                    css_file.write_text(css, encoding="utf8")
+                    html = html.replace(
+                        "<div id=app></div>",
+                        "<link rel=stylesheet href=shaka.css>"
+                        "<div id=app><video style='width:100%;height:100%'></video></div>",
+                    )
                 elif player == "chrome-ui":
                     html = html.replace(
                         "<div id=app></div>",
@@ -434,8 +504,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("assets", type=Path)
     parser.add_argument("folder", type=Path)
-    parser.add_argument(
-        "--players", nargs="+", choices=list(CASES), default=["dplayer", "artplayer", "mejs"]
-    )
+    parser.add_argument("--players", nargs="+", choices=list(CASES))
+    parser.add_argument("--cases", type=Path, help="JSON recording scenarios keyed by player")
     args = parser.parse_args()
-    prepare(args.assets.resolve(), args.folder.resolve(), args.players)
+    cases = json.loads(args.cases.read_text(encoding="utf8")) if args.cases else CASES
+    players = args.players or (list(cases) if args.cases else ["dplayer", "artplayer", "mejs"])
+    prepare(args.assets.resolve(), args.folder.resolve(), players, cases)

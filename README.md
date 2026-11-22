@@ -89,6 +89,8 @@ Install local OCR to read Chinese and English captions and locate icons in scree
 
 Use `--player-toolbar` for bottom-bar icons and player readouts. `--icon-dir` selects your own PNG template bank. `--fallback-icon-dir` first runs the built-in toolbar detector, then checks unused positions against your templates with support from nearby controls. [Evaluation and options](docs/subtitle-icon-evaluation-20261122.md) · [Earlier recording results](docs/player-recordings-20261122.md) · [Temporal OCR and unfamiliar icon styles](docs/temporal-player-overlays-20261122.md)
 
+The latest recording benchmark measures opening-title false positives, raised captions, and volume and fullscreen controls across five players, including a held-out Shaka Player skin. [Results and reproduction steps](docs/volume-title-player-20261122.md)
+
 ```bash
 python -m pip install -e ".[overlays]" -e "./packages/motionspec"
 motionspec overlays screenshot.png
