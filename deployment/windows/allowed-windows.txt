@@ -1,2 +1,5 @@
-# One window title (or a distinctive substring) per line. Restart after editing.
-# No entries means desktop actions are disabled. Use UTF-8 for non-ASCII titles.
+# One rule per line. Restart after editing. Use UTF-8 for non-ASCII titles.
+#   Title                     a distinctive part of the window title
+#   Title | program.exe       ...and the window must belong to that program (recommended)
+#   | program.exe             every window of that program
+# No rules means desktop actions are disabled; reading the screen still works.

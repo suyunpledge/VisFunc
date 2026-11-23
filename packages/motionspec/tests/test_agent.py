@@ -497,3 +497,163 @@ def test_caption_buttons_are_dropped():
     ]
     kept = _without_caption(elements, [60, 60, 1000, 700])
     assert [(e["name"], e["bbox_px"][1]) for e in kept] == [("关闭", 600), ("Start sync", 600)]
+
+
+# -- production guards -------------------------------------------------------------------------
+
+
+def test_allow_rules_bind_titles_to_programs():
+    from motionspec.agent import parse_allow_rule
+
+    assert parse_allow_rule("Keystone agent task | Python.EXE") == (
+        "keystone agent task",
+        "python.exe",
+    )
+    assert parse_allow_rule("Report | draft") == ("report | draft", None)  # not a program name
+    assert parse_allow_rule("| notepad.exe") == ("", "notepad.exe")
+    agent, _, _ = make(
+        allowed_windows=["Sync settings | sync.exe", "Plain title"],
+        process_name=lambda hwnd: {1: "sync.exe", 2: "evil.exe"}[hwnd],
+    )
+    agent._permit(1, "Sync settings - main")
+    agent._permit(2, "Plain title")  # a title-only rule still matches any program
+    with pytest.raises(PermissionError, match="evil.exe"):
+        agent._permit(2, "Sync settings - fake")
+    with pytest.raises(PermissionError):
+        agent._permit(1, "Something else")
+
+
+def test_locked_desktop_refuses_before_reserving_an_action():
+    calls = []
+    agent, _, _ = make(
+        allowed_windows=["App"], desktop=lambda: "locked", act=lambda *a, **k: calls.append(a)
+    )
+    server = McpServer(agent)
+    reply = rpc(
+        server,
+        "tools/call",
+        {
+            "name": "click_element",
+            "arguments": {"window_title": "App", "target": "Save"},
+            "_meta": {"visfunc/operationId": "11111111-2222-3333-4444-555555555555"},
+        },
+    )
+    assert reply["result"]["isError"] and "locked" in reply["result"]["content"][0]["text"]
+    assert calls == [] and server.receipts.stats()["reserved"] == 0
+    reply = rpc(server, "tools/call", {"name": "read_screen_text", "arguments": {}}, mid=2)
+    assert "DesktopUnavailable" in reply["result"]["content"][0]["text"]
+    with pytest.raises(Exception, match="service"):
+        make(desktop=lambda: "service")[0].require_desktop()
+
+
+class SlowAgent:
+    """Records how many calls overlap, per window and in total."""
+
+    allowed_windows = []
+
+    def __init__(self):
+        import threading
+
+        self.lock, self.active, self.peak, self.peak_by_window = threading.Lock(), {}, 0, {}
+
+    def tool_specs(self):
+        return [{"name": "list_ui_elements", "inputSchema": {"type": "object"}}]
+
+    def require_desktop(self):
+        pass
+
+    def __getattr__(self, name):  # the other tools are looked up but never called here
+        return lambda **kw: {}
+
+    def list_ui_elements(self, window_title=None):
+        import time
+
+        with self.lock:
+            self.active[window_title] = self.active.get(window_title, 0) + 1
+            self.peak = max(self.peak, sum(self.active.values()))
+            self.peak_by_window[window_title] = max(
+                self.peak_by_window.get(window_title, 0), self.active[window_title]
+            )
+        time.sleep(0.2)
+        with self.lock:
+            self.active[window_title] -= 1
+        return {"elements": []}
+
+
+def test_calls_on_different_windows_overlap_and_one_window_queues():
+    import threading
+
+    agent = SlowAgent()
+    server = McpServer(agent)
+    threads = [
+        threading.Thread(
+            target=rpc,
+            args=(
+                server,
+                "tools/call",
+                {"name": "list_ui_elements", "arguments": {"window_title": title}},
+                i,
+            ),
+        )
+        for i, title in enumerate(["A", "B", "A", "B"])
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert agent.peak == 2  # A and B ran side by side
+    assert agent.peak_by_window == {"A": 1, "B": 1}  # never two calls on one window at once
+
+
+def test_tool_calls_are_logged_without_arguments(tmp_path):
+    import json
+
+    from motionspec.agent import json_log
+
+    path = tmp_path / "logs" / "calls.jsonl"
+    server = McpServer(
+        make(
+            allowed_windows=["App"],
+            act=lambda *a, **k: {
+                "performed": "set_value",
+                "window": "App",
+                "element": {"name": "Note"},
+                "after": None,
+            },
+            windows=lambda title: None,
+        )[0],
+        log=json_log(str(path)),
+    )
+    rpc(
+        server,
+        "tools/call",
+        {
+            "name": "set_field_text",
+            "arguments": {"window_title": "App", "field": "Note", "text": "secret value 123"},
+            "_meta": {"visfunc/operationId": "21111111-2222-3333-4444-555555555555"},
+        },
+    )
+    rpc(
+        server,
+        "tools/call",
+        {"name": "click_element", "arguments": {"window_title": "Nope"}},
+        mid=2,
+    )
+    lines = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert [(e["tool"], e["ok"]) for e in lines] == [
+        ("set_field_text", True),
+        ("click_element", False),
+    ]
+    assert lines[0]["window"] == "App" and lines[0]["execution_state"] == "completed"
+    assert "secret value" not in path.read_text(encoding="utf-8")
+
+
+def test_http_requires_a_token_unless_explicitly_waived(capsys, monkeypatch):
+    from motionspec.cli import main
+
+    monkeypatch.delenv("VISFUNC_MCP_TOKEN", raising=False)
+
+    with pytest.raises(SystemExit) as stop:
+        main(["agent-mcp", "--http", "127.0.0.1:1"])
+    assert stop.value.code == 2
+    assert "VISFUNC_MCP_TOKEN" in capsys.readouterr().err

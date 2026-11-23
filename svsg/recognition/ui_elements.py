@@ -231,6 +231,54 @@ def window_title(hwnd: int) -> str:
     return buffer.value
 
 
+def window_process_name(hwnd: int) -> str:
+    """Executable file name (lower case, e.g. ``notepad.exe``) of the process owning a window."""
+    _require_windows()
+    import ctypes
+    from ctypes import wintypes
+
+    pid = wintypes.DWORD()
+    ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    kernel32 = ctypes.windll.kernel32
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    handle = kernel32.OpenProcess(0x1000, False, pid.value)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not handle:
+        raise OSError(f"cannot inspect the process of window {hwnd}")
+    try:
+        size = wintypes.DWORD(1024)
+        buffer = ctypes.create_unicode_buffer(size.value)
+        if not kernel32.QueryFullProcessImageNameW(handle, 0, buffer, ctypes.byref(size)):
+            raise OSError(f"cannot read the program path of window {hwnd}")
+    finally:
+        kernel32.CloseHandle(handle)
+    return buffer.value.replace("/", "\\").rsplit("\\", 1)[-1].casefold()
+
+
+def desktop_state() -> str:
+    """Whether this process can see and drive the user's desktop.
+
+    ``interactive``: the input desktop is reachable. ``locked``: the session is locked or a
+    secure desktop (UAC, Ctrl+Alt+Del) is in front, so captures are black and input is refused.
+    ``service``: the process runs in session 0, which has no user desktop at all.
+    """
+    if sys.platform != "win32":
+        return "interactive"
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32, user32 = ctypes.windll.kernel32, ctypes.windll.user32
+    session = wintypes.DWORD()
+    if kernel32.ProcessIdToSessionId(kernel32.GetCurrentProcessId(), ctypes.byref(session)):
+        if session.value == 0:
+            return "service"
+    user32.OpenInputDesktop.restype = wintypes.HANDLE
+    desktop = user32.OpenInputDesktop(0, False, 0x0100)  # DESKTOP_SWITCHDESKTOP
+    if not desktop:
+        return "locked"
+    user32.CloseDesktop(desktop)
+    return "interactive"
+
+
 def _window(client: _Client, title: str | None, hwnd: int | None) -> Any:
     import ctypes
 

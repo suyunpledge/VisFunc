@@ -19,6 +19,8 @@ from __future__ import annotations
 import base64
 import json
 import sys
+import threading
+import time
 from collections import Counter
 from collections.abc import Callable, Iterator, Sequence
 from typing import Any
@@ -218,6 +220,44 @@ def _without_caption(elements: list[dict], window_box: Sequence[int] | None) -> 
     ]
 
 
+class DesktopUnavailable(RuntimeError):
+    """The user's desktop cannot be seen or driven right now; nothing was done."""
+
+
+def parse_allow_rule(entry: str) -> tuple[str, str | None]:
+    """``title`` or ``title | program.exe`` -> (title part, program name or None), case-folded.
+
+    A rule with a program only matches windows of that executable, so another application
+    cannot borrow an allowed title. An empty title part allows every window of the program.
+    """
+    title, sep, program = entry.rpartition("|")
+    if sep and program.strip().casefold().endswith(".exe"):
+        return title.strip().casefold(), program.strip().casefold()
+    return entry.strip().casefold(), None
+
+
+class _Stream:
+    """A capture generator shared by calls on one area; one caller at a time pulls frames."""
+
+    def __init__(self, generator):
+        self.generator = generator
+        self.lock = threading.Lock()
+        self.last_used = time.monotonic()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        with self.lock:
+            self.last_used = time.monotonic()
+            return next(self.generator)
+
+    def close(self):
+        with self.lock:
+            if hasattr(self.generator, "close"):
+                self.generator.close()
+
+
 class ScreenAgent:
     """Resident screen tools. Dependencies are injectable for tests."""
 
@@ -236,6 +276,8 @@ class ScreenAgent:
         max_wait_ms: float | None = None,
         images: bool = True,
         history_seconds: float = 20.0,
+        process_name: Callable[[int], str] | None = None,
+        desktop: Callable[[], str] | None = None,
     ) -> None:
         self.capture = capture
         self.max_fps = max_fps
@@ -244,7 +286,12 @@ class ScreenAgent:
         self._click = click
         self.blocked: set[str] = set()  # window titles whose capture never shows changes
         self.last_controls: dict[str, dict] = {}
-        self.allowed_windows = [w.casefold() for w in allowed_windows if w.strip()]
+        self.allow_rules = [parse_allow_rule(w) for w in allowed_windows if w.strip()]
+        self.allowed_windows = [title for title, _ in self.allow_rules]  # truthy = actions on
+        self._process_name = process_name
+        self._desktop = desktop
+        self._state_lock = threading.RLock()  # streams, watchers and armed baselines
+        self._armed_areas: set = set()
         self.max_wait_ms = max_wait_ms
         self.images = images
         self.history_seconds = min(60.0, _finite("history_seconds", history_seconds))
@@ -286,23 +333,72 @@ class ScreenAgent:
         return None
 
     def _frames(self, area: Box | None) -> Iterator[tuple[float, np.ndarray]]:
-        if area not in self.streams:
-            if len(self.streams) >= 8:
-                oldest = next(iter(self.streams))
-                stream = self.streams.pop(oldest)
-                if hasattr(stream, "close"):
-                    stream.close()
-                self.watchers.pop(oldest, None)
-            self.streams[area] = self.capture(area, max_fps=self.max_fps)
-        return self.streams[area]
+        with self._state_lock:
+            stream = self.streams.get(area)
+            if stream is None:
+                if len(self.streams) >= 8:
+                    # Evict the least recently used stream that nobody has pulled for 30 s.
+                    idle = [
+                        (s.last_used, key)
+                        for key, s in self.streams.items()
+                        if time.monotonic() - s.last_used > 30 and not s.lock.locked()
+                    ]
+                    if idle:
+                        oldest = min(idle, key=lambda row: row[0])[1]
+                        self.streams.pop(oldest).close()
+                        self.watchers.pop(oldest, None)
+                stream = self.streams[area] = _Stream(self.capture(area, max_fps=self.max_fps))
+            return stream
 
     def close(self):
         self.history.close()
-        for stream in self.streams.values():
-            if hasattr(stream, "close"):
+        with self._state_lock:
+            for stream in self.streams.values():
                 stream.close()
-        self.streams.clear()
-        self.watchers.clear()
+            self.streams.clear()
+            self.watchers.clear()
+
+    # -- production guards --------------------------------------------------------------------
+    def desktop_state(self) -> str:
+        if self._desktop is None:
+            try:
+                from svsg.recognition.ui_elements import desktop_state
+            except ImportError:  # pragma: no cover - svsg is installed alongside
+                return "interactive"
+            self._desktop = desktop_state
+        return self._desktop()
+
+    def require_desktop(self) -> None:
+        state = self.desktop_state()
+        if state == "interactive":
+            return
+        reason = {
+            "locked": "the Windows session is locked or a secure desktop (UAC, sign-in) is in "
+            "front; unlock it and retry",
+            "service": "the server runs as a service in session 0, which has no user desktop; "
+            "start it from the signed-in user's session",
+        }.get(state, f"the desktop is not available ({state})")
+        raise DesktopUnavailable(f"{reason}. Nothing was captured or clicked.")
+
+    def _permit(self, hwnd: int, actual: str) -> None:
+        """Raise unless the window matches an allowed title (and program, when one is given)."""
+        title = actual.casefold()
+        program = None
+        for allowed, exe in self.allow_rules:
+            if allowed not in title:
+                continue
+            if exe is None:
+                return
+            if program is None:
+                if self._process_name is None:
+                    from svsg.recognition.ui_elements import window_process_name
+
+                    self._process_name = window_process_name
+                program = self._process_name(hwnd)
+            if program == exe:
+                return
+        shown = f" ({program})" if program else ""
+        raise PermissionError(f"window {actual!r}{shown} is not in the allowed list")
 
     def watch_screen_changes(self, *, window_title: str) -> dict:
         if not self.history_seconds or not window_title.strip():
@@ -399,14 +495,15 @@ class ScreenAgent:
         )
 
     def _watcher(self, area: Box | None, ambient_ms: float, waits: dict) -> tuple[Any, bool]:
-        watcher = self.watchers.get(area)
-        # Only ambient_ms changes what has been learned; the waits can change between calls.
-        fresh = watcher is None or watcher.ambient_ms != float(ambient_ms)
-        if fresh:
-            watcher = self.watchers[area] = SettleWatcher(ambient_ms=ambient_ms, **waits)
-        else:
-            watcher.update(**waits)
-        return watcher, fresh
+        with self._state_lock:
+            watcher = self.watchers.get(area)
+            # Only ambient_ms changes what has been learned; the waits can change between calls.
+            fresh = watcher is None or watcher.ambient_ms != float(ambient_ms)
+            if fresh:
+                watcher = self.watchers[area] = SettleWatcher(ambient_ms=ambient_ms, **waits)
+            else:
+                watcher.update(**waits)
+            return watcher, fresh
 
     def _mark_baseline(self, area: Box | None, ambient_ms: float = 3000.0) -> np.ndarray:
         """Make the current screen the baseline the next settle compares against."""
@@ -414,7 +511,8 @@ class ScreenAgent:
         t_ms, frame = next(self._frames(area))
         watcher.push(frame, t_ms)
         watcher.rearm()
-        self._armed = ("armed", area)
+        with self._state_lock:
+            self._armed_areas.add(area)
         return frame
 
     def _settle(
@@ -436,9 +534,11 @@ class ScreenAgent:
             "timeout_ms": timeout_ms,
         }
         watcher, fresh = self._watcher(area, ambient_ms, waits)
-        if not fresh and getattr(self, "_armed", None) != ("armed", area):
+        with self._state_lock:
+            armed = area in self._armed_areas
+            self._armed_areas.discard(area)
+        if not fresh and not armed:
             watcher.rearm()  # otherwise _mark_baseline already set the baseline
-        self._armed = None
         for t_ms, frame in self._frames(area):
             if watcher.push(frame, t_ms):
                 break
@@ -551,6 +651,7 @@ class ScreenAgent:
         """Act inside an allowed window, then wait and report the effect in the same call."""
         if not self.allowed_windows:
             raise PermissionError("actions are disabled; start the server with --allow-window")
+        self.require_desktop()
         if not window_title or not query:
             raise ValueError("window_title and target are required")
         if self._act is None:
@@ -559,8 +660,7 @@ class ScreenAgent:
             def act(query, action, *, title, **kw):
                 hwnd = ui_elements.find_window(title)
                 actual = ui_elements.window_title(hwnd)
-                if not any(allowed in actual.casefold() for allowed in self.allowed_windows):
-                    raise PermissionError(f"window {actual!r} is not in the allowed list")
+                self._permit(hwnd, actual)
                 return ui_elements.perform(query, action, hwnd=hwnd, **kw)
 
             self._act = act
@@ -575,6 +675,7 @@ class ScreenAgent:
         """Click at a screen point inside an allowed window, for controls without names."""
         if not self.allowed_windows:
             raise PermissionError("actions are disabled; start the server with --allow-window")
+        self.require_desktop()
         if not window_title:
             raise ValueError("window_title is required")
         x, y = int(x), int(y)
@@ -584,8 +685,7 @@ class ScreenAgent:
             def click(title, x, y):
                 hwnd = ui_elements.find_window(title)
                 actual = ui_elements.window_title(hwnd)
-                if not any(allowed in actual.casefold() for allowed in self.allowed_windows):
-                    raise PermissionError(f"window {actual!r} is not in the allowed list")
+                self._permit(hwnd, actual)
                 done = ui_elements.post_click(hwnd, x, y)
                 return {
                     "performed": "mouse_down_at"
@@ -646,7 +746,8 @@ class ScreenAgent:
         try:
             self._observe_effect(report, window_title, area, before, outcome, blocked)
         except Exception as exc:  # The side effect already happened, even if its window is gone.
-            self._armed = None
+            with self._state_lock:
+                self._armed_areas.discard(area)
             report.update(
                 observation_state="failed",
                 screen={"state": "unavailable"},
@@ -1016,11 +1117,36 @@ TOOLS.append(
 )
 
 
+NO_DESKTOP_TOOLS = {"read_screen_history"}  # reads what was recorded; needs no live desktop
+
+
 class McpServer:
-    def __init__(self, agent: ScreenAgent, *, receipts=None) -> None:
+    def __init__(self, agent: ScreenAgent, *, receipts=None, log=None) -> None:
         self.agent = agent
         self.receipts = receipts if receipts is not None else ActionReceipts()
         self.scope = uuid4().hex
+        self.log = log
+        self._locks: dict = {}
+        self._locks_guard = threading.Lock()
+
+    def _lock_for(self, args: dict) -> threading.Lock:
+        """Calls on one window run one at a time; different windows run side by side."""
+        title = args.get("window_title") if isinstance(args, dict) else None
+        key = ("window", str(title).casefold()) if title else ("screen",)
+        with self._locks_guard:
+            if key not in self._locks:
+                if len(self._locks) > 256:  # forget idle windows
+                    for stale in [k for k, lock in self._locks.items() if not lock.locked()]:
+                        del self._locks[stale]
+                self._locks[key] = threading.Lock()
+            return self._locks[key]
+
+    def _record(self, **event) -> None:
+        if self.log is not None:
+            try:
+                self.log(event)
+            except Exception:  # noqa: BLE001 - logging must never break a tool call
+                pass
 
     def close(self):
         self.agent.close()
@@ -1046,6 +1172,8 @@ class McpServer:
         }.get(name)
         if method is None:
             raise KeyError(name)
+        if name not in NO_DESKTOP_TOOLS:
+            self.agent.require_desktop()
         report = method(**args)
         image = report.get("operation_marker", {}).pop("pre_action_png", None)
         event_image = report.pop("event_jpeg", None)
@@ -1119,8 +1247,12 @@ class McpServer:
                     "id": mid,
                     "error": {"code": -32602, "message": f"unknown tool {name!r}"},
                 }
+            started = time.perf_counter()
+            window = args.get("window_title") if isinstance(args, dict) else None
             try:
                 if name in ACTION_TOOLS:
+                    # Refuse before reserving: a locked desktop must not leave an unknown receipt.
+                    self.agent.require_desktop()
                     scope = self.scope if session is True else session
                     meta_id = (params.get("_meta") or {}).get("visfunc/operationId")
                     if operation_id and meta_id and operation_id != meta_id:
@@ -1128,15 +1260,41 @@ class McpServer:
                     key = operation_key(
                         scope, mid, operation_id if operation_id is not None else meta_id
                     )
-                    content = self._action(key, name, args)
+                    with self._lock_for(args):
+                        content = self._action(key, name, args)
                 else:
-                    content = self.call(name, args)
+                    with self._lock_for(args):
+                        content = self.call(name, args)
                 result = {"content": content, "isError": False}
+                outcome = {}
+                try:
+                    report = json.loads(content[0]["text"])
+                    outcome = {
+                        k: report[k]
+                        for k in ("execution_state", "observation_state", "replayed")
+                        if isinstance(report, dict) and k in report
+                    }
+                except (ValueError, KeyError, IndexError, TypeError):
+                    pass
+                self._record(
+                    tool=name,
+                    window=window,
+                    ok=True,
+                    ms=round((time.perf_counter() - started) * 1000),
+                    **outcome,
+                )
             except Exception as exc:  # noqa: BLE001 - a failing tool must not end the server
                 result = {
                     "content": [{"type": "text", "text": f"{type(exc).__name__}: {exc}"}],
                     "isError": True,
                 }
+                self._record(
+                    tool=name,
+                    window=window,
+                    ok=False,
+                    ms=round((time.perf_counter() - started) * 1000),
+                    error=f"{type(exc).__name__}: {str(exc)[:200]}",
+                )
         else:
             return {
                 "jsonrpc": "2.0",
@@ -1146,12 +1304,46 @@ class McpServer:
         return {"jsonrpc": "2.0", "id": mid, "result": result}
 
 
-def serve_mcp(agent: ScreenAgent | None = None, stdin=None, stdout=None) -> None:
+def json_log(path: str | None, *, max_bytes: int = 5_000_000, backups: int = 5):
+    """A rotating JSON-lines writer for tool calls, or None when no path is given.
+
+    Each line holds time, tool, window title, duration and outcome. Arguments such as typed
+    text or search queries are never written.
+    """
+    if not path:
+        return None
+    import logging
+    from logging.handlers import RotatingFileHandler
+    from pathlib import Path
+
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    logger = logging.getLogger(f"motionspec.agent.{path}")
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    if not logger.handlers:
+        handler = RotatingFileHandler(
+            path, maxBytes=max_bytes, backupCount=backups, encoding="utf-8"
+        )
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        logger.addHandler(handler)
+
+    def write(event: dict) -> None:
+        stamp = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
+        logger.info(json.dumps({"time": stamp, **event}, ensure_ascii=False))
+
+    return write
+
+
+def serve_mcp(
+    agent: ScreenAgent | None = None, stdin=None, stdout=None, *, log_file: str | None = None
+) -> None:
     """Serve MCP over newline-delimited JSON-RPC on stdin/stdout until stdin closes."""
     stdin = stdin or sys.stdin.buffer
     stdout = stdout or sys.stdout.buffer
     sys.stdout = sys.stderr  # Anything printed by libraries must not corrupt the protocol stream.
-    server = McpServer(agent or ScreenAgent(), receipts=ActionReceipts(receipt_path()))
+    server = McpServer(
+        agent or ScreenAgent(), receipts=ActionReceipts(receipt_path()), log=json_log(log_file)
+    )
     try:
         _serve_lines(server, stdin, stdout)
     finally:
@@ -1196,18 +1388,26 @@ def serve_http(
     *,
     token: str = "",
     ready=None,
+    workers: int = 4,
+    log_file: str | None = None,
 ) -> None:
     """Serve MCP over Streamable HTTP (JSON responses, no server-sent events) at /mcp.
 
-    Requests are handled one at a time, so tools never race over the screen or the watchers.
-    Only loopback browsers may call it (Origin check), and a bearer token can be required.
+    A small pool of worker threads serves requests. Calls on the same window run one at a
+    time, so they never race over its frames or watcher; calls on different windows proceed
+    side by side. Only loopback browsers may call it (Origin check), and a bearer token can be
+    required.
     """
     import hmac
     import uuid
+    from concurrent.futures import ThreadPoolExecutor
     from http.server import BaseHTTPRequestHandler, HTTPServer
     from urllib.parse import urlsplit
 
-    server_logic = McpServer(agent or ScreenAgent(), receipts=ActionReceipts(receipt_path()))
+    log = json_log(log_file)
+    server_logic = McpServer(
+        agent or ScreenAgent(), receipts=ActionReceipts(receipt_path()), log=log
+    )
 
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -1234,6 +1434,8 @@ def serve_http(
             if token:
                 given = self.headers.get("Authorization", "")
                 if not hmac.compare_digest(given.encode(), f"Bearer {token}".encode()):
+                    if log is not None:
+                        log({"event": "unauthorized", "client": self.client_address[0]})
                     self._reply(401, {"error": "unauthorized"})
                     return False
             if urlsplit(self.path).path not in ("/mcp", "/mcp/"):
@@ -1308,12 +1510,44 @@ def serve_http(
                 headers["Mcp-Session-Id"] = uuid.uuid4().hex
             self._reply(200, reply, headers)
 
-    httpd = HTTPServer((host, port), Handler)
+    class PoolServer(HTTPServer):
+        def __init__(self, address, handler):
+            super().__init__(address, handler)
+            self.pool = ThreadPoolExecutor(max(1, workers), thread_name_prefix="agent-mcp")
+
+        def process_request(self, request, client_address):
+            self.pool.submit(self._work, request, client_address)
+
+        def _work(self, request, client_address):
+            try:
+                self.finish_request(request, client_address)
+            except Exception:  # noqa: BLE001 - report like the base server, keep serving
+                self.handle_error(request, client_address)
+            finally:
+                self.shutdown_request(request)
+
+        def server_close(self):
+            super().server_close()
+            self.pool.shutdown(wait=True, cancel_futures=True)
+
+    httpd = PoolServer((host, port), Handler)
     if ready is not None:
         ready(httpd)
     sys.stderr.write(f"agent-mcp listening on http://{host}:{httpd.server_port}/mcp\n")
+    if log is not None:
+        log(
+            {
+                "event": "start",
+                "port": httpd.server_port,
+                "workers": workers,
+                "actions": bool(server_logic.agent.allowed_windows),
+                "token": bool(token),
+            }
+        )
     try:
         httpd.serve_forever()
     finally:
         httpd.server_close()
         server_logic.close()
+        if log is not None:
+            log({"event": "stop"})

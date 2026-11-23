@@ -144,11 +144,18 @@ def main(argv: list[str] | None = None) -> int:
     am.add_argument("--http", metavar="HOST:PORT",
                     help="serve Streamable HTTP at http://HOST:PORT/mcp instead of stdio")
     am.add_argument("--allow-window", action="append", default=[], metavar="TITLE",
-                    help="enable click/text tools in windows titled with TITLE; repeatable")
+                    help="enable click/text tools in windows titled with TITLE; "
+                         "'TITLE | program.exe' also requires that program; repeatable")
     am.add_argument("--no-images", action="store_true",
                     help="omit the screenshot tool (for clients that pass images as text)")
     am.add_argument("--max-wait-ms", type=float,
                     help="cap waits per call; defaults to 8000 over HTTP for 10 s client timeouts")
+    am.add_argument("--log-file", help="append one JSON line per tool call (rotates at 5 MB)")
+    am.add_argument("--workers", type=int, default=4,
+                    help="HTTP worker threads; calls on one window still run one at a time")
+    am.add_argument("--insecure-no-token", action="store_true",
+                    help="serve HTTP without VISFUNC_MCP_TOKEN (any local program may then "
+                         "read the screen and act on allowed windows)")
 
     t = sub.add_parser("trace", help="convert a Qt probe trace (motionspec.qt_probe) into a spec")
     t.add_argument("trace")
@@ -256,9 +263,15 @@ def main(argv: list[str] | None = None) -> int:
             host, _, port = args.http.rpartition(":")
             if not host or not port.isdigit():
                 am.exit(2, "motionspec agent-mcp: --http needs HOST:PORT\n")
-            serve_http(agent, host, int(port), token=os.environ.get("VISFUNC_MCP_TOKEN", ""))
+            token = os.environ.get("VISFUNC_MCP_TOKEN", "").strip()
+            if not token and not args.insecure_no_token:
+                am.exit(2, "motionspec agent-mcp: set VISFUNC_MCP_TOKEN so that only clients "
+                           "holding it can read the screen or act; pass --insecure-no-token "
+                           "to serve without one\n")
+            serve_http(agent, host, int(port), token=token, workers=args.workers,
+                       log_file=args.log_file)
         else:
-            serve_mcp(agent)
+            serve_mcp(agent, log_file=args.log_file)
         return 0
 
     if args.command == "screen-text":

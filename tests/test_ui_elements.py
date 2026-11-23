@@ -93,3 +93,16 @@ def test_password_field_value_is_omitted_from_ui_event_input():
     assert "value" not in _describe(Element())
     props["password"] = False
     assert _describe(Element())["value"] == "sensitive input"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows only")
+def test_process_name_and_desktop_state():
+    import ctypes
+
+    from svsg.recognition.ui_elements import desktop_state, window_process_name
+
+    assert desktop_state() in {"interactive", "locked", "service"}
+    taskbar = ctypes.windll.user32.FindWindowW("Shell_TrayWnd", None)
+    if not taskbar:
+        pytest.skip("no taskbar in this session")
+    assert window_process_name(taskbar) == "explorer.exe"

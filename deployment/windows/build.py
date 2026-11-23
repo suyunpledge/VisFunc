@@ -17,6 +17,78 @@ from pathlib import Path
 PROJECT = Path(__file__).resolve().parents[2]
 SKIP = shutil.ignore_patterns("__pycache__", "*.pyc")
 LAUNCH_FILES = ("Start.cmd", "MotionSpec.cmd", "launch.py", "allowed-windows.txt", "README.zh.md")
+# What each profile installs. "desktop" is the desktop agent and the image API without the
+# local detectors (torch, ultralytics, ONNX person model), Qt or FFmpeg: about a third the size.
+PROFILES = {
+    "full": {"svsg": "api,llm,ml,crowd,overlays,uia", "motionspec": "capture", "qt": True},
+    "desktop": {"svsg": "api,llm,overlays,uia", "motionspec": "capture", "qt": False},
+}
+
+
+def requirement_closure(site_dirs, roots):
+    """Names of the distributions that the root requirements need, found in vendored dirs."""
+    from packaging.markers import default_environment
+    from packaging.requirements import Requirement
+    from packaging.utils import canonicalize_name
+
+    dists = {}
+    for directory in site_dirs:
+        for dist in importlib.metadata.distributions(path=[str(directory)]):
+            if dist.metadata["Name"]:
+                dists.setdefault(canonicalize_name(dist.metadata["Name"]), dist)
+    environment = default_environment()
+    needed, queue = set(), [Requirement(r) for r in roots]
+    while queue:
+        req = queue.pop()
+        name = canonicalize_name(req.name)
+        if name in needed:
+            continue
+        dist = dists.get(name)
+        if dist is None:
+            raise ValueError(f"vendored packages lack {req.name}, needed by this profile")
+        needed.add(name)
+        for raw in dist.requires or []:
+            dep = Requirement(raw)
+            marker_extras = sorted(req.extras) or [""]
+            if dep.marker is None or any(
+                dep.marker.evaluate({**environment, "extra": extra}) for extra in marker_extras
+            ):
+                queue.append(dep)
+    return needed, dists
+
+
+def copy_distributions(names, dists, site):
+    """Copy the files that each named distribution's RECORD lists into ``site``."""
+    for name in sorted(names):
+        dist = dists[name]
+        base = Path(dist.locate_file(""))
+        for item in dist.files or []:
+            src = base / item
+            rel = Path(item)
+            if rel.parts and (rel.parts[0] in ("..", "bin") or "__pycache__" in rel.parts):
+                continue  # console wrappers point to the build machine's Python
+            if src.suffix == ".pyc" or not src.is_file():
+                continue
+            dest = site / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dest)
+
+
+def profile_roots(source, profile):
+    import tomllib
+
+    roots = []
+    for project, extras in (
+        (source, profile["svsg"]),
+        (source / "packages" / "motionspec", profile["motionspec"]),
+    ):
+        meta = tomllib.loads((project / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+        roots += meta.get("dependencies", [])
+        for extra in extras.split(","):
+            roots += meta.get("optional-dependencies", {}).get(extra, [])
+    if profile["qt"]:
+        roots.append("PySide6")
+    return roots
 
 
 def sha256(path):
@@ -27,7 +99,8 @@ def sha256(path):
 def build(args):
     if sys.platform != "win32" or struct.calcsize("P") != 8 or sys.version_info[:3] != (3, 12, 10):
         raise RuntimeError("build with the matching CPython 3.12.10 Windows x64 installation")
-    root = args.work / "SVSG-Windows-x64"
+    profile = PROFILES[args.profile]
+    root = args.work / bundle_name(args.profile)
     root.mkdir(parents=True, exist_ok=False)
     runtime = root / "runtime"
     with zipfile.ZipFile(args.python_embed) as archive:
@@ -71,7 +144,11 @@ def build(args):
         if src.is_file():
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dest)
-    if args.vendor:
+    if args.vendor and args.profile != "full":
+        # Copy only what this profile needs, distribution by distribution.
+        names, dists = requirement_closure(args.vendor, profile_roots(source, profile))
+        copy_distributions(names, dists, site)
+    elif args.vendor:
         for directory in args.vendor:
             # pip-generated console wrappers point to the build machine's Python.
             def wheel_files(path, names, vendor=directory):
@@ -91,9 +168,9 @@ def build(args):
                 "--no-compile",
                 "--target",
                 str(site),
-                f"{source}[api,llm,ml,crowd,overlays,uia]",
-                f"{source / 'packages' / 'motionspec'}[capture]",
-                "PySide6",
+                f"{source}[{profile['svsg']}]",
+                f"{source / 'packages' / 'motionspec'}[{profile['motionspec']}]",
+                *(["PySide6"] if profile["qt"] else []),
             ],
             check=True,
         )
@@ -135,17 +212,23 @@ def build(args):
         "SVSG_YOLO_WEIGHTS=yolov8n.pt", "SVSG_YOLO_WEIGHTS=models/yolo11n.pt"
     )
     (root / ".env.example").write_text(
-        config + "\nVISFUNC_MCP_PORT=8765\n# VISFUNC_MCP_TOKEN=\n", encoding="utf-8"
+        config
+        + "\nVISFUNC_MCP_PORT=8765\n"
+        + "# Start.cmd creates a random token here on first start.\n# VISFUNC_MCP_TOKEN=\n",
+        encoding="utf-8",
     )
-    binaries = {
-        "bin/ffmpeg.exe": args.ffmpeg / "bin/ffmpeg.exe",
-        "bin/ffprobe.exe": args.ffmpeg / "bin/ffprobe.exe",
-        "licenses/ffmpeg-LICENSE": args.ffmpeg / "LICENSE",
-        "licenses/ffmpeg-README.txt": args.ffmpeg / "README.txt",
-        "models/yolo11n.pt": args.yolo,
-        "models/crowdhuman.onnx": args.crowd,
-        "prerequisites/vc_redist.x64.exe": args.redist,
-    }
+    binaries = {"prerequisites/vc_redist.x64.exe": args.redist}
+    if args.profile == "full":
+        binaries.update(
+            {
+                "bin/ffmpeg.exe": args.ffmpeg / "bin/ffmpeg.exe",
+                "bin/ffprobe.exe": args.ffmpeg / "bin/ffprobe.exe",
+                "licenses/ffmpeg-LICENSE": args.ffmpeg / "LICENSE",
+                "licenses/ffmpeg-README.txt": args.ffmpeg / "README.txt",
+                "models/yolo11n.pt": args.yolo,
+                "models/crowdhuman.onnx": args.crowd,
+            }
+        )
     for name, src in binaries.items():
         dest = root / name
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -166,6 +249,7 @@ def build(args):
                     for p in sorted(source.rglob("*"))
                     if p.is_file()
                 },
+                "profile": args.profile,
                 "python": sys.version,
                 "python_embed_sha256": sha256(args.python_embed),
                 "bundled_files_sha256": {name: sha256(root / name) for name in binaries},
@@ -198,10 +282,22 @@ def pack(root, output):
     print(target, digest)
 
 
+def bundle_name(profile):
+    return "SVSG-Windows-x64" if profile == "full" else "SVSG-Windows-x64-Desktop"
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ("work", "output", "python-embed", "ffmpeg", "redist", "yolo", "crowd"):
+    parser.add_argument(
+        "--profile",
+        choices=sorted(PROFILES),
+        default="full",
+        help="full: everything; desktop: desktop agent and image API only",
+    )
+    for name in ("work", "output", "python-embed", "redist"):
         parser.add_argument("--" + name, required=True, type=Path)
+    for name in ("ffmpeg", "yolo", "crowd"):
+        parser.add_argument("--" + name, type=Path, help="required by the full profile")
     parser.add_argument("--vendor", action="append", type=Path, help="preinstalled wheel directory")
     parser.add_argument(
         "--include-source",
@@ -216,7 +312,9 @@ def main():
             setattr(args, key, value.resolve())
     if args.vendor:
         args.vendor = [path.resolve() for path in args.vendor]
-    output = args.output / "SVSG-Windows-x64.zip"
+    if args.profile == "full" and not all((args.ffmpeg, args.yolo, args.crowd)):
+        parser.error("the full profile needs --ffmpeg, --yolo and --crowd")
+    output = args.output / (bundle_name(args.profile) + ".zip")
     if output.exists() or output.with_suffix(".zip.partial").exists():
         parser.error("choose an output directory without an existing bundle or partial build")
     pack(build(args), args.output)
