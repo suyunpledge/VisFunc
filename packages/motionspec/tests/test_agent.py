@@ -386,10 +386,10 @@ def test_unavailable_history_keeps_successful_action_and_point(monkeypatch):
         images=False,
     )
 
-    def vanished(**kw):
+    def vanished(*args):
         raise ValueError("window closed")
 
-    monkeypatch.setattr(agent, "watch_screen_changes", vanished)
+    monkeypatch.setattr(agent, "_start_history", vanished)
     parts = McpServer(agent).call(
         "click_point", {"window_title": "App", "x": 180, "y": 150, "marker_image": True}
     )

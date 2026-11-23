@@ -105,14 +105,16 @@ These rules were tuned on video captions and player toolbars. On ordinary applic
 
 `motionspec agent-mcp` is a resident MCP server. Once an agent client registers it, the agent can call these tools:
 
-- `wait_for_settle`: call it after clicking. It returns once the screen has been still for 200 ms, lists the regions that changed since the previous step, and can read the text inside them.
+- `wait_for_settle` observes longer operations or input from another tool. Built-in actions already wait and return their effect. The default quiet interval is 200 ms.
 - `find_on_screen`: finds where to click by name or visible text. It checks Windows UI Automation first, which names icon-only buttons and knows which controls are disabled or checked, then OCR.
 - `click_element`, `set_field_text`: press buttons and fill fields through UI Automation, only in windows allowed with `--allow-window` at start. Each action returns its effect directly.
 - `read_screen_text`, `list_ui_elements`, `screenshot`.
 
 `click_point` returns the dispatched physical screen coordinates in `operation_marker.screen_px`. A named UI Automation action labels the control centre as `uia_target_center`. Image-capable clients can request a marked pre-action crop with `marker_image=true`.
 
-Actions return a `screen_history.history_id`. Pass it to `read_screen_history` with `read_text=true` to recover brief messages that disappeared between calls. To begin sampling independently, use `watch_screen_changes`. The default is 20 seconds at up to 8 Hz in the named window. Set `--history-seconds 0` to disable recording. [Usage and measurements](docs/agent-history-video-20261123.md)
+Actions return a `screen_history.history_id`. Use `read_screen_history` with `compact=true` to recover a transient notification, changed field or dialog in that window. Continue from `after=next_after`. Request `read_text=true` for OCR of pixel evidence. The default recording lasts 20 seconds, sampling pixels at up to 8 Hz and controls at up to 4 Hz. `watch_screen_changes` starts a recording independently and `--history-seconds 0` disables it. [Event cache and token measurements](docs/agent-ui-events-20261123.md)
+
+For HTTP retries, generate a UUID per intended action and reuse it in the `Idempotency-Key` header across reconnects. MCP clients can also send it in `params._meta["visfunc/operationId"]`. Within a negotiated session the same JSON-RPC request ID also identifies a retry. Receipts are retained for 24 hours. A replay reporting `unknown` calls for a read-only check of the window. [Retry and recovery details](docs/agent-ui-events-20261123.md)
 
 Coordinates are physical screen pixels, the ones a click uses. The server learns areas that never stop changing, such as video or an animated background, once, and they no longer slow down the wait. Without MCP, use `motionspec settle --screen --read-text`, `motionspec screen-text` or the HTTP endpoint `POST /v1/screen-text`.
 

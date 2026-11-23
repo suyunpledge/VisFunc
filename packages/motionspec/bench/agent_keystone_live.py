@@ -16,6 +16,7 @@
   recovery  同上，但第一次同步会因端口错误失败，需按错误框提示改端口后重试
   web       独立的 Chrome 窗口里填注册表单：输入框、下拉框、图标按钮、复选框、提交
   canvas    自绘窗口：按钮是画出来的，只能靠屏幕文字找位置并按坐标点击
+  pulse     可选。点击一次，找回在动作回执之后显示 625 毫秒的随机提示码
 
 运行时桌面上会出现任务窗口（置顶、不抢焦点；Chrome 窗口由 Playwright 单独启动）。OpenAI 密钥
 从本机 ~/.forge/secrets.json 读出，只通过环境变量交给网关子进程；网关使用临时 home。
@@ -121,6 +122,16 @@ def settings_ok(s: dict) -> bool:
 
 
 TASKS = {
+    "pulse": {
+        "window": "VisFunc pulse benchmark",
+        "prompt": "目标窗口「VisFunc pulse benchmark」。用 click_point 点击 Start check 一次，"
+        "报告随后一闪而过的五位数提示码。如果它已经消失，尽可能用现有工具复核。"
+        "若找不到请说未看到，不猜数字，不再次操作。",
+        "make": lambda qt, work: QtTask(qt, work, "agent_pulse_app.py", []),
+        "ok": lambda s: s["clicks"] == 1 and s["hidden"],
+        "answer": (),
+        "transient_code": True,
+    },
     "settings": {
         "window": "Keystone agent task",
         "prompt": "请在「Keystone agent task」窗口里完成：把服务器名称改成 archive-02，"
@@ -178,6 +189,7 @@ def run_once(task_name, task, model, mcp_url, gateway, max_turns, tag) -> dict:
     app = task["app"]
     app.start(tag)
     trace: list[dict] = []
+    history_ids = set()
     turns: list[dict] = []
     cancel = threading.Event()
     mcp = McpHttp(mcp_url, "", cancel)
@@ -195,6 +207,14 @@ def run_once(task_name, task, model, mcp_url, gateway, max_turns, tag) -> dict:
 
     def dispatch(target, arguments, cancel_event):  # same checks as McpCatalog.call_chat_tool
         start = time.perf_counter()
+        if task.get("transient_code"):
+            if target == "read_screen_history":
+                if arguments.get("history_id") not in history_ids:
+                    raise ValueError("unknown benchmark history")
+            else:
+                if "region" in arguments:
+                    raise ValueError("window-scoped benchmark")
+                arguments = {**arguments, "window_title": task["window"]}
         entry = {"tool": target, "arguments": arguments}
         if len(json.dumps(arguments, ensure_ascii=False).encode()) > 64 * 1024:
             response = {
@@ -204,6 +224,28 @@ def run_once(task_name, task, model, mcp_url, gateway, max_turns, tag) -> dict:
             }
         else:
             result = mcp.invoke(target, arguments)
+            if task.get("transient_code") and not result.get("isError"):
+                data = json.loads(result["content"][0]["text"])
+                for ticket in (data, data.get("screen_history", {})):
+                    if ticket.get("history_id"):
+                        history_ids.add(ticket["history_id"])
+                if target == "click_point":
+                    app.path.with_suffix(".armed").touch()
+                elif target == "read_screen_history":
+                    entry["event_count"] = len(data["events"])
+                    entry["ocr_cache"] = data.get("ocr_cache")
+                    code = app.state()["code"].split()[-1]
+                    words = [text for event in data["events"] for text in event.get("text", ())]
+                    labels = [
+                        change.get(field)
+                        for event in data["events"]
+                        for change in event.get("changes", ())
+                        for field in ("name", "value", "was")
+                    ]
+                    pattern = re.compile(rf"(?<!\d){re.escape(code)}(?!\d)")
+                    entry["contains_code"] = any(
+                        isinstance(value, str) and pattern.search(value) for value in words + labels
+                    )
             size = len(json.dumps(result, ensure_ascii=False).encode())
             entry["result_bytes"] = size
             if size > 128 * 1024:
@@ -259,6 +301,7 @@ def run_once(task_name, task, model, mcp_url, gateway, max_turns, tag) -> dict:
             next_round=lambda: None,
             system_context=conversation.WORK_CONTEXT,
             mcp=(tools, dispatch),
+            **({"tool_filter": tools.__contains__} if task.get("transient_code") else {}),
             max_turns=max_turns,
         )
         answer = result.text
@@ -271,11 +314,14 @@ def run_once(task_name, task, model, mcp_url, gateway, max_turns, tag) -> dict:
     state = app.state()
     app.stop()
     usage = [t["usage"] or {} for t in turns]
+    answer_ok = all(token in answer for token in task["answer"])
+    if task.get("transient_code"):
+        answer_ok = set(re.findall(r"(?<!\d)\d{5}(?!\d)", answer)) == {state["code"].split()[-1]}
     return {
         "task": task_name,
         "model": model,
-        "success": bool(task["ok"](state)),
-        "answer_mentions": all(token in answer for token in task["answer"]),
+        "success": bool(task["ok"](state)) and (not task.get("transient_code") or answer_ok),
+        "answer_mentions": answer_ok,
         "seconds": seconds,
         "model_turns": len(turns),
         "max_turns": max_turns,
@@ -284,9 +330,21 @@ def run_once(task_name, task, model, mcp_url, gateway, max_turns, tag) -> dict:
         "tool_ms_total": sum(t["ms"] for t in trace),
         "model_ms_total": sum(t["ms"] for t in turns),
         "tokens": {
-            k: sum(u.get(k, 0) or 0 for u in usage)
+            k: sum(u[k] for u in usage)
+            if usage and error is None and all(isinstance(u.get(k), int) for u in usage)
+            else None
             for k in ("prompt_tokens", "completion_tokens", "total_tokens")
         },
+        "cached_prompt_tokens": (
+            sum(u["prompt_tokens_details"]["cached_tokens"] for u in usage)
+            if usage
+            and error is None
+            and all(
+                isinstance((u.get("prompt_tokens_details") or {}).get("cached_tokens"), int)
+                for u in usage
+            )
+            else None
+        ),
         "state": state,
         "answer": answer,
         "error": error,
@@ -301,7 +359,9 @@ def main() -> None:
     parser.add_argument("qt_python")
     parser.add_argument("out", type=Path)
     parser.add_argument("--models", nargs="+", default=["gpt-6.1-sol", "gpt-6.1-terra"])
-    parser.add_argument("--tasks", nargs="+", default=list(TASKS), choices=list(TASKS))
+    parser.add_argument(
+        "--tasks", nargs="+", default=["settings", "recovery", "web", "canvas"], choices=list(TASKS)
+    )
     parser.add_argument("--repeat", type=int, default=1)
     parser.add_argument("--max-turns", type=int, default=100)
     args = parser.parse_args()

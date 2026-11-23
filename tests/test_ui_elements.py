@@ -73,3 +73,23 @@ def test_missing_window_is_reported():
 
     with pytest.raises(ValueError, match="no visible window"):
         find_window("no window has this title 7d1c0e")
+
+
+def test_password_field_value_is_omitted_from_ui_event_input():
+    from svsg.recognition.ui_elements import _PROPERTIES, _describe
+
+    props = {
+        "rect": [0, 0, 20, 10],
+        "control_type": 50004,
+        "name": "PIN",
+        "password": True,
+        "value": "sensitive input",
+    }
+
+    class Element:
+        def GetCachedPropertyValue(self, prop):
+            return next((props[key] for key in props if _PROPERTIES[key] == prop), None)
+
+    assert "value" not in _describe(Element())
+    props["password"] = False
+    assert _describe(Element())["value"] == "sensitive input"

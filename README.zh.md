@@ -95,14 +95,16 @@ motionspec overlays slide-out/functions.json --player-toolbar
 
 `motionspec agent-mcp` 是一个常驻的 MCP 服务，Agent 客户端登记后就能调用这些工具：
 
-- `wait_for_settle`：点击之后调用，界面静止 200 ms 就返回，列出相对上一步变化的区域，可顺便读出其中的文字；
+- `wait_for_settle` 用于等待较长的操作或其他工具触发的界面变化，默认静止区间为 200 ms。内置动作会自行等待并返回变化。
 - `find_on_screen`：按名字或可见文字找点击位置，先查 Windows UI Automation（只有图标的按钮也有名字，禁用和勾选状态都知道），再查 OCR；
 - `click_element`、`set_field_text`：通过 UI Automation 点按钮、填输入框，只对启动时 `--allow-window` 允许的窗口生效，每次操作直接带回效果；
 - `read_screen_text`、`list_ui_elements`、`screenshot`。
 
 `click_point` 回执的 `operation_marker.screen_px` 是发送鼠标消息的屏幕物理坐标；按名字操作的 `uia_target_center` 标记控件中心。支持图像的 MCP 客户端可以传 `marker_image=true`，取得标记在操作前截图上的位置。
 
-动作回执会给出 `screen_history.history_id`。Agent 可在下一步调用 `read_screen_history(history_id=…, read_text=true)` 读取思考期间已经消失的提示，也可用 `watch_screen_changes` 单独开始采样。默认按窗口采样 20 秒、最高 8 Hz，`--history-seconds 0` 关闭。历史事件支持按屏幕区域、游标和事件编号查询。[使用示例与实测](docs/agent-history-video-20261123.md)
+动作回执会给出 `screen_history.history_id`。用 `read_screen_history` 并设置 `compact=true`，可以查到提示文字、字段状态、对话框和局部画面变化。后续传入 `after=next_after` 增量读取，需要识别裁图时加 `read_text=true`。默认每次记录 20 秒，像素采样最高 8 Hz，控件最高 4 Hz。`watch_screen_changes` 可单独开始记录，`--history-seconds 0` 可关闭。[界面事件缓存与 token 实测](docs/agent-ui-events-20261123.md)
+
+客户端为每次有意操作生成一个 UUID，跨连接重试时沿用同一个 HTTP `Idempotency-Key` 或 MCP `params._meta["visfunc/operationId"]`。已协商的同一会话也可用原 JSON-RPC 请求编号重试。动作回执保留 24 小时，遇到 `unknown` 时先只读核对窗口状态。[回执与恢复方式](docs/agent-ui-events-20261123.md)
 
 坐标都是屏幕物理像素，即点击用的坐标。视频、动画背景这类一直在变的区域，服务只需认识一次，之后不再拖慢等待。不用 MCP 时，也可以直接用命令行 `motionspec settle --screen --read-text`、`motionspec screen-text`，或 HTTP 接口 `POST /v1/screen-text`。
 

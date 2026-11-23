@@ -22,10 +22,12 @@ import sys
 from collections import Counter
 from collections.abc import Callable, Iterator, Sequence
 from typing import Any
+from uuid import uuid4
 
 import cv2
 import numpy as np
 
+from .action_receipts import ActionReceipts, operation_key, receipt_path
 from .screen_history import ScreenHistory
 from .settle import SettleWatcher, _finite, capture_screen
 
@@ -107,7 +109,7 @@ def _compact_element(element: dict | None) -> dict | None:
     return {k: element[k] for k in keep if k in element}
 
 
-def _control_changes(before: list[dict], after: list[dict]) -> list[dict]:
+def _control_changes(before: list[dict], after: list[dict], *, locations=False) -> list[dict]:
     """What an action changed in a window's controls: states, values, controls added or removed."""
 
     def group(c):
@@ -124,6 +126,8 @@ def _control_changes(before: list[dict], after: list[dict]) -> list[dict]:
         result = {"name": k[0], "control_type": k[1]}
         if k[2] is not None:
             result.update({f: c[f] for f in ("element_ref", "center_px") if f in c})
+        elif locations and "center_px" in c:
+            result["center_px"] = c["center_px"]
         return result
 
     old = {key(c): c for c in before}
@@ -144,6 +148,32 @@ def _control_changes(before: list[dict], after: list[dict]) -> list[dict]:
                 )
     changes += [{**identity(k, old[k]), "gone": True} for k in old if k not in new]
     return changes[:20]
+
+
+def _ui_delta(before, after):
+    changed_window = before["title"] != after["title"] or before.get("window_id") != after.get(
+        "window_id"
+    )
+    changes = _control_changes(
+        [] if changed_window else before["controls"], after["controls"], locations=True
+    )
+    if not changes and not changed_window:
+        return None
+    event = {"kind": "window" if changed_window else "controls", "changes": []}
+    if changed_window:
+        event["window_title"] = after["title"][:160]
+        if len(after["title"]) > 160:
+            event["truncated"] = True
+    for change in changes[:12]:
+        bounded = {
+            key: value[:160] if isinstance(value, str) else value for key, value in change.items()
+        }
+        if bounded != change:
+            event["truncated"] = True
+        event["changes"].append(bounded)
+    if len(changes) > 12:
+        event["truncated"] = True
+    return event
 
 
 def _window_summary(window: dict) -> dict:
@@ -277,17 +307,31 @@ class ScreenAgent:
     def watch_screen_changes(self, *, window_title: str) -> dict:
         if not self.history_seconds or not window_title.strip():
             raise ValueError("screen history requires an enabled recorder and a window title")
-        if window_title.casefold() in self.blocked:
-            return {"state": "capture_unavailable", "note": BLOCKED_NOTE}
         area = self.resolve_region(None, window_title)
+        before = self._top_window(window_title)
+        try:
+            frame = None if window_title.casefold() in self.blocked else self.grab(area)
+        except Exception:
+            if before is None:
+                raise
+            frame = None
+        return self._start_history(window_title, area, frame, before)
+
+    def _start_history(self, window_title, area, frame, before):
+        from svsg.recognition.ui_elements import release_thread_client
+
         return self.history.start(
             window_title,
             area,
-            self.grab(area),
+            frame,
             self.history_seconds,
             min(8.0, self.max_fps),
             self.capture,
             self.locate_window,
+            observe=lambda: self._top_window(window_title),
+            before=before,
+            delta=_ui_delta,
+            cleanup=release_thread_client,
         )
 
     def read_screen_history(
@@ -300,10 +344,11 @@ class ScreenAgent:
         stop: bool = False,
         include_image: bool = False,
         region: Sequence[int] | None = None,
+        compact: bool = False,
     ) -> dict:
         read = (lambda image: self.reader.read(image)) if read_text else None
         return self.history.read(
-            history_id, after, event_id, read, stop, include_image and self.images, region
+            history_id, after, event_id, read, stop, include_image and self.images, region, compact
         )
 
     def grab(self, area: Box | None) -> np.ndarray:
@@ -593,6 +638,11 @@ class ScreenAgent:
                     _draw_marker(baseline, area, marker)
                 except (ValueError, cv2.error) as exc:
                     marker["image_error"] = str(exc)
+        if self.history_seconds:
+            try:
+                report["screen_history"] = self._start_history(window_title, area, baseline, before)
+            except Exception as exc:
+                report["screen_history"] = {"state": "capture_unavailable", "detail": str(exc)}
         try:
             self._observe_effect(report, window_title, area, before, outcome, blocked)
         except Exception as exc:  # The side effect already happened, even if its window is gone.
@@ -604,11 +654,6 @@ class ScreenAgent:
                 next_step="Inspect current controls or wait for a fresh observation. "
                 "Do not repeat this action based on this observation error.",
             )
-        if self.history_seconds:
-            try:
-                report["screen_history"] = self.watch_screen_changes(window_title=window_title)
-            except Exception as exc:
-                report["screen_history"] = {"state": "capture_unavailable", "detail": str(exc)}
         if report["execution_state"] == "partial":
             report["operation_marker"]["kind"] = "posted_mouse_down"
             report["next_step"] = (
@@ -707,7 +752,7 @@ class ScreenAgent:
                     for e in _without_caption(listed["elements"], listed["window"]["bbox_px"])
                     if e["control_type"] in ui_elements.INTERACTIVE or e["control_type"] == "text"
                 ]
-                return {"title": listed["window"]["title"], "controls": controls}
+                return {"title": listed["window"]["title"], "window_id": hwnd, "controls": controls}
 
             self._windows = windows
         try:
@@ -785,18 +830,15 @@ _REGION = {
     "items": {"type": "integer"},
     "minItems": 4,
     "maxItems": 4,
-    "description": "[left, top, right, bottom] in physical screen pixels",
+    "description": "physical screen pixels [left,top,right,bottom]",
 }
-_WINDOW = {"type": "string", "description": "use the visible window whose title contains this"}
+_WINDOW = {"type": "string", "description": "visible window title substring"}
 TOOLS = [
     {
         "name": "wait_for_settle",
         "description": (
-            "Wait until a window or region has been still for quiet_ms and report state "
-            "(settled, unchanged, timeout) and what changed since the previous call. Actions "
-            "already wait and report their own effect; use this for longer processes (a sync in "
-            "progress, a page loading; raise quiet_ms above the update interval) or after input "
-            "from other tools. Video and similar areas are ignored after ambient_ms."
+            "Wait for stillness after external input or a longer operation. Actions already wait. "
+            "For periodic updates set quiet_ms above their interval."
         ),
         "inputSchema": {
             "type": "object",
@@ -823,9 +865,7 @@ TOOLS = [
     {
         "name": "find_on_screen",
         "description": (
-            "Find where to click for a control or text. Looks up UI Automation names first "
-            "(finds icon-only buttons, reports disabled controls), then visible text by OCR. "
-            "Returns targets with center_px, best first."
+            "Find click targets by UI Automation name, then OCR. Best center_px first."
         ),
         "inputSchema": {
             "type": "object",
@@ -850,8 +890,7 @@ TOOLS = [
     {
         "name": "list_ui_elements",
         "description": (
-            "List a window's controls through Windows UI Automation: name, type, box, enabled, "
-            "checkbox state and field values. Defaults to the foreground window."
+            "List controls, coordinates, values and states. Defaults to foreground window."
         ),
         "inputSchema": {"type": "object", "properties": {"window_title": _WINDOW}},
     },
@@ -885,15 +924,14 @@ TOOLS += [
     },
     {
         "name": "read_screen_history",
-        "description": "Read buffered changes that happened while thinking, even when the window "
-        "has returned to its baseline. Use the history_id from an action or "
-        "watch_screen_changes. read_text reads the last two selected event crops; "
-        "event_id selects one earlier event. Filter by screen region, or page with after set "
-        "to the last returned event_id when has_more is true.",
+        "description": "Read transient UI changes by history_id. Prefer compact=true. "
+        "Controls include text; "
+        "read_text also OCRs two pixel crops. Page using after=next_after.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "history_id": {"type": "string"},
+                "compact": {"type": "boolean"},
                 "after": {"type": "integer", "minimum": 0},
                 "event_id": {"type": "integer", "minimum": 1},
                 "region": _REGION,
@@ -914,17 +952,14 @@ _MARKER_IMAGE = {
 }
 _ELEMENT_REF = {
     "type": "string",
-    "description": "Current element_ref from list_ui_elements or "
-    "find_on_screen. Supply it when controls share a name.",
+    "description": "Use the current element_ref for same-name controls.",
 }
 TOOLS += [
     {
         "name": "click_element",
         "description": (
-            "Press a button or link, toggle a checkbox, select a tab or list item, or open a menu, "
-            "by its name, through Windows UI Automation. No mouse input is sent. Works only in "
-            "windows the user allowed. Returns the effect: the control's new state, what changed "
-            "on screen with its text, and any dialog that opened (new_top_window, with controls)."
+            "Activate a named control in an allowed window via UI Automation. "
+            "Returns effect and history_id."
         ),
         "inputSchema": {
             "type": "object",
@@ -932,8 +967,7 @@ TOOLS += [
                 "window_title": _WINDOW,
                 "target": {
                     "type": "string",
-                    "description": "the control's name, as listed by list_ui_elements or "
-                    "find_on_screen",
+                    "description": "control name",
                 },
                 "control_type": {"type": "string", "description": "optional, e.g. button"},
                 "marker_image": _MARKER_IMAGE,
@@ -945,9 +979,7 @@ TOOLS += [
     {
         "name": "set_field_text",
         "description": (
-            "Replace the text of an input field, found by its name or current value, through "
-            "Windows UI Automation. Works only in windows the user allowed. Returns the effect "
-            "like click_element."
+            "Replace a field's text by name or current value in an allowed window. Returns effect."
         ),
         "inputSchema": {
             "type": "object",
@@ -967,10 +999,8 @@ TOOLS.append(
     {
         "name": "click_point",
         "description": (
-            "Click at a physical screen point inside an allowed window, for controls that have no "
-            "name in list_ui_elements (custom-drawn buttons, canvas items). Take the point from "
-            "find_on_screen or read_screen_text (center_px). The pointer does not move. Returns "
-            "the effect like click_element. Prefer click_element when the control has a name."
+            "Click center_px from find_on_screen or read_screen_text in an allowed window. "
+            "Prefer click_element for named controls. Returns effect and history_id."
         ),
         "inputSchema": {
             "type": "object",
@@ -987,8 +1017,14 @@ TOOLS.append(
 
 
 class McpServer:
-    def __init__(self, agent: ScreenAgent) -> None:
+    def __init__(self, agent: ScreenAgent, *, receipts=None) -> None:
         self.agent = agent
+        self.receipts = receipts if receipts is not None else ActionReceipts()
+        self.scope = uuid4().hex
+
+    def close(self):
+        self.agent.close()
+        self.receipts.close()
 
     def call(self, name: str, args: dict) -> list[dict]:
         if name == "screenshot":
@@ -1013,14 +1049,44 @@ class McpServer:
         report = method(**args)
         image = report.get("operation_marker", {}).pop("pre_action_png", None)
         event_image = report.pop("event_jpeg", None)
-        content = [{"type": "text", "text": json.dumps(report, ensure_ascii=False)}]
+        content = [
+            {"type": "text", "text": json.dumps(report, ensure_ascii=False, separators=(",", ":"))}
+        ]
         if image:
             content.append({"type": "image", "mimeType": "image/png", "data": image})
         if event_image:
             content.append({"type": "image", "mimeType": "image/jpeg", "data": event_image})
         return content
 
-    def handle(self, message: dict) -> dict | None:
+    def _action(self, key, name, args):
+        replay = self.receipts.reserve(key, name, args)
+        if replay is not None:
+            history_id = replay.get("screen_history", {}).get("history_id")
+            if history_id and not self.agent.history.contains(history_id):
+                replay.pop("screen_history")
+            return [{"type": "text", "text": json.dumps(replay)}]
+        # A crash from here onwards leaves a reservation. The next caller must inspect the UI.
+        try:
+            content = self.call(name, args)
+        except Exception as exc:
+            raise RuntimeError(
+                f"{exc}. Dispatch unconfirmed; inspect the window before acting again."
+            ) from exc
+        report = json.loads(content[0]["text"])
+        receipt = {k: report[k] for k in ("execution_state", "observation_state") if k in report}
+        if "history_id" in report.get("screen_history", {}):
+            receipt["screen_history"] = {"history_id": report["screen_history"]["history_id"]}
+        if report.get("next_step"):
+            receipt["next_step"] = report["next_step"]
+        try:
+            self.receipts.finish(key, receipt)
+        except Exception:
+            # Reservation already committed. Preserve the original dispatch result.
+            report["receipt_warning"] = "Final status unavailable on replay; inspect current state."
+            content[0]["text"] = json.dumps(report, ensure_ascii=False)
+        return content
+
+    def handle(self, message: dict, *, session=True, operation_id=None) -> dict | None:
         """Answer one JSON-RPC message; notifications get no reply."""
         method, mid = message.get("method"), message.get("id")
         if mid is None:
@@ -1035,6 +1101,13 @@ class McpServer:
             }
         elif method == "ping":
             result = {}
+            if ((message.get("params") or {}).get("_meta") or {}).get("visfunc/cacheStats") is True:
+                result["_meta"] = {
+                    "visfunc/cacheStats": {
+                        "actions": self.receipts.stats(),
+                        "history": self.agent.history.stats(),
+                    }
+                }
         elif method == "tools/list":
             result = {"tools": self.agent.tool_specs()}
         elif method == "tools/call":
@@ -1047,7 +1120,18 @@ class McpServer:
                     "error": {"code": -32602, "message": f"unknown tool {name!r}"},
                 }
             try:
-                result = {"content": self.call(name, args), "isError": False}
+                if name in ACTION_TOOLS:
+                    scope = self.scope if session is True else session
+                    meta_id = (params.get("_meta") or {}).get("visfunc/operationId")
+                    if operation_id and meta_id and operation_id != meta_id:
+                        raise ValueError("conflicting operation IDs")
+                    key = operation_key(
+                        scope, mid, operation_id if operation_id is not None else meta_id
+                    )
+                    content = self._action(key, name, args)
+                else:
+                    content = self.call(name, args)
+                result = {"content": content, "isError": False}
             except Exception as exc:  # noqa: BLE001 - a failing tool must not end the server
                 result = {
                     "content": [{"type": "text", "text": f"{type(exc).__name__}: {exc}"}],
@@ -1067,11 +1151,11 @@ def serve_mcp(agent: ScreenAgent | None = None, stdin=None, stdout=None) -> None
     stdin = stdin or sys.stdin.buffer
     stdout = stdout or sys.stdout.buffer
     sys.stdout = sys.stderr  # Anything printed by libraries must not corrupt the protocol stream.
-    server = McpServer(agent or ScreenAgent())
+    server = McpServer(agent or ScreenAgent(), receipts=ActionReceipts(receipt_path()))
     try:
         _serve_lines(server, stdin, stdout)
     finally:
-        server.agent.close()
+        server.close()
 
 
 def _serve_lines(server, stdin, stdout):
@@ -1123,7 +1207,7 @@ def serve_http(
     from http.server import BaseHTTPRequestHandler, HTTPServer
     from urllib.parse import urlsplit
 
-    server_logic = McpServer(agent or ScreenAgent())
+    server_logic = McpServer(agent or ScreenAgent(), receipts=ActionReceipts(receipt_path()))
 
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -1198,7 +1282,24 @@ def serve_http(
                     },
                 )
                 return
-            reply = server_logic.handle(message)
+            session = self.headers.get("Mcp-Session-Id")
+            if session:
+                try:
+                    session = uuid.UUID(session).hex
+                except ValueError:
+                    self._reply(400, {"error": "invalid MCP session ID"})
+                    return
+            if (
+                message.get("method") == "tools/list"
+                and not session
+                and server_logic.agent.allowed_windows
+                and self.headers.get("MCP-Protocol-Version") not in (*PROTOCOL_VERSIONS, None)
+            ):
+                self._reply(400, {"error": "initialize to negotiate a supported MCP version"})
+                return
+            reply = server_logic.handle(
+                message, session=session, operation_id=self.headers.get("Idempotency-Key")
+            )
             if reply is None:
                 self._reply(202)
                 return
@@ -1215,4 +1316,4 @@ def serve_http(
         httpd.serve_forever()
     finally:
         httpd.server_close()
-        server_logic.agent.close()
+        server_logic.close()

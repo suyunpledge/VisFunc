@@ -17,6 +17,7 @@ screen text for those.
 from __future__ import annotations
 
 import sys
+import threading
 import time
 from collections.abc import Sequence
 from typing import Any
@@ -37,6 +38,7 @@ _PROPERTIES = {
     "focused": 30008,
     "help_text": 30013,
     "value": 30045,
+    "password": 30019,
     "toggle_state": 30086,
     "toggle_available": 30041,
 }
@@ -124,8 +126,9 @@ class _Client:
             pass
         try:
             comtypes.CoInitialize()
+            self.owns_com = True
         except OSError:
-            pass  # Already initialised in another mode on this thread.
+            self.owns_com = False  # Already initialised in another mode on this thread.
         comtypes.client.GetModule("UIAutomationCore.dll")
         from comtypes.gen import UIAutomationClient as uia
 
@@ -138,16 +141,27 @@ class _Client:
         self.everything = self.client.CreateTrueCondition()
 
 
-_clients: dict[int, _Client] = {}
+_clients = threading.local()
 
 
 def _client() -> _Client:
-    import threading
+    client = getattr(_clients, "current", None)
+    if client is None:
+        client = _clients.current = _Client()
+    return client
 
-    key = threading.get_ident()
-    if key not in _clients:
-        _clients[key] = _Client()
-    return _clients[key]
+
+def release_thread_client() -> None:
+    """Release interfaces on their owning worker before its COM apartment exits."""
+    client = getattr(_clients, "current", None)
+    if client is not None:
+        owns_com = client.owns_com
+        del _clients.current
+        del client
+        if owns_com:
+            import comtypes
+
+            comtypes.CoUninitialize()
 
 
 def find_windows(title: str) -> list[int]:
@@ -266,7 +280,11 @@ def _describe(element: Any) -> dict | None:
         item["element_ref"] = "box:" + ",".join(map(str, box))
     if _cached(element, _PROPERTIES["focused"]):
         item["focused"] = True
-    value = _cached(element, _PROPERTIES["value"])
+    value = (
+        None
+        if _cached(element, _PROPERTIES["password"])
+        else _cached(element, _PROPERTIES["value"])
+    )
     if isinstance(value, str) and value and kind in ("edit", "combobox", "document", "spinner"):
         item["value"] = value
     if _cached(element, _PROPERTIES["toggle_available"]):

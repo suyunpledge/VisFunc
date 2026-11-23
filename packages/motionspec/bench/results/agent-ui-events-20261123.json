@@ -1,0 +1,384 @@
+{
+  "baseline": "92cf3e162287b793265340510f9d9fa65fc40209",
+  "paired_order": [
+    "base-A",
+    "new-A",
+    "new-B",
+    "base-B"
+  ],
+  "standalone_verification": "verifier",
+  "runs": [
+    {
+      "condition": "base-A",
+      "model": "gpt-6.1-sol",
+      "truth": "34401",
+      "answer": "提示码是 **34401**。已通过屏幕历史记录复核，未再次点击。",
+      "clicks": 1,
+      "correct": true,
+      "model_turns": 5,
+      "tool_sequence": [
+        "find_on_screen",
+        "click_point",
+        "read_screen_history",
+        "read_screen_history"
+      ],
+      "seconds": 31.4,
+      "tool_ms": 2879,
+      "tool_errors": 0,
+      "total_result_bytes": 2947,
+      "history_reads": [
+        {
+          "event_count": 4,
+          "truth_in_events": false,
+          "truth_in_controls": false,
+          "truth_in_ocr": false,
+          "ocr_cache": null,
+          "compact": false
+        },
+        {
+          "event_count": 1,
+          "truth_in_events": true,
+          "truth_in_controls": false,
+          "truth_in_ocr": true,
+          "ocr_cache": null,
+          "compact": false
+        }
+      ],
+      "tokens": {
+        "prompt_tokens": 10514,
+        "completion_tokens": 233,
+        "total_tokens": 10747
+      },
+      "cached_input_tokens": 7652,
+      "per_turn_usage": [
+        {
+          "prompt_tokens": 1469,
+          "completion_tokens": 43,
+          "total_tokens": 1512,
+          "cached_input_tokens": 0
+        },
+        {
+          "prompt_tokens": 1666,
+          "completion_tokens": 45,
+          "total_tokens": 1711,
+          "cached_input_tokens": 1466
+        },
+        {
+          "prompt_tokens": 2013,
+          "completion_tokens": 55,
+          "total_tokens": 2068,
+          "cached_input_tokens": 1663
+        },
+        {
+          "prompt_tokens": 2516,
+          "completion_tokens": 65,
+          "total_tokens": 2581,
+          "cached_input_tokens": 2010
+        },
+        {
+          "prompt_tokens": 2850,
+          "completion_tokens": 25,
+          "total_tokens": 2875,
+          "cached_input_tokens": 2513
+        }
+      ]
+    },
+    {
+      "condition": "new-A",
+      "model": "gpt-6.1-sol",
+      "truth": "40977",
+      "answer": "提示码是 **40977**。已从点击后的屏幕历史记录复核，Start check 仅点击了一次。",
+      "clicks": 1,
+      "correct": true,
+      "model_turns": 4,
+      "tool_sequence": [
+        "find_on_screen",
+        "click_point",
+        "read_screen_history"
+      ],
+      "seconds": 39.7,
+      "tool_ms": 1711,
+      "tool_errors": 0,
+      "total_result_bytes": 2461,
+      "history_reads": [
+        {
+          "event_count": 6,
+          "truth_in_events": true,
+          "truth_in_controls": true,
+          "truth_in_ocr": true,
+          "ocr_cache": {
+            "hits": 0,
+            "calls": 2
+          },
+          "compact": true
+        }
+      ],
+      "tokens": {
+        "prompt_tokens": 6255,
+        "completion_tokens": 180,
+        "total_tokens": 6435
+      },
+      "cached_input_tokens": 4111,
+      "per_turn_usage": [
+        {
+          "prompt_tokens": 1151,
+          "completion_tokens": 43,
+          "total_tokens": 1194,
+          "cached_input_tokens": 0
+        },
+        {
+          "prompt_tokens": 1331,
+          "completion_tokens": 45,
+          "total_tokens": 1376,
+          "cached_input_tokens": 1148
+        },
+        {
+          "prompt_tokens": 1638,
+          "completion_tokens": 61,
+          "total_tokens": 1699,
+          "cached_input_tokens": 1328
+        },
+        {
+          "prompt_tokens": 2135,
+          "completion_tokens": 31,
+          "total_tokens": 2166,
+          "cached_input_tokens": 1635
+        }
+      ]
+    },
+    {
+      "condition": "new-B",
+      "model": "gpt-6.1-sol",
+      "truth": "55468",
+      "answer": "五位数提示码是 **55468**。已通过屏幕历史复核，仅点击了一次 Start check。",
+      "clicks": 1,
+      "correct": true,
+      "model_turns": 4,
+      "tool_sequence": [
+        "find_on_screen",
+        "click_point",
+        "read_screen_history"
+      ],
+      "seconds": 42.8,
+      "tool_ms": 1712,
+      "tool_errors": 0,
+      "total_result_bytes": 2460,
+      "history_reads": [
+        {
+          "event_count": 6,
+          "truth_in_events": true,
+          "truth_in_controls": true,
+          "truth_in_ocr": true,
+          "ocr_cache": {
+            "hits": 0,
+            "calls": 2
+          },
+          "compact": true
+        }
+      ],
+      "tokens": {
+        "prompt_tokens": 6254,
+        "completion_tokens": 178,
+        "total_tokens": 6432
+      },
+      "cached_input_tokens": 5196,
+      "per_turn_usage": [
+        {
+          "prompt_tokens": 1151,
+          "completion_tokens": 43,
+          "total_tokens": 1194,
+          "cached_input_tokens": 1085
+        },
+        {
+          "prompt_tokens": 1331,
+          "completion_tokens": 45,
+          "total_tokens": 1376,
+          "cached_input_tokens": 1148
+        },
+        {
+          "prompt_tokens": 1638,
+          "completion_tokens": 61,
+          "total_tokens": 1699,
+          "cached_input_tokens": 1328
+        },
+        {
+          "prompt_tokens": 2134,
+          "completion_tokens": 29,
+          "total_tokens": 2163,
+          "cached_input_tokens": 1635
+        }
+      ]
+    },
+    {
+      "condition": "base-B",
+      "model": "gpt-6.1-sol",
+      "truth": "34161",
+      "answer": "提示码是 **34161**。已从屏幕变化历史中复核，仅点击了一次。",
+      "clicks": 1,
+      "correct": true,
+      "model_turns": 4,
+      "tool_sequence": [
+        "find_on_screen",
+        "click_point",
+        "read_screen_history"
+      ],
+      "seconds": 16.6,
+      "tool_ms": 1622,
+      "tool_errors": 0,
+      "total_result_bytes": 1993,
+      "history_reads": [
+        {
+          "event_count": 2,
+          "truth_in_events": true,
+          "truth_in_controls": false,
+          "truth_in_ocr": true,
+          "ocr_cache": null,
+          "compact": false
+        }
+      ],
+      "tokens": {
+        "prompt_tokens": 7534,
+        "completion_tokens": 168,
+        "total_tokens": 7702
+      },
+      "cached_input_tokens": 6541,
+      "per_turn_usage": [
+        {
+          "prompt_tokens": 1469,
+          "completion_tokens": 43,
+          "total_tokens": 1512,
+          "cached_input_tokens": 1403
+        },
+        {
+          "prompt_tokens": 1666,
+          "completion_tokens": 45,
+          "total_tokens": 1711,
+          "cached_input_tokens": 1466
+        },
+        {
+          "prompt_tokens": 2012,
+          "completion_tokens": 54,
+          "total_tokens": 2066,
+          "cached_input_tokens": 1663
+        },
+        {
+          "prompt_tokens": 2387,
+          "completion_tokens": 26,
+          "total_tokens": 2413,
+          "cached_input_tokens": 2009
+        }
+      ]
+    },
+    {
+      "condition": "verifier",
+      "model": "gpt-6.1-sol",
+      "truth": "11434",
+      "answer": "提示码是 **11434**。已通过屏幕历史记录复核，未再次点击。",
+      "clicks": 1,
+      "correct": true,
+      "model_turns": 4,
+      "tool_sequence": [
+        "find_on_screen",
+        "click_point",
+        "read_screen_history"
+      ],
+      "seconds": 42.5,
+      "tool_ms": 1778,
+      "tool_errors": 0,
+      "total_result_bytes": 2460,
+      "history_reads": [
+        {
+          "event_count": 6,
+          "truth_in_events": true,
+          "ocr_cache": {
+            "hits": 0,
+            "calls": 2
+          },
+          "compact": true
+        }
+      ],
+      "tokens": {
+        "prompt_tokens": 6251,
+        "completion_tokens": 174,
+        "total_tokens": 6425
+      },
+      "cached_input_tokens": 5192,
+      "per_turn_usage": [
+        {
+          "prompt_tokens": 1150,
+          "completion_tokens": 42,
+          "total_tokens": 1192,
+          "cached_input_tokens": 1085
+        },
+        {
+          "prompt_tokens": 1329,
+          "completion_tokens": 44,
+          "total_tokens": 1373,
+          "cached_input_tokens": 1147
+        },
+        {
+          "prompt_tokens": 1637,
+          "completion_tokens": 63,
+          "total_tokens": 1700,
+          "cached_input_tokens": 1326
+        },
+        {
+          "prompt_tokens": 2135,
+          "completion_tokens": 25,
+          "total_tokens": 2160,
+          "cached_input_tokens": 1634
+        }
+      ]
+    }
+  ],
+  "retry_and_ocr": {
+    "code": "PULSE 37716",
+    "event_ids": [
+      4,
+      6
+    ],
+    "cold": {
+      "hits": 0,
+      "calls": 2
+    },
+    "warm": {
+      "hits": 2,
+      "calls": 0
+    },
+    "stats_before_restart": {
+      "actions": {
+        "reserved": 1,
+        "replays": 1,
+        "conflicts": 0
+      },
+      "history": {
+        "reads": 4,
+        "matches": 3,
+        "unavailable": 0,
+        "ocr_hits": 2,
+        "ocr_calls": 2
+      }
+    },
+    "stats_after_restart": {
+      "actions": {
+        "reserved": 1,
+        "replays": 1,
+        "conflicts": 0
+      },
+      "history": {
+        "reads": 0,
+        "matches": 0,
+        "unavailable": 0,
+        "ocr_hits": 0,
+        "ocr_calls": 0
+      }
+    },
+    "clicks_before_new_intent": 1,
+    "clicks_after_new_intent": 2,
+    "after_restart": {
+      "execution_state": "completed",
+      "observation_state": "observed",
+      "replayed": true
+    }
+  }
+}
