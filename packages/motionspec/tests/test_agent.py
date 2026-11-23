@@ -703,3 +703,34 @@ def test_http_refusals_reach_the_client_as_status_codes():
     finally:
         holder["httpd"].shutdown()
         thread.join(5)
+
+
+def test_window_outside_the_rules_is_refused_before_reserving(monkeypatch):
+    from svsg.recognition import ui_elements
+
+    monkeypatch.setattr(ui_elements, "find_window", lambda title: 7)
+    monkeypatch.setattr(ui_elements, "window_title", lambda hwnd: "Sync settings")
+    screen, reader = FakeScreen(), FakeReader()
+    agent = ScreenAgent(
+        capture=screen.capture,
+        reader_factory=lambda: reader,
+        locate_window=lambda title: (50, 60, 450, 360),
+        history_seconds=0,
+        allowed_windows=["Sync settings | sync.exe"],
+        desktop=lambda: "interactive",
+        process_name=lambda hwnd: "impostor.exe",
+    )
+    server = McpServer(agent)
+    meta = {"visfunc/operationId": "31111111-2222-3333-4444-555555555555"}
+    reply = rpc(
+        server,
+        "tools/call",
+        {
+            "name": "click_element",
+            "arguments": {"window_title": "Sync settings", "target": "Save"},
+            "_meta": meta,
+        },
+    )
+    text = reply["result"]["content"][0]["text"]
+    assert reply["result"]["isError"] and "impostor.exe" in text and "unconfirmed" not in text
+    assert server.receipts.stats()["reserved"] == 0  # nothing reserved, a retry is not "unknown"

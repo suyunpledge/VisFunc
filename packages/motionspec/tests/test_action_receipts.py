@@ -24,6 +24,7 @@ def request(server, args=None, mid=1, **kw):
 def server_at(path, dispatch):
     agent = ScreenAgent(allowed_windows=["Sample"])
     agent.click_point = dispatch
+    agent.precheck_action = lambda title: None  # no real "Sample" window; receipts are under test
     return McpServer(agent, receipts=ActionReceipts(path))
 
 
@@ -152,6 +153,7 @@ def test_http_reconnect_and_process_restart_do_not_redispatch(tmp_path, monkeypa
     def start():
         agent = ScreenAgent(allowed_windows=["Sample"])
         agent.click_point = click
+        agent.precheck_action = lambda title: None  # no real "Sample" window
         ready = Queue()
         worker = threading.Thread(
             target=serve_http, kwargs={"agent": agent, "port": 0, "ready": ready.put}, daemon=True

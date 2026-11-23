@@ -284,6 +284,9 @@ class ScreenAgent:
         self._act = act
         self._windows = windows
         self._click = click
+        # With the real dispatchers the target window can be checked before anything is
+        # reserved or sent; injected dispatchers (tests) do their own checks.
+        self._real_dispatch = act is None and click is None
         self.blocked: set[str] = set()  # window titles whose capture never shows changes
         self.last_controls: dict[str, dict] = {}
         self.allow_rules = [parse_allow_rule(w) for w in allowed_windows if w.strip()]
@@ -367,6 +370,21 @@ class ScreenAgent:
                 return "interactive"
             self._desktop = desktop_state
         return self._desktop()
+
+    def precheck_action(self, window_title: str | None) -> None:
+        """Refuse an action that cannot run, before its receipt is reserved.
+
+        A refusal here means nothing was sent, so the client may fix the cause and retry with
+        the same operation ID instead of being told the outcome is unknown.
+        """
+        if not self.allowed_windows:
+            raise PermissionError("actions are disabled; start the server with --allow-window")
+        self.require_desktop()
+        if self._real_dispatch and window_title:
+            from svsg.recognition import ui_elements
+
+            hwnd = ui_elements.find_window(window_title)
+            self._permit(hwnd, ui_elements.window_title(hwnd))
 
     def require_desktop(self) -> None:
         state = self.desktop_state()
@@ -1251,8 +1269,13 @@ class McpServer:
             window = args.get("window_title") if isinstance(args, dict) else None
             try:
                 if name in ACTION_TOOLS:
-                    # Refuse before reserving: a locked desktop must not leave an unknown receipt.
-                    self.agent.require_desktop()
+                    # Refuse before reserving: a locked desktop, a missing window or one outside
+                    # the allowed list must not leave an unknown receipt behind.
+                    precheck = getattr(self.agent, "precheck_action", None)
+                    if precheck is not None:
+                        precheck(args.get("window_title") if isinstance(args, dict) else None)
+                    else:
+                        self.agent.require_desktop()
                     scope = self.scope if session is True else session
                     meta_id = (params.get("_meta") or {}).get("visfunc/operationId")
                     if operation_id and meta_id and operation_id != meta_id:
