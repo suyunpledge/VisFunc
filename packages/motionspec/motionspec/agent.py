@@ -19,13 +19,14 @@ from __future__ import annotations
 import base64
 import json
 import sys
+from collections import Counter
 from collections.abc import Callable, Iterator, Sequence
 from typing import Any
 
 import cv2
 import numpy as np
 
-from .settle import SettleWatcher, capture_screen
+from .settle import SettleWatcher, _finite, capture_screen
 
 Box = tuple[int, int, int, int]
 PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
@@ -81,35 +82,53 @@ def _offset(item: dict, dx: int, dy: int) -> dict:
 def _compact_element(element: dict | None) -> dict | None:
     if not element:
         return None
-    keep = ("name", "control_type", "enabled", "value", "toggle_state", "center_px")
+    keep = ("name", "control_type", "enabled", "value", "toggle_state", "center_px", "element_ref")
     return {k: element[k] for k in keep if k in element}
 
 
 def _control_changes(before: list[dict], after: list[dict]) -> list[dict]:
     """What an action changed in a window's controls: states, values, controls added or removed."""
 
-    def key(c):
+    def group(c):
         return (c.get("name", ""), c.get("control_type", ""))
+
+    counts = Counter(map(group, before)) | Counter(map(group, after))
+
+    def key(c):
+        name, kind = group(c)
+        identity = c.get("element_ref") or tuple(c.get("center_px", []))
+        return name, kind, identity if counts[name, kind] > 1 else None
+
+    def identity(k, c):
+        result = {"name": k[0], "control_type": k[1]}
+        if k[2] is not None:
+            result.update({f: c[f] for f in ("element_ref", "center_px") if f in c})
+        return result
 
     old = {key(c): c for c in before}
     new = {key(c): c for c in after}
     changes = []
     for k, c in new.items():
         if k not in old:
-            changes.append({"name": k[0], "control_type": k[1], "appeared": True})
+            changes.append({**identity(k, c), "appeared": True})
             continue
         for field in ("enabled", "value", "toggle_state"):
             if old[k].get(field) != c.get(field):
                 changes.append(
                     {
-                        "name": k[0],
-                        "control_type": k[1],
+                        **identity(k, c),
                         field: c.get(field),
                         "was": old[k].get(field),
                     }
                 )
-    changes += [{"name": k[0], "control_type": k[1], "gone": True} for k in old if k not in new]
+    changes += [{**identity(k, old[k]), "gone": True} for k in old if k not in new]
     return changes[:20]
+
+
+def _window_summary(window: dict) -> dict:
+    if len(window["controls"]) <= 30:
+        return window
+    return {**window, "controls": window["controls"][:30], "truncated": True}
 
 
 CAPTION_NAMES = {
@@ -172,6 +191,7 @@ class ScreenAgent:
         self._windows = windows
         self._click = click
         self.blocked: set[str] = set()  # window titles whose capture never shows changes
+        self.last_controls: dict[str, dict] = {}
         self.allowed_windows = [w.casefold() for w in allowed_windows if w.strip()]
         self.max_wait_ms = max_wait_ms
         self.images = images
@@ -231,6 +251,28 @@ class ScreenAgent:
         ambient_ms: float = 3000.0,
         read_text: bool = False,
     ) -> dict:
+        if region is None and window_title and window_title.casefold() in self.blocked:
+            key = window_title.casefold()
+            before = self.last_controls.get(key)
+            baseline = "last_observation" if before else "first_observation_of_this_call"
+            if before is None:
+                before = self._top_window(window_title)
+            settle, top = self._settle_by_elements(
+                window_title,
+                before,
+                quiet_ms=quiet_ms,
+                expect_change_ms=expect_change_ms,
+                timeout_ms=timeout_ms,
+            )
+            settle.update(baseline=baseline, source="ui_automation", note=BLOCKED_NOTE)
+            if top:
+                self.last_controls[key] = top
+                settle["controls_changed"] = _control_changes(
+                    before["controls"] if before else [], top["controls"]
+                )
+                if read_text:
+                    settle["window"] = _window_summary(top)
+            return settle
         area = self.resolve_region(region, window_title)
         return self._settle(
             area,
@@ -357,6 +399,7 @@ class ScreenAgent:
                 targets.append(
                     {
                         "source": "ui_automation",
+                        **({"element_ref": e["element_ref"]} if "element_ref" in e else {}),
                         "text": e["name"],
                         "control_type": e["control_type"],
                         "enabled": e["enabled"],
@@ -444,7 +487,25 @@ class ScreenAgent:
         if not blocked:
             self._mark_baseline(area)
         outcome = do()
-        query = label
+        report = {
+            "execution_state": "completed",
+            "done": f"{outcome['performed']} {outcome['element']['name'] or label!r}",
+            "element_after": _compact_element(outcome.get("after")),
+        }
+        try:
+            self._observe_effect(report, window_title, area, before, outcome, blocked)
+        except Exception as exc:  # The side effect already happened, even if its window is gone.
+            self._armed = None
+            report.update(
+                observation_state="failed",
+                screen={"state": "unavailable"},
+                observation_error=f"{type(exc).__name__}: {exc}",
+                next_step="Inspect current controls or wait for a fresh observation. "
+                "Do not repeat this action based on this observation error.",
+            )
+        return report
+
+    def _observe_effect(self, report, window_title, area, before, outcome, blocked):
         if blocked:
             settle, top = self._settle_by_elements(window_title, before)
         else:
@@ -457,21 +518,18 @@ class ScreenAgent:
                 read_text=True,
             )
             top = self._top_window(window_title)
-        report = {
-            "done": f"{outcome['performed']} {outcome['element']['name'] or query!r}",
-            "element_after": _compact_element(outcome.get("after")),
-            "screen": {
-                "state": settle["state"],
-                "settled_after_ms": settle["elapsed_ms"],
-                "changed_regions": [r["bbox_px"] for r in settle["changed_regions"][:6]],
-                "text_in_changed_regions": [
-                    {"text": line["text"], "center_px": line["center_px"]}
-                    for line in (settle.get("text") or [])[:20]
-                ],
-            },
+        report["screen"] = {
+            "state": settle["state"],
+            "settled_after_ms": settle["elapsed_ms"],
+            "changed_regions": [r["bbox_px"] for r in settle["changed_regions"][:6]],
+            "text_in_changed_regions": [
+                {"text": line["text"], "center_px": line["center_px"]}
+                for line in (settle.get("text") or [])[:20]
+            ],
         }
+        report["observation_state"] = "failed" if settle["state"] == "unavailable" else "observed"
         if top and top["title"] != outcome.get("window"):
-            report["new_top_window"] = top
+            report["new_top_window"] = _window_summary(top)
         elif top and before and top["title"] == before["title"]:
             report["controls_changed"] = _control_changes(before["controls"], top["controls"])
         saw_change = bool(report.get("new_top_window") or report.get("controls_changed"))
@@ -480,9 +538,10 @@ class ScreenAgent:
             self.blocked.add(window_title.casefold())
             blocked = True
         if blocked:
+            if top:
+                self.last_controls[window_title.casefold()] = top
             report["screen"]["source"] = "ui_automation"
             report["screen"]["note"] = BLOCKED_NOTE
-        return report
 
     def _settle_by_elements(
         self,
@@ -490,28 +549,37 @@ class ScreenAgent:
         before: dict | None,
         *,
         quiet_ms: float = 250.0,
+        expect_change_ms: float = 1000.0,
         timeout_ms: float = 3000.0,
     ) -> tuple[dict, dict | None]:
         """Wait until a window's controls stop changing, when its pixels can't be read."""
         import time as _time
 
+        quiet_ms = _finite("quiet_ms", quiet_ms, positive=True)
+        timeout_ms = _finite("timeout_ms", timeout_ms, positive=True)
+        expect_change_ms = _finite("expect_change_ms", expect_change_ms)
+        if self.max_wait_ms is not None:
+            timeout_ms = min(timeout_ms, self.max_wait_ms)
         start = _time.perf_counter()
         last, stable_since, changed = before, start, False
         while True:
-            _time.sleep(0.12)
-            now = _time.perf_counter()
             snapshot = self._top_window(window_title)
+            now = _time.perf_counter()
+            if snapshot is None:
+                state, last = "unavailable", None
+                break
             if snapshot != last:
                 last, stable_since, changed = snapshot, now, True
             elif changed and (now - stable_since) * 1000 >= quiet_ms:
                 state = "settled"
                 break
-            elif not changed and (now - start) * 1000 >= 1000:
+            elif not changed and (now - start) * 1000 >= expect_change_ms:
                 state = "unchanged"
                 break
             if (now - start) * 1000 >= timeout_ms:
                 state = "timeout"
                 break
+            _time.sleep(min(0.12, max(0, timeout_ms / 1000 - (now - start))))
         elapsed = round((_time.perf_counter() - start) * 1000, 1)
         return {"state": state, "elapsed_ms": elapsed, "changed_regions": [], "text": []}, last
 
@@ -528,7 +596,7 @@ class ScreenAgent:
                     for e in _without_caption(listed["elements"], listed["window"]["bbox_px"])
                     if e["control_type"] in ui_elements.INTERACTIVE or e["control_type"] == "text"
                 ]
-                return {"title": listed["window"]["title"], "controls": controls[:30]}
+                return {"title": listed["window"]["title"], "controls": controls}
 
             self._windows = windows
         try:
@@ -537,12 +605,21 @@ class ScreenAgent:
             return None
 
     def click_element(
-        self, *, window_title: str, target: str, control_type: str | None = None
+        self,
+        *,
+        window_title: str,
+        target: str,
+        control_type: str | None = None,
+        element_ref: str | None = None,
     ) -> dict:
-        return self._act_on(window_title, target, "click", control_type=control_type)
+        selector = {"element_ref": element_ref} if element_ref is not None else {}
+        return self._act_on(window_title, target, "click", control_type=control_type, **selector)
 
-    def set_field_text(self, *, window_title: str, field: str, text: str) -> dict:
-        return self._act_on(window_title, field, "set_text", text=text)
+    def set_field_text(
+        self, *, window_title: str, field: str, text: str, element_ref: str | None = None
+    ) -> dict:
+        selector = {"element_ref": element_ref} if element_ref is not None else {}
+        return self._act_on(window_title, field, "set_text", text=text, **selector)
 
     def tool_specs(self) -> list[dict]:
         tools = [t for t in TOOLS if t["name"] not in ACTION_TOOLS and t["name"] != "screenshot"]
@@ -671,6 +748,11 @@ TOOLS = [
 
 
 ACTION_TOOLS = ("click_element", "set_field_text", "click_point")
+_ELEMENT_REF = {
+    "type": "string",
+    "description": "Current element_ref from list_ui_elements or "
+    "find_on_screen. Supply it when controls share a name.",
+}
 TOOLS += [
     {
         "name": "click_element",
@@ -690,6 +772,7 @@ TOOLS += [
                     "find_on_screen",
                 },
                 "control_type": {"type": "string", "description": "optional, e.g. button"},
+                "element_ref": _ELEMENT_REF,
             },
             "required": ["window_title", "target"],
         },
@@ -706,6 +789,7 @@ TOOLS += [
             "properties": {
                 "window_title": _WINDOW,
                 "field": {"type": "string"},
+                "element_ref": _ELEMENT_REF,
                 "text": {"type": "string"},
             },
             "required": ["window_title", "field", "text"],

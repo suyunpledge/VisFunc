@@ -2,6 +2,8 @@
 
 [English](README.md) · 中文
 
+Windows x64 用户可解压部署包并双击 `Start.cmd`，同时启动图片 API 和桌面 Agent MCP。[部署说明](deployment/windows/README.zh.md)
+
 VisFunc 把图片和视频里能测量的东西先用程序测出来，再交给 AI。
 
 多模态模型能说出画面里有什么，但问到"这张卡片移动了多少像素""这个动画用了多久""这两块区域有没有挨着"，

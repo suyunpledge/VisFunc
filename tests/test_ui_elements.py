@@ -52,6 +52,20 @@ def test_matches_values_help_text_and_type():
         find_element(RESULT, " ")
 
 
+@pytest.mark.parametrize("action", ["click", "set_text"])
+def test_same_name_needs_live_unambiguous_reference(action):
+    from svsg.recognition.ui_elements import _action_target
+
+    west = element("Seats", kind="edit", element_ref="uia:123.1")
+    east = element("Seats", kind="edit", element_ref="uia:123.2")
+    with pytest.raises(ValueError, match="ambiguous.*123.1.*123.2"):
+        _action_target([west, east], "Seats", action, None, None)
+    assert _action_target([east, west], "Seats", action, None, east["element_ref"]) is east
+    with pytest.raises(ValueError, match="no current element"):
+        _action_target([west], "Seats", action, None, east["element_ref"])
+    assert _action_target([east, dict(west, enabled=False)], "Seats", action, None, None) is east
+
+
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows only")
 def test_missing_window_is_reported():
     pytest.importorskip("comtypes")

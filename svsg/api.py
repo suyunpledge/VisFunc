@@ -385,7 +385,9 @@ def create_app(
         if len(regions.encode()) > MAX_QUERY_BYTES:
             raise HTTPException(status_code=413, detail="区域参数过长")
         try:
-            boxes = TypeAdapter(list[tuple[int, int, int, int]] | None).validate_json(regions)
+            boxes: list[tuple[int, int, int, int]] | None = TypeAdapter(
+                list[tuple[int, int, int, int]] | None
+            ).validate_json(regions)
         except ValidationError as exc:
             raise HTTPException(status_code=422, detail="无效的区域参数") from exc
         data, _, _ = await _read_image(file)

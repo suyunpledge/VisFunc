@@ -1,0 +1,2 @@
+# One window title (or a distinctive substring) per line. Restart after editing.
+# No entries means desktop actions are disabled. Use UTF-8 for non-ASCII titles.

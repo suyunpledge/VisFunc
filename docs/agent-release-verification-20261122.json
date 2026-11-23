@@ -1,0 +1,136 @@
+{
+  "zip_sha256": "fb9a895fd800e14f3ef51f25b5b3a7b809514bef73f0b82686288224ca9b967d",
+  "zip_bytes": 917453987,
+  "unpacked_bytes": 2304812755,
+  "source_files_matched": 226,
+  "bundled_files_matched": 7,
+  "pytest": "492 passed, 1 warning in 139.46s (0:02:19)",
+  "keystone": [
+    {
+      "model": "gpt-6.1-sol",
+      "task": "fault",
+      "tool_calls": 2,
+      "tool_errors": 0,
+      "seconds": 13.5,
+      "state": {
+        "adds": 1,
+        "saved": 0,
+        "ready": false,
+        "west": "2",
+        "east": "2",
+        "status": "Count 1"
+      },
+      "success": true,
+      "tools": [
+        "click_element",
+        "list_ui_elements"
+      ],
+      "mcp_runtime": "project checkout"
+    },
+    {
+      "model": "gpt-6.1-sol",
+      "task": "twins",
+      "tool_calls": 4,
+      "tool_errors": 0,
+      "seconds": 18.7,
+      "state": {
+        "adds": 0,
+        "saved": 1,
+        "ready": false,
+        "west": "2",
+        "east": "7",
+        "status": "Saved 7"
+      },
+      "success": true,
+      "tools": [
+        "list_ui_elements",
+        "set_field_text",
+        "click_element",
+        "list_ui_elements"
+      ],
+      "mcp_runtime": "project checkout"
+    },
+    {
+      "model": "gpt-6.1-sol",
+      "task": "frozen",
+      "tool_calls": 2,
+      "tool_errors": 0,
+      "seconds": 11.5,
+      "state": {
+        "adds": 1,
+        "saved": 0,
+        "ready": true,
+        "west": "2",
+        "east": "2",
+        "status": "Batch verified 731"
+      },
+      "success": true,
+      "tools": [
+        "click_element",
+        "wait_for_settle"
+      ],
+      "mcp_runtime": "project checkout"
+    },
+    {
+      "model": "gpt-6.1-sol",
+      "task": "fault",
+      "tool_calls": 3,
+      "tool_errors": 0,
+      "seconds": 12.5,
+      "state": {
+        "adds": 1,
+        "saved": 0,
+        "ready": false,
+        "west": "2",
+        "east": "2",
+        "status": "Count 1"
+      },
+      "success": true,
+      "tools": [
+        "list_ui_elements",
+        "click_element",
+        "list_ui_elements"
+      ],
+      "mcp_runtime": "extracted bundle"
+    }
+  ],
+  "packaged_fault_receipt": {
+    "execution_state": "completed",
+    "done": "invoke 'Add one'",
+    "element_after": {
+      "name": "Add one",
+      "control_type": "button",
+      "enabled": true,
+      "center_px": [
+        1280,
+        916
+      ],
+      "element_ref": "uia:42.21961340.4.-2147483641"
+    },
+    "observation_state": "failed",
+    "screen": {
+      "state": "unavailable"
+    },
+    "observation_error": "RuntimeError: injected post-click OCR failure",
+    "next_step": "Inspect current controls or wait for a fresh observation. Do not repeat this action based on this observation error."
+  },
+  "checks": {
+    "distinct_uia_refs": 2,
+    "readonly_tools": [
+      "find_on_screen",
+      "list_ui_elements",
+      "read_screen_text",
+      "wait_for_settle"
+    ],
+    "config_preserved": true,
+    "exact_text_lines": 18,
+    "missing_text": 0,
+    "extra_text": 0,
+    "exported_functions": true,
+    "duration_s": 1.0,
+    "detectors": [
+      "YOLO11n CPU",
+      "CrowdHuman ONNX CPU"
+    ]
+  }
+}

@@ -30,7 +30,7 @@ def _area(b: Box) -> int:
     return max(0, b[2] - b[0]) * max(0, b[3] - b[1])
 
 
-def _overlap(a: Box, b: Box) -> int:
+def _overlap(a: Sequence[int], b: Sequence[int]) -> int:
     return _area((max(a[0], b[0]), max(a[1], b[1]), min(a[2], b[2]), min(a[3], b[3])))
 
 
@@ -253,7 +253,7 @@ def lines_touching(result: dict, regions: Sequence[Sequence[int]]) -> list[dict]
         line
         for line in result["lines"]
         if any(
-            _overlap(tuple(line["bbox_px"]), tuple(r)) > 0 or same_row(line["bbox_px"], r)
+            _overlap(line["bbox_px"], r) > 0 or same_row(line["bbox_px"], r)
             for r in regions
         )
     ]

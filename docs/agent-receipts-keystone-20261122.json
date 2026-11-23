@@ -1,0 +1,678 @@
+[
+  {
+    "task": "fault",
+    "model": "gpt-6.1-sol",
+    "success": true,
+    "seconds": 13.5,
+    "tokens": {
+      "prompt_tokens": 4359,
+      "completion_tokens": 102,
+      "total_tokens": 4461
+    },
+    "tool_calls": 2,
+    "state": {
+      "adds": 1,
+      "saved": 0,
+      "ready": false,
+      "west": "2",
+      "east": "2",
+      "status": "Count 1"
+    },
+    "answer": "已点击一次 Add one，确认界面最终显示 **Count 1**（计数为 1）。",
+    "calls": [
+      {
+        "tool": "click_element",
+        "arguments": {
+          "window_title": "SVSG verify fault",
+          "target": "Add one"
+        },
+        "isError": false,
+        "receipt": {
+          "execution_state": "completed",
+          "done": "invoke 'Add one'",
+          "element_after": {
+            "name": "Add one",
+            "control_type": "button",
+            "enabled": true,
+            "center_px": [
+              1280,
+              916
+            ],
+            "element_ref": "uia:42.16915574.4.-2147483641"
+          },
+          "observation_state": "failed",
+          "screen": {
+            "state": "unavailable"
+          },
+          "observation_error": "RuntimeError: injected post-click OCR failure",
+          "next_step": "Inspect current controls or wait for a fresh observation. Do not repeat this action based on this observation error."
+        }
+      },
+      {
+        "tool": "list_ui_elements",
+        "arguments": {
+          "window_title": "SVSG verify fault"
+        },
+        "isError": false,
+        "receipt": {
+          "window": {
+            "title": "SVSG verify fault",
+            "bbox_px": [
+              891,
+              577,
+              1671,
+              952
+            ],
+            "process_id": 245228
+          },
+          "elements": [
+            {
+              "name": "SVSG verify fault",
+              "control_type": "window",
+              "enabled": true,
+              "center_px": [
+                1281,
+                764
+              ],
+              "element_ref": "uia:42.16915574"
+            },
+            {
+              "name": "West",
+              "control_type": "text",
+              "enabled": true,
+              "center_px": [
+                1091,
+                642
+              ],
+              "element_ref": "uia:42.16915574.4.-2147483646"
+            },
+            {
+              "name": "East",
+              "control_type": "text",
+              "enabled": true,
+              "center_px": [
+                1469,
+                642
+              ],
+              "element_ref": "uia:42.16915574.4.-2147483644"
+            },
+            {
+              "name": "Seats",
+              "control_type": "edit",
+              "enabled": true,
+              "value": "2",
+              "center_px": [
+                1091,
+                717
+              ],
+              "element_ref": "uia:42.16915574.4.-2147483645"
+            },
+            {
+              "name": "Seats",
+              "control_type": "edit",
+              "enabled": true,
+              "value": "2",
+              "center_px": [
+                1469,
+                717
+              ],
+              "element_ref": "uia:42.16915574.4.-2147483643"
+            },
+            {
+              "name": "Count 1",
+              "control_type": "text",
+              "enabled": true,
+              "center_px": [
+                1280,
+                816
+              ],
+              "element_ref": "uia:42.16915574.4.-2147483642"
+            },
+            {
+              "name": "Add one",
+              "control_type": "button",
+              "enabled": true,
+              "center_px": [
+                1280,
+                916
+              ],
+              "element_ref": "uia:42.16915574.4.-2147483641"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    ]
+  },
+  {
+    "task": "twins",
+    "model": "gpt-6.1-sol",
+    "success": true,
+    "seconds": 18.7,
+    "tokens": {
+      "prompt_tokens": 10260,
+      "completion_tokens": 265,
+      "total_tokens": 10525
+    },
+    "tool_calls": 4,
+    "state": {
+      "adds": 0,
+      "saved": 1,
+      "ready": false,
+      "west": "2",
+      "east": "7",
+      "status": "Saved 7"
+    },
+    "answer": "已按名称并用 element_ref 区分同名控件，只修改了右侧 East，随后点击了 **Save seats**。\n\n最终值：\n- 左侧 West：**2**（保持不变）\n- 右侧 East：**7**\n\n窗口显示“Saved 7”，确认已保存。",
+    "calls": [
+      {
+        "tool": "list_ui_elements",
+        "arguments": {
+          "window_title": "SVSG verify twins"
+        },
+        "isError": false,
+        "receipt": {
+          "window": {
+            "title": "SVSG verify twins",
+            "bbox_px": [
+              891,
+              577,
+              1671,
+              952
+            ],
+            "process_id": 248216
+          },
+          "elements": [
+            {
+              "name": "SVSG verify twins",
+              "control_type": "window",
+              "enabled": true,
+              "center_px": [
+                1281,
+                764
+              ],
+              "element_ref": "uia:42.13770924"
+            },
+            {
+              "name": "West",
+              "control_type": "text",
+              "enabled": true,
+              "center_px": [
+                1091,
+                642
+              ],
+              "element_ref": "uia:42.13770924.4.-2147483646"
+            },
+            {
+              "name": "East",
+              "control_type": "text",
+              "enabled": true,
+              "center_px": [
+                1469,
+                642
+              ],
+              "element_ref": "uia:42.13770924.4.-2147483644"
+            },
+            {
+              "name": "Seats",
+              "control_type": "edit",
+              "enabled": true,
+              "value": "2",
+              "center_px": [
+                1091,
+                717
+              ],
+              "element_ref": "uia:42.13770924.4.-2147483645"
+            },
+            {
+              "name": "Seats",
+              "control_type": "edit",
+              "enabled": true,
+              "value": "2",
+              "center_px": [
+                1469,
+                717
+              ],
+              "element_ref": "uia:42.13770924.4.-2147483643"
+            },
+            {
+              "name": "Ready",
+              "control_type": "text",
+              "enabled": true,
+              "center_px": [
+                1280,
+                816
+              ],
+              "element_ref": "uia:42.13770924.4.-2147483642"
+            },
+            {
+              "name": "Save seats",
+              "control_type": "button",
+              "enabled": true,
+              "center_px": [
+                1280,
+                916
+              ],
+              "element_ref": "uia:42.13770924.4.-2147483641"
+            }
+          ],
+          "truncated": false
+        }
+      },
+      {
+        "tool": "set_field_text",
+        "arguments": {
+          "window_title": "SVSG verify twins",
+          "field": "Seats",
+          "element_ref": "uia:42.13770924.4.-2147483643",
+          "text": "7"
+        },
+        "isError": false,
+        "receipt": {
+          "execution_state": "completed",
+          "done": "set_value 'Seats'",
+          "element_after": {
+            "name": "Seats",
+            "control_type": "edit",
+            "enabled": true,
+            "value": "7",
+            "center_px": [
+              1469,
+              717
+            ],
+            "element_ref": "uia:42.13770924.4.-2147483643"
+          },
+          "screen": {
+            "state": "settled",
+            "settled_after_ms": 365.011,
+            "changed_regions": [
+              [
+                1287,
+                704,
+                1653,
+                739
+              ],
+              [
+                932,
+                545,
+                1073,
+                569
+              ],
+              [
+                1555,
+                545,
+                1576,
+                566
+              ],
+              [
+                1626,
+                545,
+                1647,
+                566
+              ],
+              [
+                1486,
+                552,
+                1507,
+                559
+              ]
+            ],
+            "text_in_changed_regions": [
+              {
+                "text": "SVSG verify twins",
+                "center_px": [
+                  988,
+                  557
+                ]
+              },
+              {
+                "text": "口",
+                "center_px": [
+                  1566,
+                  558
+                ]
+              }
+            ]
+          },
+          "observation_state": "observed",
+          "controls_changed": [
+            {
+              "name": "Seats",
+              "control_type": "edit",
+              "element_ref": "uia:42.13770924.4.-2147483643",
+              "center_px": [
+                1469,
+                717
+              ],
+              "value": "7",
+              "was": "2"
+            }
+          ]
+        }
+      },
+      {
+        "tool": "click_element",
+        "arguments": {
+          "window_title": "SVSG verify twins",
+          "target": "Save seats",
+          "control_type": "button",
+          "element_ref": "uia:42.13770924.4.-2147483641"
+        },
+        "isError": false,
+        "receipt": {
+          "execution_state": "completed",
+          "done": "invoke 'Save seats'",
+          "element_after": {
+            "name": "Save seats",
+            "control_type": "button",
+            "enabled": true,
+            "center_px": [
+              1280,
+              916
+            ],
+            "element_ref": "uia:42.13770924.4.-2147483641"
+          },
+          "screen": {
+            "state": "settled",
+            "settled_after_ms": 406.792,
+            "changed_regions": [
+              [
+                1287,
+                730,
+                1653,
+                739
+              ],
+              [
+                905,
+                807,
+                977,
+                831
+              ]
+            ],
+            "text_in_changed_regions": [
+              {
+                "text": "Saved 7",
+                "center_px": [
+                  941,
+                  820
+                ]
+              }
+            ]
+          },
+          "observation_state": "observed",
+          "controls_changed": [
+            {
+              "name": "Saved 7",
+              "control_type": "text",
+              "appeared": true
+            },
+            {
+              "name": "Ready",
+              "control_type": "text",
+              "gone": true
+            }
+          ]
+        }
+      },
+      {
+        "tool": "list_ui_elements",
+        "arguments": {
+          "window_title": "SVSG verify twins"
+        },
+        "isError": false,
+        "receipt": {
+          "window": {
+            "title": "SVSG verify twins",
+            "bbox_px": [
+              891,
+              577,
+              1671,
+              952
+            ],
+            "process_id": 248216
+          },
+          "elements": [
+            {
+              "name": "SVSG verify twins",
+              "control_type": "window",
+              "enabled": true,
+              "center_px": [
+                1281,
+                764
+              ],
+              "element_ref": "uia:42.13770924"
+            },
+            {
+              "name": "West",
+              "control_type": "text",
+              "enabled": true,
+              "center_px": [
+                1091,
+                642
+              ],
+              "element_ref": "uia:42.13770924.4.-2147483646"
+            },
+            {
+              "name": "East",
+              "control_type": "text",
+              "enabled": true,
+              "center_px": [
+                1469,
+                642
+              ],
+              "element_ref": "uia:42.13770924.4.-2147483644"
+            },
+            {
+              "name": "Seats",
+              "control_type": "edit",
+              "enabled": true,
+              "value": "2",
+              "center_px": [
+                1091,
+                717
+              ],
+              "element_ref": "uia:42.13770924.4.-2147483645"
+            },
+            {
+              "name": "Seats",
+              "control_type": "edit",
+              "enabled": true,
+              "value": "7",
+              "center_px": [
+                1469,
+                717
+              ],
+              "element_ref": "uia:42.13770924.4.-2147483643"
+            },
+            {
+              "name": "Saved 7",
+              "control_type": "text",
+              "enabled": true,
+              "center_px": [
+                1280,
+                816
+              ],
+              "element_ref": "uia:42.13770924.4.-2147483642"
+            },
+            {
+              "name": "Save seats",
+              "control_type": "button",
+              "enabled": true,
+              "center_px": [
+                1280,
+                916
+              ],
+              "element_ref": "uia:42.13770924.4.-2147483641"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    ]
+  },
+  {
+    "task": "frozen",
+    "model": "gpt-6.1-sol",
+    "success": true,
+    "seconds": 11.5,
+    "tokens": {
+      "prompt_tokens": 4678,
+      "completion_tokens": 148,
+      "total_tokens": 4826
+    },
+    "tool_calls": 2,
+    "state": {
+      "adds": 1,
+      "saved": 0,
+      "ready": true,
+      "west": "2",
+      "east": "2",
+      "status": "Batch verified 731"
+    },
+    "answer": "已点击一次 Add one，并使用独立的 wait_for_settle 工具（read_text 已开启）检查结果。窗口显示 **Batch verified 731**，实际编号为 **731**。",
+    "calls": [
+      {
+        "tool": "click_element",
+        "arguments": {
+          "window_title": "SVSG verify frozen",
+          "target": "Add one"
+        },
+        "isError": false,
+        "receipt": {
+          "execution_state": "completed",
+          "done": "invoke 'Add one'",
+          "element_after": {
+            "name": "Add one",
+            "control_type": "button",
+            "enabled": true,
+            "center_px": [
+              1280,
+              916
+            ],
+            "element_ref": "uia:42.36703772.4.-2147483641"
+          },
+          "screen": {
+            "state": "unchanged",
+            "settled_after_ms": 1518.257,
+            "changed_regions": [],
+            "text_in_changed_regions": [],
+            "source": "ui_automation",
+            "note": "Screen capture of this window does not show changes (for example a browser screen protection feature of security software), so screenshots and OCR of it are unreliable; effects are read from UI Automation instead."
+          },
+          "observation_state": "observed",
+          "controls_changed": [
+            {
+              "name": "Count 1",
+              "control_type": "text",
+              "appeared": true
+            },
+            {
+              "name": "Ready",
+              "control_type": "text",
+              "gone": true
+            }
+          ]
+        }
+      },
+      {
+        "tool": "wait_for_settle",
+        "arguments": {
+          "window_title": "SVSG verify frozen",
+          "read_text": true,
+          "quiet_ms": 1000,
+          "expect_change_ms": 2000,
+          "timeout_ms": 10000
+        },
+        "isError": false,
+        "receipt": {
+          "state": "settled",
+          "elapsed_ms": 1131.6,
+          "changed_regions": [],
+          "text": [],
+          "baseline": "last_observation",
+          "source": "ui_automation",
+          "note": "Screen capture of this window does not show changes (for example a browser screen protection feature of security software), so screenshots and OCR of it are unreliable; effects are read from UI Automation instead.",
+          "controls_changed": [
+            {
+              "name": "Batch verified 731",
+              "control_type": "text",
+              "appeared": true
+            },
+            {
+              "name": "Count 1",
+              "control_type": "text",
+              "gone": true
+            }
+          ],
+          "window": {
+            "title": "SVSG verify frozen",
+            "controls": [
+              {
+                "name": "West",
+                "control_type": "text",
+                "enabled": true,
+                "center_px": [
+                  1091,
+                  642
+                ],
+                "element_ref": "uia:42.36703772.4.-2147483646"
+              },
+              {
+                "name": "East",
+                "control_type": "text",
+                "enabled": true,
+                "center_px": [
+                  1469,
+                  642
+                ],
+                "element_ref": "uia:42.36703772.4.-2147483644"
+              },
+              {
+                "name": "Seats",
+                "control_type": "edit",
+                "enabled": true,
+                "value": "2",
+                "center_px": [
+                  1091,
+                  717
+                ],
+                "element_ref": "uia:42.36703772.4.-2147483645"
+              },
+              {
+                "name": "Seats",
+                "control_type": "edit",
+                "enabled": true,
+                "value": "2",
+                "center_px": [
+                  1469,
+                  717
+                ],
+                "element_ref": "uia:42.36703772.4.-2147483643"
+              },
+              {
+                "name": "Batch verified 731",
+                "control_type": "text",
+                "enabled": true,
+                "center_px": [
+                  1280,
+                  816
+                ],
+                "element_ref": "uia:42.36703772.4.-2147483642"
+              },
+              {
+                "name": "Add one",
+                "control_type": "button",
+                "enabled": true,
+                "center_px": [
+                  1280,
+                  916
+                ],
+                "element_ref": "uia:42.36703772.4.-2147483641"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+]

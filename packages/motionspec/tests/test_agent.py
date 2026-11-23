@@ -348,6 +348,65 @@ def test_blocked_capture_switches_to_ui_automation():
     assert "note" in agent.read_screen_text(window_title="App")
 
 
+@pytest.mark.parametrize(
+    "tool,args",
+    [
+        ("click_element", {"target": "Add"}),
+        ("set_field_text", {"field": "Seats", "text": "7"}),
+        ("click_point", {"x": 200, "y": 180}),
+    ],
+)
+def test_mcp_returns_completed_receipt_if_post_action_ocr_fails(tool, args):
+    calls = []
+
+    def mutate(*a, **kw):
+        calls.append(1)
+        screen.act()
+        return {"performed": "test", "window": "App", "element": {"name": "target"}}
+
+    agent, screen, reader = make(
+        act=mutate, click=mutate, windows=lambda _: None, allowed_windows=["App"]
+    )
+
+    def fail(*_):
+        raise RuntimeError("lost OCR")
+
+    reader.read = fail
+    rpc = McpServer(agent).handle(
+        {
+            "id": 1,
+            "method": "tools/call",
+            "params": {"name": tool, "arguments": {"window_title": "App", **args}},
+        }
+    )["result"]
+    assert screen.saved and calls == [1] and not rpc["isError"]
+    report = json.loads(rpc["content"][0]["text"])
+    assert report["execution_state"] == "completed" and report["observation_state"] == "failed"
+    assert "lost OCR" in report["observation_error"] and "Do not repeat" in report["next_step"]
+
+
+def test_blocked_explicit_wait_uses_saved_controls_and_honors_waits():
+    line = {"name": "Seats", "control_type": "edit", "center_px": [10, 20], "value": "2"}
+    other = {**line, "center_px": [70, 20]}
+    before = {"title": "App", "controls": [line, other]}
+    after = {"title": "App", "controls": [dict(line, value="7"), other]}
+    agent, screen, _ = make(windows=lambda _: after)
+    agent.blocked.add("app")
+    agent.last_controls["app"] = before
+    report = agent.wait_for_settle(window_title="App", quiet_ms=5, read_text=True)
+    assert not screen.areas and report["source"] == "ui_automation"
+    assert report["state"] == "settled" and report["window"] == after
+    assert report["controls_changed"] == [
+        {"name": "Seats", "control_type": "edit", "center_px": [10, 20], "was": "2", "value": "7"}
+    ]
+    again = agent.wait_for_settle(window_title="App", expect_change_ms=0)
+    assert again["state"] == "unchanged" and not again["controls_changed"]
+    with pytest.raises(ValueError):
+        agent.wait_for_settle(window_title="App", timeout_ms=-1)
+    agent._windows = lambda _: None
+    assert agent.wait_for_settle(window_title="App")["state"] == "unavailable"
+
+
 def test_caption_buttons_are_dropped():
     from motionspec.agent import _without_caption
 

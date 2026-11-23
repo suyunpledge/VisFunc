@@ -26,6 +26,7 @@ MAX_ELEMENTS = 5000
 
 # UI Automation property and control type ids (UIAutomationClient.h).
 _PROPERTIES = {
+    "runtime_id": 30000,
     "name": 30005,
     "control_type": 30003,
     "automation_id": 30011,
@@ -258,6 +259,11 @@ def _describe(element: Any) -> dict | None:
         value = _cached(element, _PROPERTIES[key])
         if value:
             item[key] = str(value)
+    runtime_id = _cached(element, _PROPERTIES["runtime_id"])
+    if isinstance(runtime_id, (tuple, list)) and runtime_id:
+        item["element_ref"] = "uia:" + ".".join(map(str, runtime_id))
+    else:
+        item["element_ref"] = "box:" + ",".join(map(str, box))
     if _cached(element, _PROPERTIES["focused"]):
         item["focused"] = True
     value = _cached(element, _PROPERTIES["value"])
@@ -389,6 +395,32 @@ def find_element(
 _PATTERNS = {"invoke": 10000, "value": 10002, "expand": 10005, "select": 10010, "toggle": 10015}
 
 
+def _action_target(items, query, action, control_type, element_ref):
+    if action == "set_text":
+        items = [
+            e for e in items if e["control_type"] in ("edit", "combobox", "document", "spinner")
+        ]
+    if element_ref is not None:
+        items = [e for e in items if e.get("element_ref") == element_ref]
+    listed = {"elements": items}
+    ranked = find_element(listed, query, control_type=control_type, exact=True)
+    if not ranked:
+        ranked = find_element(listed, query, control_type=control_type)
+    if not ranked:
+        raise ValueError(f"no current element matches {query!r}; list controls again")
+    enabled = [e for e in ranked if e["enabled"]]
+    if not enabled:
+        raise ValueError(f"{ranked[0]['name'] or query!r} is disabled")
+    candidates = [e for e in enabled if e["control_type"] in INTERACTIVE] or enabled
+    if len(candidates) != 1:
+        choices = [
+            {k: e.get(k) for k in ("name", "control_type", "element_ref", "center_px")}
+            for e in candidates[:12]
+        ]
+        raise ValueError(f"ambiguous control {query!r}; choose an element_ref: {choices}")
+    return candidates[0]
+
+
 def perform(
     query: str,
     action: str,
@@ -397,6 +429,7 @@ def perform(
     hwnd: int | None = None,
     text: str | None = None,
     control_type: str | None = None,
+    element_ref: str | None = None,
 ) -> dict:
     """Act on the best element matching `query` through UI Automation patterns.
 
@@ -418,18 +451,8 @@ def perform(
         item = _describe(element)
         if item is not None:
             pairs.append((item, element))
-    ranked = find_element(
-        {"elements": [item for item, _ in pairs]}, query, control_type=control_type
-    )
-    if action == "set_text":
-        ranked = [
-            e for e in ranked if e["control_type"] in ("edit", "combobox", "document", "spinner")
-        ]
-    if not ranked:
-        raise ValueError(f"no element matches {query!r}")
-    target = ranked[0]
-    if not target["enabled"]:
-        raise ValueError(f"{target['name'] or query!r} is disabled")
+    target = _action_target([item for item, _ in pairs], query, action, control_type, element_ref)
+    title_before_action = window.CurrentName or ""
     element = next(el for item, el in pairs if item is target)
     uia = client.uia
 
@@ -476,7 +499,7 @@ def perform(
         "performed": done,
         "element": target,
         "after": after,
-        "window": window.CurrentName or "",
+        "window": title_before_action,
     }
 
 
