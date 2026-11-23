@@ -532,13 +532,21 @@ def post_click(root: int, x: int, y: int) -> dict:
     if not target or owner.value != mine.value:
         raise ValueError(f"point ({x}, {y}) is covered by another application's window")
     local = wintypes.POINT(x, y)
-    user32.ScreenToClient(target, ctypes.byref(local))
+    if not user32.ScreenToClient(target, ctypes.byref(local)):
+        raise OSError("could not map the screen point into the target window")
     lparam = (local.y & 0xFFFF) << 16 | (local.x & 0xFFFF)
-    for message, wparam in ((0x0200, 0), (0x0201, 0x0001), (0x0202, 0)):  # move, down, up
-        user32.PostMessageW(target, message, wparam, lparam)
-        time.sleep(0.02)
-    return {
+    receipt = {
         "window": window_title(root),
         "target_window": window_title(target),
         "client_point": [local.x, local.y],
+        "screen_point": [x, y],
+        "dispatch_state": "completed",
     }
+    for message, wparam in ((0x0200, 0), (0x0201, 0x0001), (0x0202, 0)):  # move, down, up
+        if not user32.PostMessageW(target, message, wparam, lparam):
+            if message == 0x0202:
+                receipt["dispatch_state"] = "partial"
+                break
+            raise OSError("the target rejected the mouse message before button down")
+        time.sleep(0.02)
+    return receipt

@@ -340,7 +340,7 @@ def _dpi_aware() -> None:
 
 
 def _grabber(region: Box | None, backend: str):
-    """Return (name, grab) where grab() gives one BGR frame of `region` or the primary screen."""
+    """Return (name, grab, close) for one screen capture stream."""
     if backend not in ("auto", "mss", "pil"):
         raise ValueError("capture backend must be auto, mss or pil")
     if region is not None:
@@ -360,14 +360,17 @@ def _grabber(region: Box | None, backend: str):
                 if region is None
                 else {"left": left, "top": top, "width": right - left, "height": bottom - top}
             )
-            return "mss", lambda: np.ascontiguousarray(np.asarray(shooter.grab(area))[:, :, :3])
+            def grab_mss():
+                return np.ascontiguousarray(np.asarray(shooter.grab(area))[:, :, :3])
+
+            return "mss", grab_mss, shooter.close
     from PIL import ImageGrab
 
     def grab() -> np.ndarray:
         image = ImageGrab.grab(bbox=region, all_screens=region is not None)
         return cv2.cvtColor(np.asarray(image.convert("RGB")), cv2.COLOR_RGB2BGR)
 
-    return "pil", grab
+    return "pil", grab, None
 
 
 def capture_screen(
@@ -380,11 +383,15 @@ def capture_screen(
     """
     interval = 1.0 / _finite("max_fps", max_fps, positive=True)
     _dpi_aware()
-    _, grab = _grabber(region, backend)
-    while True:
-        start = time.perf_counter()
-        frame = grab()
-        yield start * 1000.0, frame
-        spare = interval - (time.perf_counter() - start)
-        if spare > 0:
-            time.sleep(spare)
+    _, grab, close = _grabber(region, backend)
+    try:
+        while True:
+            start = time.perf_counter()
+            frame = grab()
+            yield start * 1000.0, frame
+            spare = interval - (time.perf_counter() - start)
+            if spare > 0:
+                time.sleep(spare)
+    finally:
+        if close is not None:
+            close()

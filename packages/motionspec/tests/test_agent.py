@@ -87,6 +87,7 @@ def make(**kw):
         reader_factory=lambda: reader,
         elements=kw.pop("elements", elements),
         locate_window=lambda title: (50, 60, 450, 360),
+        history_seconds=kw.pop("history_seconds", 0),
         **kw,
     )
     return agent, screen, reader
@@ -314,11 +315,89 @@ def test_click_point_reports_effect_and_needs_permission():
     report = agent.click_point(window_title="App", x="210", y=180)
     assert clicks == [("App", 210, 180)]
     assert report["done"] == "click_at '(210, 180)'"
+    assert report["operation_marker"] == {
+        "kind": "posted_click",
+        "screen_px": [210, 180],
+        "window_px": [160, 120],
+    }
     assert report["screen"]["state"] == "settled"
     assert "click_point" in [t["name"] for t in agent.tool_specs()]
     blocked, _, _ = make(click=click)
     with pytest.raises(PermissionError):
         blocked.click_point(window_title="App", x=1, y=1)
+
+
+def test_marker_crop_is_pre_action_and_does_not_contaminate_pixels():
+    agent, screen, _ = make(allowed_windows=["App"], windows=lambda _: None)
+
+    def invoke(*args, **kwargs):
+        screen.saved = True
+        return {
+            "performed": "invoke",
+            "window": "App",
+            "element": {"name": "Save", "center_px": [195, 180]},
+        }
+
+    agent._act = invoke
+    content = McpServer(agent).call(
+        "click_element", {"window_title": "App", "target": "Save", "marker_image": True}
+    )
+    import base64
+
+    marker = json.loads(content[0]["text"])["operation_marker"]
+    center = marker["image_point_px"]
+    assert marker["kind"] == "uia_target_center"
+    assert [a + b for a, b in zip(center, marker["crop_origin_px"], strict=True)] == [195, 180]
+    png = cv2.imdecode(np.frombuffer(base64.b64decode(content[1]["data"]), np.uint8), 1)
+    assert png[center[1], center[0]].tolist() == [20, 220, 255]
+    assert png[center[1] + 15, center[0]].tolist() == [240] * 3
+    assert screen.frame()[120, 145].tolist() == [30, 120, 30]
+
+
+def test_partial_mouse_dispatch_returns_observe_before_retry():
+    agent, _, _ = make(
+        allowed_windows=["App"],
+        windows=lambda _: None,
+        click=lambda *args: {
+            "performed": "mouse_down_at",
+            "window": "App",
+            "element": {"name": "button"},
+            "dispatch_state": "partial",
+        },
+    )
+    report = agent.click_point(window_title="App", x=150, y=100)
+    assert report["execution_state"] == "partial"
+    assert report["operation_marker"]["kind"] == "posted_mouse_down"
+    assert "release failed" in report["next_step"]
+
+
+def test_unavailable_history_keeps_successful_action_and_point(monkeypatch):
+    calls = []
+
+    def click(title, x, y):
+        calls.append((x, y))
+        return {"performed": "click_at", "element": {"name": "button"}, "window": title}
+
+    agent, _, _ = make(
+        click=click,
+        windows=lambda _: None,
+        allowed_windows=["App"],
+        history_seconds=3,
+        images=False,
+    )
+
+    def vanished(**kw):
+        raise ValueError("window closed")
+
+    monkeypatch.setattr(agent, "watch_screen_changes", vanished)
+    parts = McpServer(agent).call(
+        "click_point", {"window_title": "App", "x": 180, "y": 150, "marker_image": True}
+    )
+    assert len(parts) == 1 and calls == [(180, 150)]
+    report = json.loads(parts[0]["text"])
+    assert report["execution_state"] == "completed"
+    assert report["operation_marker"]["screen_px"] == [180, 150]
+    assert report["screen_history"]["state"] == "capture_unavailable"
 
 
 def test_blocked_capture_switches_to_ui_automation():

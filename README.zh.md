@@ -100,6 +100,10 @@ motionspec overlays slide-out/functions.json --player-toolbar
 - `click_element`、`set_field_text`：通过 UI Automation 点按钮、填输入框，只对启动时 `--allow-window` 允许的窗口生效，每次操作直接带回效果；
 - `read_screen_text`、`list_ui_elements`、`screenshot`。
 
+`click_point` 回执的 `operation_marker.screen_px` 是发送鼠标消息的屏幕物理坐标；按名字操作的 `uia_target_center` 标记控件中心。支持图像的 MCP 客户端可以传 `marker_image=true`，取得标记在操作前截图上的位置。
+
+动作回执会给出 `screen_history.history_id`。Agent 可在下一步调用 `read_screen_history(history_id=…, read_text=true)` 读取思考期间已经消失的提示，也可用 `watch_screen_changes` 单独开始采样。默认按窗口采样 20 秒、最高 8 Hz，`--history-seconds 0` 关闭。历史事件支持按屏幕区域、游标和事件编号查询。[使用示例与实测](docs/agent-history-video-20261123.md)
+
 坐标都是屏幕物理像素，即点击用的坐标。视频、动画背景这类一直在变的区域，服务只需认识一次，之后不再拖慢等待。不用 MCP 时，也可以直接用命令行 `motionspec settle --screen --read-text`、`motionspec screen-text`，或 HTTP 接口 `POST /v1/screen-text`。
 
 ```bash

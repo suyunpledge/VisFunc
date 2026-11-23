@@ -110,6 +110,10 @@ These rules were tuned on video captions and player toolbars. On ordinary applic
 - `click_element`, `set_field_text`: press buttons and fill fields through UI Automation, only in windows allowed with `--allow-window` at start. Each action returns its effect directly.
 - `read_screen_text`, `list_ui_elements`, `screenshot`.
 
+`click_point` returns the dispatched physical screen coordinates in `operation_marker.screen_px`. A named UI Automation action labels the control centre as `uia_target_center`. Image-capable clients can request a marked pre-action crop with `marker_image=true`.
+
+Actions return a `screen_history.history_id`. Pass it to `read_screen_history` with `read_text=true` to recover brief messages that disappeared between calls. To begin sampling independently, use `watch_screen_changes`. The default is 20 seconds at up to 8 Hz in the named window. Set `--history-seconds 0` to disable recording. [Usage and measurements](docs/agent-history-video-20261123.md)
+
 Coordinates are physical screen pixels, the ones a click uses. The server learns areas that never stop changing, such as video or an animated background, once, and they no longer slow down the wait. Without MCP, use `motionspec settle --screen --read-text`, `motionspec screen-text` or the HTTP endpoint `POST /v1/screen-text`.
 
 ```bash

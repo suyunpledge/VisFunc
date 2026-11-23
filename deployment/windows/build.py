@@ -54,11 +54,16 @@ def build(args):
     tracked = subprocess.check_output(["git", "ls-files", "-z"], cwd=PROJECT)
     paths = set(tracked.decode("utf-8").split("\0")) - {""}
     paths.update(f"deployment/windows/{name}" for name in (*LAUNCH_FILES, "build.py"))
-    for extra in args.include_source:
-        paths.add((PROJECT / extra).resolve(strict=True).relative_to(PROJECT).as_posix())
+    extra_paths = {
+        (PROJECT / extra).resolve(strict=True).relative_to(PROJECT).as_posix()
+        for extra in args.include_source
+    }
+    paths.update(extra_paths)
     for name in sorted(paths):
         if name.startswith("archive/") or (
-            name.startswith("packages/motionspec/bench/results/") and not name.endswith(".md")
+            name.startswith("packages/motionspec/bench/results/")
+            and not name.endswith(".md")
+            and name not in extra_paths
         ):
             continue
         src = PROJECT / name
@@ -203,7 +208,7 @@ def main():
         action="append",
         default=[],
         metavar="FILE",
-        help="also include this untracked repository file",
+        help="also include this repository file, including benchmark evidence",
     )
     args = parser.parse_args()
     for key, value in vars(args).items():

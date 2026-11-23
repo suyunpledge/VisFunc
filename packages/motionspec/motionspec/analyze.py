@@ -94,15 +94,18 @@ def _ambient_share(scanned: Scan, roi: tuple[int, int, int, int]) -> float:
     return float(part.mean()) if part.size else 0.0
 
 
-def _decode_frames(frames: FrameSource, scanned: Scan, stop: int):
+def _decode_frames(frames: FrameSource, scanned: Scan, stop: int, needed):
     """Bind later reads to the first pass index and fail on an inconsistent source."""
-    with closing(frames.selected_raw()) as stream:
+    with closing(frames.selected_samples(lambda fid: needed(fid - scanned.first_id))) as stream:
         for i, (frame_id, stamp, raw) in enumerate(stream):
             if frame_id != scanned.first_id + i or stamp != scanned.times[i]:
                 raise ValueError(
                     "source timestamps or frame indices changed during analysis"
                 )
-            yield i, raw
+            if needed(i):
+                if raw is None:
+                    raise ValueError(f"missing pixels at requested frame {frame_id}")
+                yield i, raw
             if i == stop:
                 return
     raise ValueError("source ended before a requested evidence frame was decoded")
@@ -119,10 +122,11 @@ def _analyze_windows(
     done = []
     inv = 1.0 / frames.info.scale
     for batch in batches:
-        for i, raw in _decode_frames(frames, scanned, max(w.end for w in batch)):
+        def in_batch(index, windows=batch):
+            return any(w.start <= index <= w.end for w in windows)
+
+        for i, raw in _decode_frames(frames, scanned, max(w.end for w in batch), in_batch):
             active = [w for w in batch if w.start <= i <= w.end]
-            if not active:
-                continue
             frame = frames.resized(raw)
             for w in active:
                 x1, y1, x2, y2 = w.roi
@@ -421,7 +425,8 @@ def _export_evidence(
         return
     refs = []
     for i, raw in _decode_frames(
-        frames, scanned, len(scanned.times) - 1 if raw_frames else 0
+        frames, scanned, len(scanned.times) - 1 if raw_frames else 0,
+        lambda index: (sheets and index == 0) or (raw_frames and index in frame_roles),
     ):
         if i == 0 and sheets and done:
             boxes = [

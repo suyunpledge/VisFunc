@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -143,7 +143,7 @@ class FrameSource:
             frame = cv2.resize(frame, self._size, interpolation=cv2.INTER_AREA)
         return frame
 
-    def _raw(self) -> Iterator[tuple[int, float, np.ndarray]]:
+    def _raw(self) -> Iterator[tuple[int, float, np.ndarray | None]]:
         step = 1000.0 / self.info.fps
         if self._frames is not None:
             for i, frame in enumerate(self._frames):
@@ -155,31 +155,59 @@ class FrameSource:
                     raise ValueError(f"cannot read {path}")
                 yield i, i * step, frame
         else:
-            cap = cv2.VideoCapture(self._video)
-            try:
-                if not cap.isOpened():
-                    raise ValueError(f"cannot open video {self._video}")
-                i = 0
-                while True:
+            yield from self._video_frames()
+
+    def _video_frames(self, needed: Callable[[int], bool] | None = None):
+        cap = cv2.VideoCapture(self._video)
+        try:
+            if not cap.isOpened():
+                raise ValueError(f"cannot open video {self._video}")
+            # FFmpeg exposes the decoded frame's PTS at grab(). Defer the BGR conversion
+            # and full-resolution copy until the requested interval or evidence frame.
+            sparse = cap.getBackendName() == "FFMPEG" and (
+                needed is not None or self.start_ms is not None or self.end_ms is not None
+            )
+            i = 0
+            step = 1000.0 / self.info.fps
+            while True:
+                if sparse:
+                    if not cap.grab():
+                        break
+                    stamp = float(cap.get(cv2.CAP_PROP_POS_MSEC))
+                    t = i * step if self.info.timestamps == "index" else stamp
+                    frame = None
+                    in_range = (self.start_ms is None or t >= self.start_ms) and (
+                        self.end_ms is None or t <= self.end_ms
+                    )
+                    if in_range and (needed is None or needed(i)):
+                        ok, frame = cap.retrieve()
+                        if not ok:
+                            raise ValueError(f"cannot retrieve source frame {i}")
+                else:
                     ok, frame = cap.read()
                     if not ok:
                         break
-                    # 解码之后再取：POS_MSEC 返回的是刚读出那一帧的时间戳（实测，取早了会错一帧）
                     stamp = float(cap.get(cv2.CAP_PROP_POS_MSEC))
-                    yield i, stamp, frame
-                    i += 1
-            finally:
-                cap.release()
+                yield i, stamp, frame
+                i += 1
+        finally:
+            cap.release()
 
     def __iter__(self) -> Iterator[tuple[int, float, np.ndarray]]:
         for i, t, frame in self.selected_raw():
             yield i, t, self.resized(frame)
 
     def selected_raw(self) -> Iterator[tuple[int, float, np.ndarray]]:
-        """Use one clock for the pass and validate it before applying the interval."""
+        for i, t, frame in self.selected_samples():
+            assert frame is not None
+            yield i, t, frame
+
+    def selected_samples(self, needed: Callable[[int], bool] | None = None):
+        """Validate every timestamp, including those whose pixels a replay does not need."""
         previous = -1.0
         step = 1000.0 / self.info.fps
-        for i, stamp, frame in self._raw():
+        stream = self._video_frames(needed) if self._video and needed else self._raw()
+        for i, stamp, frame in stream:
             t = i * step if self.info.timestamps == "index" else stamp
             if not math.isfinite(t) or t < 0 or t <= previous:
                 raise InvalidTimestamps(f"invalid timestamp at source frame {i}")
@@ -188,7 +216,8 @@ class FrameSource:
                 continue
             if self.end_ms is not None and t > self.end_ms:
                 break
-            frame = self._bgr(frame)
-            if frame.shape[:2] != (self.info.height, self.info.width):
-                raise ValueError(f"source frame {i} has different dimensions")
+            if frame is not None:
+                frame = self._bgr(frame)
+                if frame.shape[:2] != (self.info.height, self.info.width):
+                    raise ValueError(f"source frame {i} has different dimensions")
             yield i, t, frame

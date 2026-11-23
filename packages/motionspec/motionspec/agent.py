@@ -26,6 +26,7 @@ from typing import Any
 import cv2
 import numpy as np
 
+from .screen_history import ScreenHistory
 from .settle import SettleWatcher, _finite, capture_screen
 
 Box = tuple[int, int, int, int]
@@ -77,6 +78,26 @@ def _offset(item: dict, dx: int, dy: int) -> dict:
     if "words" in out:
         out["words"] = [_offset(w, dx, dy) for w in out["words"]]
     return out
+
+
+def _draw_marker(frame, area, marker):
+    x, y = marker["window_px"]
+    h, w = frame.shape[:2]
+    if not (0 <= x < w and 0 <= y < h):
+        return
+    left, top = max(0, x - 88), max(0, y - 60)
+    crop = frame[top : min(h, y + 61), left : min(w, x + 89)].copy()
+    center = (x - left, y - top)
+    for color, width in [((0, 0, 0), 4), ((20, 220, 255), 2)]:
+        cv2.circle(crop, center, 9, color, width, cv2.LINE_AA)
+        cv2.drawMarker(crop, center, color, cv2.MARKER_CROSS, 9, width)
+    ok, image = cv2.imencode(".png", crop)
+    if ok:
+        marker.update(
+            crop_origin_px=[area[0] + left, area[1] + top],
+            image_point_px=list(center),
+            pre_action_png=base64.b64encode(image).decode("ascii"),
+        )
 
 
 def _compact_element(element: dict | None) -> dict | None:
@@ -184,6 +205,7 @@ class ScreenAgent:
         allowed_windows: Sequence[str] = (),
         max_wait_ms: float | None = None,
         images: bool = True,
+        history_seconds: float = 20.0,
     ) -> None:
         self.capture = capture
         self.max_fps = max_fps
@@ -195,6 +217,8 @@ class ScreenAgent:
         self.allowed_windows = [w.casefold() for w in allowed_windows if w.strip()]
         self.max_wait_ms = max_wait_ms
         self.images = images
+        self.history_seconds = min(60.0, _finite("history_seconds", history_seconds))
+        self.history = ScreenHistory()
         self._reader_factory = reader_factory
         self._reader = None
         self._elements = elements
@@ -233,8 +257,54 @@ class ScreenAgent:
 
     def _frames(self, area: Box | None) -> Iterator[tuple[float, np.ndarray]]:
         if area not in self.streams:
+            if len(self.streams) >= 8:
+                oldest = next(iter(self.streams))
+                stream = self.streams.pop(oldest)
+                if hasattr(stream, "close"):
+                    stream.close()
+                self.watchers.pop(oldest, None)
             self.streams[area] = self.capture(area, max_fps=self.max_fps)
         return self.streams[area]
+
+    def close(self):
+        self.history.close()
+        for stream in self.streams.values():
+            if hasattr(stream, "close"):
+                stream.close()
+        self.streams.clear()
+        self.watchers.clear()
+
+    def watch_screen_changes(self, *, window_title: str) -> dict:
+        if not self.history_seconds or not window_title.strip():
+            raise ValueError("screen history requires an enabled recorder and a window title")
+        if window_title.casefold() in self.blocked:
+            return {"state": "capture_unavailable", "note": BLOCKED_NOTE}
+        area = self.resolve_region(None, window_title)
+        return self.history.start(
+            window_title,
+            area,
+            self.grab(area),
+            self.history_seconds,
+            min(8.0, self.max_fps),
+            self.capture,
+            self.locate_window,
+        )
+
+    def read_screen_history(
+        self,
+        *,
+        history_id: str,
+        after: int = 0,
+        event_id: int | None = None,
+        read_text: bool = False,
+        stop: bool = False,
+        include_image: bool = False,
+        region: Sequence[int] | None = None,
+    ) -> dict:
+        read = (lambda image: self.reader.read(image)) if read_text else None
+        return self.history.read(
+            history_id, after, event_id, read, stop, include_image and self.images, region
+        )
 
     def grab(self, area: Box | None) -> np.ndarray:
         return next(self._frames(area))[1]
@@ -293,13 +363,14 @@ class ScreenAgent:
             watcher.update(**waits)
         return watcher, fresh
 
-    def _mark_baseline(self, area: Box | None, ambient_ms: float = 3000.0) -> None:
+    def _mark_baseline(self, area: Box | None, ambient_ms: float = 3000.0) -> np.ndarray:
         """Make the current screen the baseline the next settle compares against."""
         watcher, _ = self._watcher(area, ambient_ms, {})
         t_ms, frame = next(self._frames(area))
         watcher.push(frame, t_ms)
         watcher.rearm()
         self._armed = ("armed", area)
+        return frame
 
     def _settle(
         self,
@@ -429,7 +500,9 @@ class ScreenAgent:
             notes.append(BLOCKED_NOTE)
         return {"query": query, "targets": targets, "ambiguous": len(targets) > 1, "notes": notes}
 
-    def _act_on(self, window_title: str, query: str, action: str, **kw) -> dict:
+    def _act_on(
+        self, window_title: str, query: str, action: str, *, marker_image=False, **kw
+    ) -> dict:
         """Act inside an allowed window, then wait and report the effect in the same call."""
         if not self.allowed_windows:
             raise PermissionError("actions are disabled; start the server with --allow-window")
@@ -447,10 +520,13 @@ class ScreenAgent:
 
             self._act = act
         return self._with_effect(
-            window_title, lambda: self._act(query, action, title=window_title, **kw), query
+            window_title,
+            lambda: self._act(query, action, title=window_title, **kw),
+            query,
+            marker_image=marker_image,
         )
 
-    def click_point(self, *, window_title: str, x: int, y: int) -> dict:
+    def click_point(self, *, window_title: str, x: int, y: int, marker_image: bool = False) -> dict:
         """Click at a screen point inside an allowed window, for controls without names."""
         if not self.allowed_windows:
             raise PermissionError("actions are disabled; start the server with --allow-window")
@@ -467,31 +543,56 @@ class ScreenAgent:
                     raise PermissionError(f"window {actual!r} is not in the allowed list")
                 done = ui_elements.post_click(hwnd, x, y)
                 return {
-                    "performed": "click_at",
+                    "performed": "mouse_down_at"
+                    if done["dispatch_state"] == "partial"
+                    else "click_at",
+                    "dispatch_state": done["dispatch_state"],
                     "window": actual,
                     "element": {"name": f"({x}, {y})"},
                     "after": None,
                     "target_window": done["target_window"],
+                    "client_point": done["client_point"],
                 }
 
             self._click = click
         return self._with_effect(
-            window_title, lambda: self._click(window_title, x, y), f"({x}, {y})"
+            window_title,
+            lambda: self._click(window_title, x, y),
+            f"({x}, {y})",
+            point=(x, y),
+            marker_image=marker_image,
         )
 
-    def _with_effect(self, window_title: str, do, label: str) -> dict:
+    def _with_effect(
+        self, window_title: str, do, label: str, *, point=None, marker_image=False
+    ) -> dict:
         """Baseline, act, wait until the window is still, and report what the action did."""
         area = self.resolve_region(None, window_title)
+        self.history.finish_window(window_title, area)
         before = self._top_window(window_title)
         blocked = window_title.casefold() in self.blocked
-        if not blocked:
-            self._mark_baseline(area)
+        baseline = None if blocked else self._mark_baseline(area)
         outcome = do()
         report = {
-            "execution_state": "completed",
+            "execution_state": outcome.get("dispatch_state", "completed"),
             "done": f"{outcome['performed']} {outcome['element']['name'] or label!r}",
             "element_after": _compact_element(outcome.get("after")),
         }
+        pos = point or outcome["element"].get("center_px")
+        if pos is not None:
+            marker = {
+                "kind": "posted_click" if point else "uia_target_center",
+                "screen_px": list(pos),
+                "window_px": [pos[0] - area[0], pos[1] - area[1]],
+            }
+            if "client_point" in outcome:
+                marker["target_client_px"] = outcome["client_point"]
+            report["operation_marker"] = marker
+            if marker_image and self.images and baseline is not None:
+                try:
+                    _draw_marker(baseline, area, marker)
+                except (ValueError, cv2.error) as exc:
+                    marker["image_error"] = str(exc)
         try:
             self._observe_effect(report, window_title, area, before, outcome, blocked)
         except Exception as exc:  # The side effect already happened, even if its window is gone.
@@ -502,6 +603,16 @@ class ScreenAgent:
                 observation_error=f"{type(exc).__name__}: {exc}",
                 next_step="Inspect current controls or wait for a fresh observation. "
                 "Do not repeat this action based on this observation error.",
+            )
+        if self.history_seconds:
+            try:
+                report["screen_history"] = self.watch_screen_changes(window_title=window_title)
+            except Exception as exc:
+                report["screen_history"] = {"state": "capture_unavailable", "detail": str(exc)}
+        if report["execution_state"] == "partial":
+            report["operation_marker"]["kind"] = "posted_mouse_down"
+            report["next_step"] = (
+                "Button down was posted but release failed. Inspect the window before acting again."
             )
         return report
 
@@ -611,9 +722,17 @@ class ScreenAgent:
         target: str,
         control_type: str | None = None,
         element_ref: str | None = None,
+        marker_image: bool = False,
     ) -> dict:
         selector = {"element_ref": element_ref} if element_ref is not None else {}
-        return self._act_on(window_title, target, "click", control_type=control_type, **selector)
+        return self._act_on(
+            window_title,
+            target,
+            "click",
+            control_type=control_type,
+            marker_image=marker_image,
+            **selector,
+        )
 
     def set_field_text(
         self, *, window_title: str, field: str, text: str, element_ref: str | None = None
@@ -627,6 +746,10 @@ class ScreenAgent:
             tools += [t for t in TOOLS if t["name"] == "screenshot"]
         if self.allowed_windows:
             tools += [t for t in TOOLS if t["name"] in ACTION_TOOLS]
+        if not self.history_seconds:
+            tools = [
+                t for t in tools if t["name"] not in ("watch_screen_changes", "read_screen_history")
+            ]
         return tools
 
     def screenshot(
@@ -680,11 +803,12 @@ TOOLS = [
             "properties": {
                 "region": _REGION,
                 "window_title": _WINDOW,
-                "quiet_ms": {"type": "number", "default": 200},
-                "expect_change_ms": {"type": "number", "default": 1000},
-                "timeout_ms": {"type": "number", "default": 10000},
+                "quiet_ms": {"type": "number", "exclusiveMinimum": 0, "default": 200},
+                "expect_change_ms": {"type": "number", "minimum": 0, "default": 1000},
+                "timeout_ms": {"type": "number", "exclusiveMinimum": 0, "default": 10000},
                 "ambient_ms": {
                     "type": "number",
+                    "minimum": 0,
                     "default": 3000,
                     "description": "0 waits for everything, including loading spinners",
                 },
@@ -748,6 +872,46 @@ TOOLS = [
 
 
 ACTION_TOOLS = ("click_element", "set_field_text", "click_point")
+TOOLS += [
+    {
+        "name": "watch_screen_changes",
+        "description": "Start sampling one visible window between calls. Actions already return a "
+        "screen_history.history_id. Use read_screen_history to inspect transient changes.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"window_title": _WINDOW},
+            "required": ["window_title"],
+        },
+    },
+    {
+        "name": "read_screen_history",
+        "description": "Read buffered changes that happened while thinking, even when the window "
+        "has returned to its baseline. Use the history_id from an action or "
+        "watch_screen_changes. read_text reads the last two selected event crops; "
+        "event_id selects one earlier event. Filter by screen region, or page with after set "
+        "to the last returned event_id when has_more is true.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "history_id": {"type": "string"},
+                "after": {"type": "integer", "minimum": 0},
+                "event_id": {"type": "integer", "minimum": 1},
+                "region": _REGION,
+                "read_text": {"type": "boolean"},
+                "stop": {"type": "boolean"},
+                "include_image": {
+                    "type": "boolean",
+                    "description": "Return the historical crop for one event_id as an image.",
+                },
+            },
+            "required": ["history_id"],
+        },
+    },
+]
+_MARKER_IMAGE = {
+    "type": "boolean",
+    "description": "Include a marked pre-action crop on image-capable servers.",
+}
 _ELEMENT_REF = {
     "type": "string",
     "description": "Current element_ref from list_ui_elements or "
@@ -772,6 +936,7 @@ TOOLS += [
                     "find_on_screen",
                 },
                 "control_type": {"type": "string", "description": "optional, e.g. button"},
+                "marker_image": _MARKER_IMAGE,
                 "element_ref": _ELEMENT_REF,
             },
             "required": ["window_title", "target"],
@@ -813,6 +978,7 @@ TOOLS.append(
                 "window_title": _WINDOW,
                 "x": {"type": "integer"},
                 "y": {"type": "integer"},
+                "marker_image": _MARKER_IMAGE,
             },
             "required": ["window_title", "x", "y"],
         },
@@ -836,13 +1002,23 @@ class McpServer:
             "find_on_screen": self.agent.find_on_screen,
             "read_screen_text": self.agent.read_screen_text,
             "list_ui_elements": self.agent.list_ui_elements,
+            "watch_screen_changes": self.agent.watch_screen_changes,
+            "read_screen_history": self.agent.read_screen_history,
             "click_element": self.agent.click_element,
             "set_field_text": self.agent.set_field_text,
             "click_point": self.agent.click_point,
         }.get(name)
         if method is None:
             raise KeyError(name)
-        return [{"type": "text", "text": json.dumps(method(**args), ensure_ascii=False)}]
+        report = method(**args)
+        image = report.get("operation_marker", {}).pop("pre_action_png", None)
+        event_image = report.pop("event_jpeg", None)
+        content = [{"type": "text", "text": json.dumps(report, ensure_ascii=False)}]
+        if image:
+            content.append({"type": "image", "mimeType": "image/png", "data": image})
+        if event_image:
+            content.append({"type": "image", "mimeType": "image/jpeg", "data": event_image})
+        return content
 
     def handle(self, message: dict) -> dict | None:
         """Answer one JSON-RPC message; notifications get no reply."""
@@ -892,6 +1068,13 @@ def serve_mcp(agent: ScreenAgent | None = None, stdin=None, stdout=None) -> None
     stdout = stdout or sys.stdout.buffer
     sys.stdout = sys.stderr  # Anything printed by libraries must not corrupt the protocol stream.
     server = McpServer(agent or ScreenAgent())
+    try:
+        _serve_lines(server, stdin, stdout)
+    finally:
+        server.agent.close()
+
+
+def _serve_lines(server, stdin, stdout):
     for raw in stdin:
         raw = raw.strip()
         if not raw:
@@ -1032,3 +1215,4 @@ def serve_http(
         httpd.serve_forever()
     finally:
         httpd.server_close()
+        server_logic.agent.close()

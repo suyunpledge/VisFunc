@@ -139,6 +139,8 @@ def main(argv: list[str] | None = None) -> int:
 
     am = sub.add_parser("agent-mcp", help="serve screen tools for agents over MCP (stdio)")
     am.add_argument("--max-fps", type=float, default=60.0, help="screen capture rate limit")
+    am.add_argument("--history-seconds", type=float, default=20.0,
+                    help="sample window changes between calls for up to 60 s; 0 disables")
     am.add_argument("--http", metavar="HOST:PORT",
                     help="serve Streamable HTTP at http://HOST:PORT/mcp instead of stdio")
     am.add_argument("--allow-window", action="append", default=[], metavar="TITLE",
@@ -248,7 +250,8 @@ def main(argv: list[str] | None = None) -> int:
         if max_wait is None and args.http:
             max_wait = 8000.0
         agent = ScreenAgent(max_fps=args.max_fps, allowed_windows=args.allow_window,
-                            max_wait_ms=max_wait, images=not args.no_images)
+                            max_wait_ms=max_wait, images=not args.no_images,
+                            history_seconds=args.history_seconds)
         if args.http:
             host, _, port = args.http.rpartition(":")
             if not host or not port.isdigit():
