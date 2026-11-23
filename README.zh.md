@@ -7,7 +7,7 @@
 
 [English](README.md) · 中文
 
-Windows x64 用户可解压部署包并双击 `Start.cmd`，同时启动图片 API 和桌面 Agent MCP。[部署说明](deployment/windows/README.zh.md)
+Windows x64 用户可解压部署包并双击 `Start.cmd`，同时启动图片 API 和桌面 Agent MCP。[部署说明](deployment/windows/README.zh.md) · [生产加固与实测](docs/agent-production-20261123.md)
 
 多模态模型能说出画面里有什么，但问到"这张卡片移动了多少像素""这个动画用了多久""这两块区域有没有挨着"，
 回答经常不对。VisFunc 在本地把这些量测出来，整理成可以按帧、按坐标、按时间查询的函数，模型读数字作答。
@@ -118,7 +118,7 @@ motionspec agent-mcp
 
 在真实桌面的 Qt 窗口上，10 个控件（其中 6 个只有图标）全部按名字找到，单次查找多数在 60 ms 以内；状态文字变化后约 210 ms 判定稳定，并读出完整的一行。在 Chrome 渲染的四类网页上，240 段文字里 239 段能按文字点中，包括 25 行表格的全部单元格。浏览器里只有图标的按钮 OCR 找不到，Chrome 窗口的 UI Automation 还没验证。[用法与评测](docs/agent-screen-20261122.md)
 
-接入 Pledge Keystone（`--http`）后，GPT-6.1 sol 和 terra 完成了四类桌面任务：Qt 设置窗口（带确认弹窗）、同步失败后按错误提示改端口重试、Chrome 里的注册表单、只能按坐标点击的自绘界面。不设回合上限的最近 16 次全部完成，单个任务 20～65 秒；出错重试的任务要 13～15 次工具调用，超过 Keystone 默认配置的 12 次。Keystone 自带的窗口驱动在 Qt 窗口里看不到任何控件。本机的 ESET 浏览器屏幕保护会挡住浏览器截屏，此时服务改用 UI Automation 判断操作效果。[Keystone 实测](docs/agent-keystone-20261122.md)
+接入 Pledge Keystone（`--http`）后，GPT-6.1 sol 和 terra 完成了四类桌面任务：Qt 设置窗口（带确认弹窗）、同步失败后按错误提示改端口重试、Chrome 里的注册表单、只能按坐标点击的自绘界面。不设回合上限的最近 16 次全部完成，单个任务 20～65 秒；出错重试的任务要 13～15 次工具调用，Keystone 原先默认 12 次就会停下，现在默认不限步数，需要时在其高级配置里设置上限。Keystone 自带的窗口驱动在 Qt 窗口里看不到任何控件。本机的 ESET 浏览器屏幕保护会挡住浏览器截屏，此时服务改用 UI Automation 判断操作效果。[Keystone 实测](docs/agent-keystone-20261122.md)
 
 ## 结果汇总
 

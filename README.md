@@ -7,7 +7,7 @@
 
 English · [中文](README.zh.md)
 
-On Windows x64, extract the portable bundle and double-click `Start.cmd` to start the image API and desktop MCP server. [Deployment guide (中文)](deployment/windows/README.zh.md)
+On Windows x64, extract the portable bundle and double-click `Start.cmd` to start the image API and desktop MCP server. [Deployment guide (中文)](deployment/windows/README.zh.md) · [Production hardening (中文)](docs/agent-production-20261123.md)
 
 Multimodal models can say what is in a picture, but they often get questions like "how many pixels did this card move",
 "how long did the animation take" or "do these two regions touch" wrong. VisFunc measures these things locally and stores
@@ -128,7 +128,7 @@ motionspec agent-mcp
 
 On a real Qt window on the desktop, all 10 controls (6 of them icon-only) were found by name, most lookups in under 60 ms. After a status text changed, the screen was judged settled about 210 ms later and the whole line was read. On four kinds of web page rendered by Chrome, 239 of 240 pieces of text could be clicked by their text, including every cell of a 25-row table. Icon-only buttons in a browser are not found by OCR, and UI Automation on a Chrome window has not been checked yet. [Usage and evaluation](docs/agent-screen-20261122.md) (Chinese)
 
-Connected to Pledge Keystone (`--http`), GPT-6.1 sol and terra completed four kinds of desktop task: a Qt settings window with a confirmation dialog, retrying a failed sync after fixing the port named in an error dialog, a sign-up form in Chrome, and a custom-drawn window that can only be clicked by coordinates. The latest 16 runs, with no turn limit, all succeeded in 20 to 65 seconds each. The retry task needs 13 to 15 tool calls, more than the 12 that Keystone's default config allows. Keystone's own window driver sees no controls in Qt windows. On this machine, ESET's browser screen protection blocks screenshots of browser windows; the server then judges effects through UI Automation instead. [Keystone test](docs/agent-keystone-20261122.md) (Chinese)
+Connected to Pledge Keystone (`--http`), GPT-6.1 sol and terra completed four kinds of desktop task: a Qt settings window with a confirmation dialog, retrying a failed sync after fixing the port named in an error dialog, a sign-up form in Chrome, and a custom-drawn window that can only be clicked by coordinates. The latest 16 runs, with no turn limit, all succeeded in 20 to 65 seconds each. The retry task needs 13 to 15 tool calls; Keystone used to stop at 12 by default and now has no step limit unless one is set in its advanced settings. Keystone's own window driver sees no controls in Qt windows. On this machine, ESET's browser screen protection blocks screenshots of browser windows; the server then judges effects through UI Automation instead. [Keystone test](docs/agent-keystone-20261122.md) (Chinese)
 
 ## Results
 
