@@ -1328,7 +1328,7 @@ def json_log(path: str | None, *, max_bytes: int = 5_000_000, backups: int = 5):
         logger.addHandler(handler)
 
     def write(event: dict) -> None:
-        stamp = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
+        stamp = time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime())
         logger.info(json.dumps({"time": stamp, **event}, ensure_ascii=False))
 
     return write
@@ -1426,21 +1426,34 @@ def serve_http(
             self.end_headers()
             self.wfile.write(data)
 
+        def _refuse(self, status: int, error: str) -> bool:
+            """Read the unread request body, then answer and close.
+
+            Closing a socket with unread input makes Windows send a reset, so the client would
+            see a dropped connection instead of the status code.
+            """
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                length = 0
+            if 0 < length <= MAX_REQUEST_BYTES:
+                self.rfile.read(length)
+            self.close_connection = True
+            self._reply(status, {"error": error}, {"Connection": "close"})
+            return False
+
         def _allowed(self) -> bool:
             origin = self.headers.get("Origin")
             if origin and urlsplit(origin).hostname not in {"localhost", "127.0.0.1", "::1"}:
-                self._reply(403, {"error": "origin not allowed"})
-                return False
+                return self._refuse(403, "origin not allowed")
             if token:
                 given = self.headers.get("Authorization", "")
                 if not hmac.compare_digest(given.encode(), f"Bearer {token}".encode()):
                     if log is not None:
                         log({"event": "unauthorized", "client": self.client_address[0]})
-                    self._reply(401, {"error": "unauthorized"})
-                    return False
+                    return self._refuse(401, "unauthorized")
             if urlsplit(self.path).path not in ("/mcp", "/mcp/"):
-                self._reply(404, {"error": "use /mcp"})
-                return False
+                return self._refuse(404, "use /mcp")
             return True
 
         def do_GET(self):

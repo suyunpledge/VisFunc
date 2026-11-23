@@ -657,3 +657,49 @@ def test_http_requires_a_token_unless_explicitly_waived(capsys, monkeypatch):
         main(["agent-mcp", "--http", "127.0.0.1:1"])
     assert stop.value.code == 2
     assert "VISFUNC_MCP_TOKEN" in capsys.readouterr().err
+
+
+def test_http_refusals_reach_the_client_as_status_codes():
+    import json
+    import threading
+    import urllib.error
+    import urllib.request
+
+    from motionspec.agent import serve_http
+
+    started = threading.Event()
+    holder = {}
+
+    def ready(httpd):
+        holder["httpd"] = httpd
+        started.set()
+
+    thread = threading.Thread(
+        target=serve_http,
+        kwargs=dict(agent=make()[0], port=0, token="right-token", ready=ready),
+        daemon=True,
+    )
+    thread.start()
+    started.wait(5)
+    url = f"http://127.0.0.1:{holder['httpd'].server_port}/mcp"
+    body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}).encode()
+    try:
+        for headers, expected in (
+            ({}, 401),
+            ({"Authorization": "Bearer wrong"}, 401),
+            ({"Authorization": "Bearer right-token", "Origin": "https://evil.example"}, 403),
+        ):
+            request = urllib.request.Request(
+                url, body, {"Content-Type": "application/json", **headers}
+            )
+            with pytest.raises(urllib.error.HTTPError) as error:
+                urllib.request.urlopen(request, timeout=5)
+            assert error.value.code == expected  # a status, not a reset connection
+        request = urllib.request.Request(
+            url, body, {"Content-Type": "application/json", "Authorization": "Bearer right-token"}
+        )
+        with urllib.request.urlopen(request, timeout=5) as response:
+            assert json.load(response)["result"]["tools"]
+    finally:
+        holder["httpd"].shutdown()
+        thread.join(5)
