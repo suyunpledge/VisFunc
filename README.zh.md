@@ -1,10 +1,13 @@
 # VisFunc
 
+**在本地测量图片和界面动效，为 AI 提供可查询、可核对的数值证据。**
+
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 [English](README.md) · 中文
 
 Windows x64 用户可解压部署包并双击 `Start.cmd`，同时启动图片 API 和桌面 Agent MCP。[部署说明](deployment/windows/README.zh.md)
-
-VisFunc 把图片和视频里能测量的东西先用程序测出来，再交给 AI。
 
 多模态模型能说出画面里有什么，但问到"这张卡片移动了多少像素""这个动画用了多久""这两块区域有没有挨着"，
 回答经常不对。VisFunc 在本地把这些量测出来，整理成可以按帧、按坐标、按时间查询的函数，模型读数字作答。
@@ -167,4 +170,4 @@ scripts/               服务启动与评测脚本
 
 ## 许可
 
-MIT
+[MIT](LICENSE)

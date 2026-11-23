@@ -1,10 +1,13 @@
 # VisFunc
 
+**Measure images and UI motion locally, then give AI models numerical evidence they can query and verify.**
+
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 English · [中文](README.zh.md)
 
 On Windows x64, extract the portable bundle and double-click `Start.cmd` to start the image API and desktop MCP server. [Deployment guide (中文)](deployment/windows/README.zh.md)
-
-VisFunc measures what can be measured in images and videos with ordinary code, then gives the measurements to an AI model.
 
 Multimodal models can say what is in a picture, but they often get questions like "how many pixels did this card move",
 "how long did the animation take" or "do these two regions touch" wrong. VisFunc measures these things locally and stores
@@ -181,4 +184,4 @@ scripts/               service launch and evaluation scripts
 
 ## License
 
-MIT
+[MIT](LICENSE)

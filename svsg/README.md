@@ -170,4 +170,4 @@ Tests are in `tests/` at the repository root: `python -m pytest tests`.
 
 ## License
 
-MIT
+[MIT](../LICENSE)
