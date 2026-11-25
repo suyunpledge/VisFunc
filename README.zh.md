@@ -105,6 +105,8 @@ motionspec overlays slide-out/functions.json --player-toolbar
 
 `click_point` 回执的 `operation_marker.screen_px` 是发送鼠标消息的屏幕物理坐标；按名字操作的 `uia_target_center` 标记控件中心。支持图像的 MCP 客户端可以传 `marker_image=true`，取得标记在操作前截图上的位置。
 
+自绘按钮可以直接用 `click_text(window_title=…, text=…)` 操作。工具在当前画面上查找文字，派发前再次核对目标区域。回执包含识别到的文字、边框和点击坐标。文字缺失、重名、置信度过低或位置发生变化时会返回 `execution_state=not_started`。[Keystone 桌面操作实测](docs/agent-screen-targets-20261125.md)
+
 动作回执会给出 `screen_history.history_id`。用 `read_screen_history` 并设置 `compact=true`，可以查到提示文字、字段状态、对话框和局部画面变化。后续传入 `after=next_after` 增量读取，需要识别裁图时加 `read_text=true`。默认每次记录 20 秒，像素采样最高 8 Hz，控件最高 4 Hz。`watch_screen_changes` 可单独开始记录，`--history-seconds 0` 可关闭。[界面事件缓存与 token 实测](docs/agent-ui-events-20261123.md)
 
 客户端为每次有意操作生成一个 UUID，跨连接重试时沿用同一个 HTTP `Idempotency-Key` 或 MCP `params._meta["visfunc/operationId"]`。已协商的同一会话也可用原 JSON-RPC 请求编号重试。动作回执保留 24 小时，遇到 `unknown` 时先只读核对窗口状态。[回执与恢复方式](docs/agent-ui-events-20261123.md)

@@ -1,0 +1,923 @@
+{
+  "baseline": "a8cbff9ab63a75b074a2d6e1ad1bb2e209fee376",
+  "platform": "Windows, real interactive desktop",
+  "model": "gpt-6.1-sol",
+  "provider": "OpenAI via local Keystone",
+  "max_turns": 14,
+  "runs": [
+    {
+      "variant": "baseline",
+      "task": "canvas_reflow",
+      "model": "gpt-6.1-sol",
+      "success": true,
+      "answer": "已完成。窗口显示状态：**Confirmed: priority High, notify on**（已确认：优先级 High，团队通知已开启）。",
+      "answer_mentions": true,
+      "application_state": {
+        "priority": "High",
+        "notify": true,
+        "confirmed": true,
+        "clicks": [
+          "Medium",
+          "High",
+          "Notify team",
+          "Confirm"
+        ],
+        "misses": 0,
+        "confirmed_with": {
+          "priority": "High",
+          "notify": true
+        },
+        "reflowed": true
+      },
+      "seconds": 36.4,
+      "model_turns": 8,
+      "tool_calls": 7,
+      "tool_errors": 0,
+      "tokens": {
+        "prompt_tokens": 21779,
+        "completion_tokens": 320,
+        "total_tokens": 22099
+      },
+      "cached_prompt_tokens": 17635,
+      "trace": [
+        {
+          "tool": "list_ui_elements",
+          "ms": 1010,
+          "result_bytes": 337,
+          "ok": true
+        },
+        {
+          "tool": "read_screen_text",
+          "ms": 1981,
+          "result_bytes": 1840,
+          "ok": true
+        },
+        {
+          "tool": "click_point",
+          "ms": 1074,
+          "result_bytes": 942,
+          "execution_state": "completed",
+          "screen_px": [
+            690,
+            366
+          ],
+          "ok": true
+        },
+        {
+          "tool": "read_screen_text",
+          "ms": 454,
+          "result_bytes": 1910,
+          "ok": true
+        },
+        {
+          "tool": "click_point",
+          "ms": 794,
+          "result_bytes": 841,
+          "execution_state": "completed",
+          "screen_px": [
+            480,
+            365
+          ],
+          "ok": true
+        },
+        {
+          "tool": "click_point",
+          "ms": 534,
+          "result_bytes": 670,
+          "execution_state": "completed",
+          "screen_px": [
+            290,
+            481
+          ],
+          "ok": true
+        },
+        {
+          "tool": "click_point",
+          "ms": 704,
+          "result_bytes": 748,
+          "execution_state": "completed",
+          "screen_px": [
+            917,
+            622
+          ],
+          "ok": true
+        }
+      ],
+      "turn_total_tokens": [
+        1225,
+        1403,
+        2128,
+        2495,
+        3247,
+        3581,
+        3863,
+        4157
+      ],
+      "per_turn_tokens": [
+        {
+          "prompt_tokens": 1189,
+          "completion_tokens": 36,
+          "total_tokens": 1225
+        },
+        {
+          "prompt_tokens": 1366,
+          "completion_tokens": 37,
+          "total_tokens": 1403
+        },
+        {
+          "prompt_tokens": 2084,
+          "completion_tokens": 44,
+          "total_tokens": 2128
+        },
+        {
+          "prompt_tokens": 2458,
+          "completion_tokens": 37,
+          "total_tokens": 2495
+        },
+        {
+          "prompt_tokens": 3203,
+          "completion_tokens": 44,
+          "total_tokens": 3247
+        },
+        {
+          "prompt_tokens": 3537,
+          "completion_tokens": 44,
+          "total_tokens": 3581
+        },
+        {
+          "prompt_tokens": 3819,
+          "completion_tokens": 44,
+          "total_tokens": 3863
+        },
+        {
+          "prompt_tokens": 4123,
+          "completion_tokens": 34,
+          "total_tokens": 4157
+        }
+      ]
+    },
+    {
+      "variant": "baseline",
+      "task": "canvas",
+      "model": "gpt-6.1-sol",
+      "success": true,
+      "answer": "已将优先级设为 **High**，打开 **Notify team**，并点击 **Confirm**。\n\n窗口显示状态：**Confirmed: priority High, notify on**（已确认：优先级 High，通知已开启）。",
+      "answer_mentions": true,
+      "application_state": {
+        "priority": "High",
+        "notify": true,
+        "confirmed": true,
+        "clicks": [
+          "High",
+          "Notify team",
+          "Confirm"
+        ],
+        "misses": 0,
+        "confirmed_with": {
+          "priority": "High",
+          "notify": true
+        }
+      },
+      "seconds": 21.9,
+      "model_turns": 6,
+      "tool_calls": 5,
+      "tool_errors": 0,
+      "tokens": {
+        "prompt_tokens": 12821,
+        "completion_tokens": 258,
+        "total_tokens": 13079
+      },
+      "cached_prompt_tokens": 10952,
+      "trace": [
+        {
+          "tool": "list_ui_elements",
+          "ms": 110,
+          "result_bytes": 337,
+          "ok": true
+        },
+        {
+          "tool": "read_screen_text",
+          "ms": 352,
+          "result_bytes": 1839,
+          "ok": true
+        },
+        {
+          "tool": "click_point",
+          "ms": 676,
+          "result_bytes": 824,
+          "execution_state": "completed",
+          "screen_px": [
+            690,
+            366
+          ],
+          "ok": true
+        },
+        {
+          "tool": "click_point",
+          "ms": 546,
+          "result_bytes": 786,
+          "execution_state": "completed",
+          "screen_px": [
+            290,
+            481
+          ],
+          "ok": true
+        },
+        {
+          "tool": "click_point",
+          "ms": 519,
+          "result_bytes": 748,
+          "execution_state": "completed",
+          "screen_px": [
+            916,
+            622
+          ],
+          "ok": true
+        }
+      ],
+      "turn_total_tokens": [
+        1225,
+        1403,
+        2127,
+        2454,
+        2777,
+        3093
+      ],
+      "per_turn_tokens": [
+        {
+          "prompt_tokens": 1189,
+          "completion_tokens": 36,
+          "total_tokens": 1225
+        },
+        {
+          "prompt_tokens": 1366,
+          "completion_tokens": 37,
+          "total_tokens": 1403
+        },
+        {
+          "prompt_tokens": 2083,
+          "completion_tokens": 44,
+          "total_tokens": 2127
+        },
+        {
+          "prompt_tokens": 2410,
+          "completion_tokens": 44,
+          "total_tokens": 2454
+        },
+        {
+          "prompt_tokens": 2733,
+          "completion_tokens": 44,
+          "total_tokens": 2777
+        },
+        {
+          "prompt_tokens": 3040,
+          "completion_tokens": 53,
+          "total_tokens": 3093
+        }
+      ]
+    },
+    {
+      "variant": "optimized",
+      "task": "canvas",
+      "model": "gpt-6.1-sol",
+      "success": true,
+      "answer": "已将优先级设为 High，开启 Notify team，并点击 Confirm。\n\n窗口显示状态：**Confirmed: priority High, notify on**（已确认：高优先级，团队通知已开启）。",
+      "answer_mentions": true,
+      "application_state": {
+        "priority": "High",
+        "notify": true,
+        "confirmed": true,
+        "clicks": [
+          "High",
+          "Notify team",
+          "Confirm"
+        ],
+        "misses": 0,
+        "confirmed_with": {
+          "priority": "High",
+          "notify": true
+        }
+      },
+      "seconds": 23.2,
+      "model_turns": 6,
+      "tool_calls": 5,
+      "tool_errors": 0,
+      "tokens": {
+        "prompt_tokens": 13572,
+        "completion_tokens": 241,
+        "total_tokens": 13813
+      },
+      "cached_prompt_tokens": 10337,
+      "trace": [
+        {
+          "tool": "list_ui_elements",
+          "ms": 566,
+          "result_bytes": 338,
+          "ok": true
+        },
+        {
+          "tool": "read_screen_text",
+          "ms": 1329,
+          "result_bytes": 1839,
+          "ok": true
+        },
+        {
+          "tool": "click_text",
+          "ms": 990,
+          "result_bytes": 1022,
+          "execution_state": "completed",
+          "screen_px": [
+            690,
+            366
+          ],
+          "ok": true
+        },
+        {
+          "tool": "click_text",
+          "ms": 726,
+          "result_bytes": 759,
+          "execution_state": "completed",
+          "screen_px": [
+            290,
+            481
+          ],
+          "ok": true
+        },
+        {
+          "tool": "click_text",
+          "ms": 940,
+          "result_bytes": 869,
+          "execution_state": "completed",
+          "screen_px": [
+            917,
+            622
+          ],
+          "ok": true
+        }
+      ],
+      "turn_total_tokens": [
+        1314,
+        1492,
+        2212,
+        2614,
+        2914,
+        3267
+      ],
+      "per_turn_tokens": [
+        {
+          "prompt_tokens": 1278,
+          "completion_tokens": 36,
+          "total_tokens": 1314
+        },
+        {
+          "prompt_tokens": 1455,
+          "completion_tokens": 37,
+          "total_tokens": 1492
+        },
+        {
+          "prompt_tokens": 2172,
+          "completion_tokens": 40,
+          "total_tokens": 2212
+        },
+        {
+          "prompt_tokens": 2573,
+          "completion_tokens": 41,
+          "total_tokens": 2614
+        },
+        {
+          "prompt_tokens": 2874,
+          "completion_tokens": 40,
+          "total_tokens": 2914
+        },
+        {
+          "prompt_tokens": 3220,
+          "completion_tokens": 47,
+          "total_tokens": 3267
+        }
+      ]
+    },
+    {
+      "variant": "optimized",
+      "task": "canvas_reflow",
+      "model": "gpt-6.1-sol",
+      "success": true,
+      "answer": "已将优先级设为 **High**，开启 **Notify team**，并点击 **Confirm**。\n\n窗口显示状态：**Confirmed: priority High, notify on**（已确认：优先级 High，通知已开启）。",
+      "answer_mentions": true,
+      "application_state": {
+        "priority": "High",
+        "notify": true,
+        "confirmed": true,
+        "clicks": [
+          "High",
+          "Notify team",
+          "Confirm"
+        ],
+        "misses": 0,
+        "confirmed_with": {
+          "priority": "High",
+          "notify": true
+        },
+        "reflowed": true
+      },
+      "seconds": 24.8,
+      "model_turns": 6,
+      "tool_calls": 5,
+      "tool_errors": 0,
+      "tokens": {
+        "prompt_tokens": 13455,
+        "completion_tokens": 247,
+        "total_tokens": 13702
+      },
+      "cached_prompt_tokens": 11522,
+      "trace": [
+        {
+          "tool": "list_ui_elements",
+          "ms": 69,
+          "result_bytes": 338,
+          "ok": true
+        },
+        {
+          "tool": "read_screen_text",
+          "ms": 239,
+          "result_bytes": 1839,
+          "ok": true
+        },
+        {
+          "tool": "click_text",
+          "ms": 886,
+          "result_bytes": 903,
+          "execution_state": "completed",
+          "screen_px": [
+            480,
+            365
+          ],
+          "ok": true
+        },
+        {
+          "tool": "click_text",
+          "ms": 711,
+          "result_bytes": 759,
+          "execution_state": "completed",
+          "screen_px": [
+            290,
+            481
+          ],
+          "ok": true
+        },
+        {
+          "tool": "click_text",
+          "ms": 769,
+          "result_bytes": 913,
+          "execution_state": "completed",
+          "screen_px": [
+            916,
+            622
+          ],
+          "ok": true
+        }
+      ],
+      "turn_total_tokens": [
+        1314,
+        1492,
+        2212,
+        2566,
+        2872,
+        3246
+      ],
+      "per_turn_tokens": [
+        {
+          "prompt_tokens": 1278,
+          "completion_tokens": 36,
+          "total_tokens": 1314
+        },
+        {
+          "prompt_tokens": 1455,
+          "completion_tokens": 37,
+          "total_tokens": 1492
+        },
+        {
+          "prompt_tokens": 2172,
+          "completion_tokens": 40,
+          "total_tokens": 2212
+        },
+        {
+          "prompt_tokens": 2525,
+          "completion_tokens": 41,
+          "total_tokens": 2566
+        },
+        {
+          "prompt_tokens": 2832,
+          "completion_tokens": 40,
+          "total_tokens": 2872
+        },
+        {
+          "prompt_tokens": 3193,
+          "completion_tokens": 53,
+          "total_tokens": 3246
+        }
+      ]
+    },
+    {
+      "variant": "baseline",
+      "task": "file_dialog",
+      "model": "gpt-6.1-sol",
+      "success": true,
+      "answer": "已打开，最终选择的文件名是：report-final.txt。",
+      "answer_mentions": true,
+      "application_state": {
+        "native_dialog": true,
+        "opened_expected_file": true,
+        "accepts": 1,
+        "file": "report-final.txt"
+      },
+      "seconds": 13.8,
+      "model_turns": 3,
+      "tool_calls": 2,
+      "tool_errors": 0,
+      "tokens": {
+        "prompt_tokens": 11541,
+        "completion_tokens": 100,
+        "total_tokens": 11641
+      },
+      "cached_prompt_tokens": 7188,
+      "trace": [
+        {
+          "tool": "list_ui_elements",
+          "ms": 1020,
+          "result_bytes": 11961,
+          "ok": true
+        },
+        {
+          "tool": "click_element",
+          "ms": 3729,
+          "result_bytes": 1696,
+          "execution_state": "completed",
+          "screen_px": [
+            778,
+            276
+          ],
+          "ok": true
+        }
+      ],
+      "turn_total_tokens": [
+        1214,
+        4916,
+        5511
+      ],
+      "per_turn_tokens": [
+        {
+          "prompt_tokens": 1178,
+          "completion_tokens": 36,
+          "total_tokens": 1214
+        },
+        {
+          "prompt_tokens": 4870,
+          "completion_tokens": 46,
+          "total_tokens": 4916
+        },
+        {
+          "prompt_tokens": 5493,
+          "completion_tokens": 18,
+          "total_tokens": 5511
+        }
+      ]
+    },
+    {
+      "variant": "optimized",
+      "task": "file_dialog",
+      "model": "gpt-6.1-sol",
+      "success": true,
+      "answer": "已打开，最终选择的文件名是 `report-final.txt`。",
+      "answer_mentions": true,
+      "application_state": {
+        "native_dialog": true,
+        "opened_expected_file": true,
+        "accepts": 1,
+        "file": "report-final.txt"
+      },
+      "seconds": 15.2,
+      "model_turns": 3,
+      "tool_calls": 2,
+      "tool_errors": 0,
+      "tokens": {
+        "prompt_tokens": 11819,
+        "completion_tokens": 101,
+        "total_tokens": 11920
+      },
+      "cached_prompt_tokens": 7461,
+      "trace": [
+        {
+          "tool": "list_ui_elements",
+          "ms": 1050,
+          "result_bytes": 11970,
+          "ok": true
+        },
+        {
+          "tool": "click_element",
+          "ms": 3552,
+          "result_bytes": 1697,
+          "execution_state": "completed",
+          "screen_px": [
+            778,
+            276
+          ],
+          "ok": true
+        }
+      ],
+      "turn_total_tokens": [
+        1303,
+        5011,
+        5606
+      ],
+      "per_turn_tokens": [
+        {
+          "prompt_tokens": 1267,
+          "completion_tokens": 36,
+          "total_tokens": 1303
+        },
+        {
+          "prompt_tokens": 4965,
+          "completion_tokens": 46,
+          "total_tokens": 5011
+        },
+        {
+          "prompt_tokens": 5587,
+          "completion_tokens": 19,
+          "total_tokens": 5606
+        }
+      ]
+    },
+    {
+      "variant": "optimized",
+      "task": "canvas_reflow",
+      "model": "gpt-6.1-sol",
+      "success": true,
+      "answer": "已将优先级设为 High，打开 Notify team，并点击 Confirm。\n\n窗口显示状态：**Confirmed: priority High, notify on**（已确认：优先级 High，团队通知已开启）。",
+      "answer_mentions": true,
+      "application_state": {
+        "priority": "High",
+        "notify": true,
+        "confirmed": true,
+        "clicks": [
+          "High",
+          "Notify team",
+          "Confirm"
+        ],
+        "misses": 0,
+        "confirmed_with": {
+          "priority": "High",
+          "notify": true
+        },
+        "reflowed": true
+      },
+      "seconds": 26.6,
+      "model_turns": 6,
+      "tool_calls": 5,
+      "tool_errors": 0,
+      "tokens": {
+        "prompt_tokens": 13481,
+        "completion_tokens": 241,
+        "total_tokens": 13722
+      },
+      "cached_prompt_tokens": 11549,
+      "trace": [
+        {
+          "tool": "list_ui_elements",
+          "ms": 479,
+          "result_bytes": 337,
+          "ok": true
+        },
+        {
+          "tool": "read_screen_text",
+          "ms": 1059,
+          "result_bytes": 1839,
+          "ok": true
+        },
+        {
+          "tool": "click_text",
+          "ms": 1106,
+          "result_bytes": 903,
+          "execution_state": "completed",
+          "screen_px": [
+            480,
+            365
+          ],
+          "ok": true
+        },
+        {
+          "tool": "click_text",
+          "ms": 836,
+          "result_bytes": 831,
+          "execution_state": "completed",
+          "screen_px": [
+            290,
+            481
+          ],
+          "ok": true
+        },
+        {
+          "tool": "click_text",
+          "ms": 869,
+          "result_bytes": 833,
+          "execution_state": "completed",
+          "screen_px": [
+            916,
+            622
+          ],
+          "ok": true
+        }
+      ],
+      "turn_total_tokens": [
+        1314,
+        1492,
+        2212,
+        2565,
+        2900,
+        3239
+      ],
+      "per_turn_tokens": [
+        {
+          "prompt_tokens": 1278,
+          "completion_tokens": 36,
+          "total_tokens": 1314
+        },
+        {
+          "prompt_tokens": 1455,
+          "completion_tokens": 37,
+          "total_tokens": 1492
+        },
+        {
+          "prompt_tokens": 2172,
+          "completion_tokens": 40,
+          "total_tokens": 2212
+        },
+        {
+          "prompt_tokens": 2524,
+          "completion_tokens": 41,
+          "total_tokens": 2565
+        },
+        {
+          "prompt_tokens": 2860,
+          "completion_tokens": 40,
+          "total_tokens": 2900
+        },
+        {
+          "prompt_tokens": 3192,
+          "completion_tokens": 47,
+          "total_tokens": 3239
+        }
+      ]
+    },
+    {
+      "variant": "baseline",
+      "task": "canvas_reflow",
+      "model": "gpt-6.1-sol",
+      "success": true,
+      "answer": "已完成。窗口显示状态：**Confirmed: priority High, notify on**（已确认：优先级 High，团队通知已开启）。",
+      "answer_mentions": true,
+      "application_state": {
+        "priority": "High",
+        "notify": true,
+        "confirmed": true,
+        "clicks": [
+          "Medium",
+          "High",
+          "Notify team",
+          "Confirm"
+        ],
+        "misses": 0,
+        "confirmed_with": {
+          "priority": "High",
+          "notify": true
+        },
+        "reflowed": true
+      },
+      "seconds": 32.4,
+      "model_turns": 8,
+      "tool_calls": 7,
+      "tool_errors": 0,
+      "tokens": {
+        "prompt_tokens": 21663,
+        "completion_tokens": 320,
+        "total_tokens": 21983
+      },
+      "cached_prompt_tokens": 18677,
+      "trace": [
+        {
+          "tool": "list_ui_elements",
+          "ms": 496,
+          "result_bytes": 337,
+          "ok": true
+        },
+        {
+          "tool": "read_screen_text",
+          "ms": 984,
+          "result_bytes": 1839,
+          "ok": true
+        },
+        {
+          "tool": "click_point",
+          "ms": 873,
+          "result_bytes": 826,
+          "execution_state": "completed",
+          "screen_px": [
+            690,
+            366
+          ],
+          "ok": true
+        },
+        {
+          "tool": "read_screen_text",
+          "ms": 323,
+          "result_bytes": 1910,
+          "ok": true
+        },
+        {
+          "tool": "click_point",
+          "ms": 597,
+          "result_bytes": 841,
+          "execution_state": "completed",
+          "screen_px": [
+            480,
+            365
+          ],
+          "ok": true
+        },
+        {
+          "tool": "click_point",
+          "ms": 807,
+          "result_bytes": 786,
+          "execution_state": "completed",
+          "screen_px": [
+            290,
+            481
+          ],
+          "ok": true
+        },
+        {
+          "tool": "click_point",
+          "ms": 999,
+          "result_bytes": 827,
+          "execution_state": "completed",
+          "screen_px": [
+            917,
+            622
+          ],
+          "ok": true
+        }
+      ],
+      "turn_total_tokens": [
+        1225,
+        1403,
+        2127,
+        2449,
+        3201,
+        3534,
+        3859,
+        4185
+      ],
+      "per_turn_tokens": [
+        {
+          "prompt_tokens": 1189,
+          "completion_tokens": 36,
+          "total_tokens": 1225
+        },
+        {
+          "prompt_tokens": 1366,
+          "completion_tokens": 37,
+          "total_tokens": 1403
+        },
+        {
+          "prompt_tokens": 2083,
+          "completion_tokens": 44,
+          "total_tokens": 2127
+        },
+        {
+          "prompt_tokens": 2412,
+          "completion_tokens": 37,
+          "total_tokens": 2449
+        },
+        {
+          "prompt_tokens": 3157,
+          "completion_tokens": 44,
+          "total_tokens": 3201
+        },
+        {
+          "prompt_tokens": 3490,
+          "completion_tokens": 44,
+          "total_tokens": 3534
+        },
+        {
+          "prompt_tokens": 3815,
+          "completion_tokens": 44,
+          "total_tokens": 3859
+        },
+        {
+          "prompt_tokens": 4151,
+          "completion_tokens": 34,
+          "total_tokens": 4185
+        }
+      ]
+    }
+  ]
+}

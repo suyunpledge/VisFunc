@@ -689,6 +689,27 @@ class ScreenAgent:
             marker_image=marker_image,
         )
 
+    def _dispatch_point(self, title, x, y, *, expected_hwnd=None):
+        if self._click is not None:
+            return self._click(title, x, y)
+        from svsg.recognition import ui_elements
+
+        hwnd = ui_elements.find_window(title)
+        actual = ui_elements.window_title(hwnd)
+        self._permit(hwnd, actual)
+        if expected_hwnd is not None and hwnd != expected_hwnd:
+            raise ui_elements.ClickTargetChanged("A different window now matches the title.")
+        done = ui_elements.post_click(hwnd, x, y)
+        return {
+            "performed": "mouse_down_at" if done["dispatch_state"] == "partial" else "click_at",
+            "dispatch_state": done["dispatch_state"],
+            "window": actual,
+            "element": {"name": f"({x}, {y})"},
+            "after": None,
+            "target_window": done["target_window"],
+            "client_point": done["client_point"],
+        }
+
     def click_point(self, *, window_title: str, x: int, y: int, marker_image: bool = False) -> dict:
         """Click at a screen point inside an allowed window, for controls without names."""
         if not self.allowed_windows:
@@ -697,51 +718,94 @@ class ScreenAgent:
         if not window_title:
             raise ValueError("window_title is required")
         x, y = int(x), int(y)
-        if self._click is None:
-            from svsg.recognition import ui_elements
-
-            def click(title, x, y):
-                hwnd = ui_elements.find_window(title)
-                actual = ui_elements.window_title(hwnd)
-                self._permit(hwnd, actual)
-                done = ui_elements.post_click(hwnd, x, y)
-                return {
-                    "performed": "mouse_down_at"
-                    if done["dispatch_state"] == "partial"
-                    else "click_at",
-                    "dispatch_state": done["dispatch_state"],
-                    "window": actual,
-                    "element": {"name": f"({x}, {y})"},
-                    "after": None,
-                    "target_window": done["target_window"],
-                    "client_point": done["client_point"],
-                }
-
-            self._click = click
         return self._with_effect(
             window_title,
-            lambda: self._click(window_title, x, y),
+            None,
             f"({x}, {y})",
             point=(x, y),
             marker_image=marker_image,
         )
 
+    def click_text(self, *, window_title: str, text: str, marker_image: bool = False) -> dict:
+        """Resolve a unique, visible label on the live window immediately before clicking."""
+        if not window_title.strip() or not text.strip():
+            raise ValueError("window_title and text are required")
+        self.precheck_action(window_title)
+        return self._with_effect(
+            window_title, None, text, visible_text=True, marker_image=marker_image
+        )
+
+    def _text_point(self, title, label, area, baseline):
+        from svsg.recognition.screen_text import find_text
+        from svsg.recognition.ui_elements import ClickTargetChanged
+
+        if baseline is None:
+            raise ClickTargetChanged("Screen capture is unavailable. Inspect the current controls.")
+        hits = find_text(self.reader.read(baseline), label, exact=True)
+        if len(hits) != 1 or hits[0]["low_confidence"]:
+            raise ClickTargetChanged(
+                "A unique confident text match is required. Inspect the visible targets."
+            )
+        hit = hits[0]
+        x, y, right, bottom = hit["bbox_px"]
+        target_pixels = baseline[y:bottom, x:right].copy()
+        fresh = self.grab(area)
+        if fresh.shape != baseline.shape or self.resolve_region(None, title) != area:
+            raise ClickTargetChanged("The window moved during recognition. Inspect it again.")
+        if not np.array_equal(target_pixels, fresh[y:bottom, x:right]):
+            raise ClickTargetChanged("The label changed during recognition. Inspect it again.")
+        return _offset(hit, area[0], area[1])
+
     def _with_effect(
-        self, window_title: str, do, label: str, *, point=None, marker_image=False
+        self,
+        window_title: str,
+        do,
+        label: str,
+        *,
+        point=None,
+        visible_text=False,
+        marker_image=False,
     ) -> dict:
         """Baseline, act, wait until the window is still, and report what the action did."""
-        area = self.resolve_region(None, window_title)
-        self.history.finish_window(window_title, area)
-        before = self._top_window(window_title)
-        blocked = window_title.casefold() in self.blocked
-        baseline = None if blocked else self._mark_baseline(area)
-        outcome = do()
+        from svsg.recognition import ui_elements
+
+        try:
+            area = self.resolve_region(None, window_title)
+            before = self._top_window(window_title)
+            expected_hwnd = (before or {}).get("window_id") if visible_text else None
+            if visible_text and expected_hwnd is None and self._click is None:
+                expected_hwnd = ui_elements.find_window(window_title)
+            blocked = window_title.casefold() in self.blocked
+            baseline = None if blocked else self._mark_baseline(area)
+            match = self._text_point(window_title, label, area, baseline) if visible_text else None
+        except Exception as exc:
+            if not visible_text:
+                raise
+            reason = (
+                str(exc)
+                if isinstance(exc, ui_elements.ClickTargetChanged)
+                else "Screen observation failed. Inspect the window again."
+            )
+            return {"execution_state": "not_started", "next_step": reason}
+
+        try:
+            if match is not None:
+                point = tuple(match["center_px"])
+            self.history.finish_window(window_title, area)
+            if point is not None:
+                outcome = self._dispatch_point(window_title, *point, expected_hwnd=expected_hwnd)
+            else:
+                outcome = do()
+        except ui_elements.ClickTargetChanged as exc:
+            return {"execution_state": "not_started", "next_step": str(exc)}
         report = {
             "execution_state": outcome.get("dispatch_state", "completed"),
             "done": f"{outcome['performed']} {outcome['element']['name'] or label!r}",
             "element_after": _compact_element(outcome.get("after")),
         }
         pos = point or outcome["element"].get("center_px")
+        if match:
+            report["text_match"] = {k: match[k] for k in ("text", "bbox_px", "score")}
         if pos is not None:
             marker = {
                 "kind": "posted_click" if point else "uia_target_center",
@@ -1029,7 +1093,7 @@ TOOLS = [
 ]
 
 
-ACTION_TOOLS = ("click_element", "set_field_text", "click_point")
+ACTION_TOOLS = ("click_element", "set_field_text", "click_point", "click_text")
 TOOLS += [
     {
         "name": "watch_screen_changes",
@@ -1074,6 +1138,22 @@ _ELEMENT_REF = {
     "description": "Use the current element_ref for same-name controls.",
 }
 TOOLS += [
+    {
+        "name": "click_text",
+        "description": (
+            "Click a unique visible text label on a custom-drawn control. "
+            "Finds it on the current frame, clicks and returns the effect in one call."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "window_title": _WINDOW,
+                "text": {"type": "string"},
+                "marker_image": _MARKER_IMAGE,
+            },
+            "required": ["window_title", "text"],
+        },
+    },
     {
         "name": "click_element",
         "description": (
@@ -1187,6 +1267,7 @@ class McpServer:
             "click_element": self.agent.click_element,
             "set_field_text": self.agent.set_field_text,
             "click_point": self.agent.click_point,
+            "click_text": self.agent.click_text,
         }.get(name)
         if method is None:
             raise KeyError(name)
@@ -1288,7 +1369,6 @@ class McpServer:
                 else:
                     with self._lock_for(args):
                         content = self.call(name, args)
-                result = {"content": content, "isError": False}
                 outcome = {}
                 try:
                     report = json.loads(content[0]["text"])
@@ -1299,10 +1379,12 @@ class McpServer:
                     }
                 except (ValueError, KeyError, IndexError, TypeError):
                     pass
+                refused = outcome.get("execution_state") == "not_started"
+                result = {"content": content, "isError": refused}
                 self._record(
                     tool=name,
                     window=window,
-                    ok=True,
+                    ok=not refused,
                     ms=round((time.perf_counter() - started) * 1000),
                     **outcome,
                 )

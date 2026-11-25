@@ -17,6 +17,8 @@
   web       独立的 Chrome 窗口里填注册表单：输入框、下拉框、图标按钮、复选框、提交
   canvas    自绘窗口：按钮是画出来的，只能靠屏幕文字找位置并按坐标点击
   pulse     可选。点击一次，找回在动作回执之后显示 625 毫秒的随机提示码
+  canvas_reflow  可选。在第一次操作前交换两个按钮的位置
+  file_dialog    可选。在 Windows 原生打开文件对话框中选择临时测试文件
 
 运行时桌面上会出现任务窗口（置顶、不抢焦点；Chrome 窗口由 Playwright 单独启动）。OpenAI 密钥
 从本机 ~/.forge/secrets.json 读出，只通过环境变量交给网关子进程；网关使用临时 home。
@@ -29,12 +31,14 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import socket
 import subprocess
 import sys
 import tempfile
 import threading
 import time
+from contextlib import suppress
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -77,7 +81,16 @@ class QtTask:
         self.proc = subprocess.Popen(
             [self.qt_python, str(HERE / self.script), str(self.path), "600", *self.extra]
         )
+        deadline = time.monotonic() + 30
         while not self.path.exists():
+            if self.proc.poll() is not None:
+                raise RuntimeError(
+                    f"task window exited before becoming ready ({self.proc.returncode})"
+                )
+            if time.monotonic() >= deadline:
+                self.proc.terminate()
+                self.proc.wait(timeout=10)
+                raise TimeoutError("task window did not become ready within 30 seconds")
             time.sleep(0.1)
         time.sleep(0.5)
 
@@ -181,18 +194,31 @@ TASKS = {
 }
 
 
-def run_once(task_name, task, model, mcp_url, gateway, max_turns, tag) -> dict:
+TASKS["canvas_reflow"] = {
+    **TASKS["canvas"],
+    "make": lambda qt, work: QtTask(qt, work, "agent_canvas_app.py", ["reflow"]),
+}
+TASKS["file_dialog"] = {
+    "window": "VisFunc file chooser",
+    "prompt": "在「VisFunc file chooser」窗口中选择 report-final.txt 并打开。"
+    "告诉我最终选择的文件名。",
+    "make": lambda qt, work: QtTask(qt, work, "agent_file_dialog.py", []),
+    "ok": lambda s: s["native_dialog"] and s["opened_expected_file"] and s["accepts"] == 1,
+    "answer": ("report-final.txt",),
+}
+
+
+def run_once(task_name, task, model, mcp_url, gateway, max_turns, tag, token) -> dict:
     from keystone_client import ChatMessage, KeystoneGatewayClient
     from qt_frontend import conversation
     from qt_frontend.mcp_http import McpHttp
 
     app = task["app"]
-    app.start(tag)
     trace: list[dict] = []
     history_ids = set()
     turns: list[dict] = []
     cancel = threading.Event()
-    mcp = McpHttp(mcp_url, "", cancel)
+    mcp = McpHttp(mcp_url, token, cancel)
     server_id, server_name = "0" * 32, "VisFunc screen"
     tools = {}
     for tool in mcp.tools():  # same shape as McpCatalog.chat_tools
@@ -207,14 +233,26 @@ def run_once(task_name, task, model, mcp_url, gateway, max_turns, tag) -> dict:
 
     def dispatch(target, arguments, cancel_event):  # same checks as McpCatalog.call_chat_tool
         start = time.perf_counter()
-        if task.get("transient_code"):
-            if target == "read_screen_history":
-                if arguments.get("history_id") not in history_ids:
-                    raise ValueError("unknown benchmark history")
-            else:
-                if "region" in arguments:
-                    raise ValueError("window-scoped benchmark")
-                arguments = {**arguments, "window_title": task["window"]}
+        if target == "read_screen_history":
+            if arguments.get("history_id") not in history_ids:
+                raise ValueError("unknown benchmark history")
+        else:
+            title = arguments.get("window_title") or task["window"]
+            if task["window"].casefold() not in title.casefold() or "region" in arguments:
+                raise ValueError("window-scoped benchmark")
+            arguments = {**arguments, "window_title": title}
+        if task_name == "canvas_reflow" and target in (
+            "click_point",
+            "click_element",
+            "click_text",
+        ):
+            if not app.state().get("reflowed"):
+                app.path.with_suffix(".reflow").touch()
+                deadline = time.monotonic() + 3
+                while not app.state().get("reflowed"):
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError("canvas did not reflow")
+                    time.sleep(0.03)
         entry = {"tool": target, "arguments": arguments}
         if len(json.dumps(arguments, ensure_ascii=False).encode()) > 64 * 1024:
             response = {
@@ -224,14 +262,19 @@ def run_once(task_name, task, model, mcp_url, gateway, max_turns, tag) -> dict:
             }
         else:
             result = mcp.invoke(target, arguments)
-            if task.get("transient_code") and not result.get("isError"):
+            data = {}
+            with suppress(json.JSONDecodeError):
                 data = json.loads(result["content"][0]["text"])
+            if "execution_state" in data:
+                entry["execution_state"] = data["execution_state"]
+                entry["screen_px"] = data.get("operation_marker", {}).get("screen_px")
+            if not result.get("isError"):
                 for ticket in (data, data.get("screen_history", {})):
                     if ticket.get("history_id"):
                         history_ids.add(ticket["history_id"])
-                if target == "click_point":
+                if task.get("transient_code") and target == "click_point":
                     app.path.with_suffix(".armed").touch()
-                elif target == "read_screen_history":
+                elif task.get("transient_code") and target == "read_screen_history":
                     entry["event_count"] = len(data["events"])
                     entry["ocr_cache"] = data.get("ocr_cache")
                     code = app.state()["code"].split()[-1]
@@ -252,13 +295,13 @@ def run_once(task_name, task, model, mcp_url, gateway, max_turns, tag) -> dict:
                 response = {
                     "ok": False,
                     "error": "MCP 结果超过对话可接收的大小。",
-                    "meta": {"execution_state": "completed"},
+                    "meta": {"execution_state": entry.get("execution_state", "completed")},
                 }
             else:
                 response = {
                     "ok": not bool(result.get("isError")),
                     "result": result,
-                    "meta": {"execution_state": "completed"},
+                    "meta": {"execution_state": entry.get("execution_state", "completed")},
                 }
                 if not response["ok"]:
                     response["error"] = "MCP 工具返回错误。"
@@ -284,6 +327,7 @@ def run_once(task_name, task, model, mcp_url, gateway, max_turns, tag) -> dict:
     client = Recording(base_url=gateway)
     messages = [ChatMessage("user", task["prompt"])]
     timer = threading.Timer(600, cancel.set)
+    app.start(tag)
     timer.start()
     started = time.perf_counter()
     answer, error = "", None
@@ -301,7 +345,7 @@ def run_once(task_name, task, model, mcp_url, gateway, max_turns, tag) -> dict:
             next_round=lambda: None,
             system_context=conversation.WORK_CONTEXT,
             mcp=(tools, dispatch),
-            **({"tool_filter": tools.__contains__} if task.get("transient_code") else {}),
+            tool_filter=tools.__contains__,
             max_turns=max_turns,
         )
         answer = result.text
@@ -311,8 +355,11 @@ def run_once(task_name, task, model, mcp_url, gateway, max_turns, tag) -> dict:
         timer.cancel()
     seconds = round(time.perf_counter() - started, 1)
     time.sleep(1.0)
-    state = app.state()
-    app.stop()
+    try:
+        state = app.state()
+    finally:
+        app.stop()
+        mcp.close()
     usage = [t["usage"] or {} for t in turns]
     answer_ok = all(token in answer for token in task["answer"])
     if task.get("transient_code"):
@@ -368,7 +415,14 @@ def main() -> None:
     sys.path[:0] = [str(args.repo), str(args.repo / "keystone-gui")]
     work = Path(tempfile.mkdtemp(prefix="keystone-agent-live-"))
     mcp_port, gateway_port = free_port(), free_port()
-    allowed = sorted({TASKS[t]["window"] for t in args.tasks})
+    qt_program = Path(args.qt_python).name
+    allowed = sorted(
+        {
+            TASKS[t]["window"] + (" | chrome.exe" if t == "web" else f" | {qt_program}")
+            for t in args.tasks
+        }
+    )
+    token = secrets.token_urlsafe(32)
     server = subprocess.Popen(
         [
             sys.executable,
@@ -382,6 +436,11 @@ def main() -> None:
         ],
         stdout=subprocess.DEVNULL,
         stderr=open(work / "mcp.log", "w"),
+        env={
+            **os.environ,
+            "VISFUNC_MCP_TOKEN": token,
+            "VISFUNC_ACTION_DB": str(work / "receipts.db"),
+        },
     )
     env = {**os.environ, "KEYSTONE_GATEWAY_KEY": openai_key()}
     gateway = subprocess.Popen(
@@ -426,6 +485,7 @@ def main() -> None:
                         f"http://127.0.0.1:{gateway_port}",
                         args.max_turns,
                         f"{task_name}-{model}-{round_}",
+                        token,
                     )
                     report["runs"].append(run)
                     summary = {

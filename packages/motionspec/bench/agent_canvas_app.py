@@ -133,8 +133,22 @@ def main() -> None:
     canvas.show()
     stop = path.with_name(path.name + ".stop")
     poll = QTimer()
-    poll.timeout.connect(lambda: stop.exists() and app.quit())
-    poll.start(300)
+    reflow = len(sys.argv) > 3 and sys.argv[3] == "reflow"
+
+    def tick():
+        if stop.exists():
+            app.quit()
+        elif reflow and not canvas.state.get("reflowed") and path.with_suffix(".reflow").exists():
+            canvas.items["High"], canvas.items["Medium"] = (
+                canvas.items["Medium"],
+                canvas.items["High"],
+            )
+            canvas.repaint()
+            canvas.state["reflowed"] = True
+            canvas.write()
+
+    poll.timeout.connect(tick)
+    poll.start(40 if reflow else 300)
     QTimer.singleShot(int(seconds * 1000), app.quit)
     app.exec()
 

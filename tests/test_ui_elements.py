@@ -95,6 +95,28 @@ def test_password_field_value_is_omitted_from_ui_event_input():
     assert _describe(Element())["value"] == "sensitive input"
 
 
+def test_coordinate_click_rejects_overlapping_sibling_window(monkeypatch):
+    import ctypes
+    from unittest.mock import Mock
+
+    from svsg.recognition import ui_elements
+
+    api = Mock()
+
+    def window_rect(hwnd, rect):
+        rect._obj.right, rect._obj.bottom = 200, 200
+        return True
+
+    api.GetWindowRect.side_effect = window_rect
+    api.WindowFromPoint.return_value = 101
+    api.GetAncestor.return_value = 100  # This child's top-level window is a sibling of root 99.
+    monkeypatch.setattr(ctypes, "windll", Mock(user32=api), raising=False)
+    monkeypatch.setattr(ui_elements, "_require_windows", lambda: None)
+    with pytest.raises(ui_elements.ClickTargetChanged, match="same application"):
+        ui_elements.post_click(99, 40, 50)
+    api.PostMessageW.assert_not_called()
+
+
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows only")
 def test_process_name_and_desktop_state():
     import ctypes

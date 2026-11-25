@@ -138,6 +138,93 @@ def test_find_falls_back_to_ocr_without_ui_automation():
     assert "unavailable" in hits["notes"][0]
 
 
+def test_click_text_exact_match_uses_screen_origin_and_deduplicates():
+    posted = []
+
+    def click(title, x, y):
+        posted.append((title, x, y))
+        return {"performed": "click_at", "window": title, "element": {"name": "Saved"}}
+
+    agent, _, _ = make(allowed_windows=["App"], click=click, windows=lambda _: None)
+    server = McpServer(agent)
+    args = {"name": "click_text", "arguments": {"window_title": "App", "text": "saved"}}
+    report = json.loads(rpc(server, "tools/call", args)["result"]["content"][0]["text"])
+    assert posted == [("App", 205, 180)]
+    assert report["operation_marker"]["screen_px"] == [205, 180]
+    assert report["text_match"]["bbox_px"] == [160, 170, 250, 190]
+    replay = json.loads(rpc(server, "tools/call", args)["result"]["content"][0]["text"])
+    assert replay["replayed"] and len(posted) == 1
+
+
+def test_click_text_requires_action_permission_before_reading():
+    agent, screen, reader = make()
+    assert "click_text" not in {tool["name"] for tool in agent.tool_specs()}
+    with pytest.raises(PermissionError):
+        agent.click_text(window_title="App", text="Saved")
+    assert not screen.areas and not reader.calls
+
+
+def test_replayed_visual_refusal_stays_not_started():
+    agent, _, _ = make(
+        allowed_windows=["App"],
+        windows=lambda _: None,
+        click=lambda *a: pytest.fail("unexpected click"),
+    )
+    server = McpServer(agent)
+    params = {"name": "click_text", "arguments": {"window_title": "App", "text": "Missing"}}
+    first = rpc(server, "tools/call", params)["result"]
+    second = rpc(server, "tools/call", params)["result"]
+    a, b = [json.loads(r["content"][0]["text"]) for r in (first, second)]
+    assert first["isError"] and second["isError"]
+    assert a["execution_state"] == "not_started" and b == {**a, "replayed": True}
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "missing",
+        "partial_label",
+        "duplicate",
+        "uncertain",
+        "moved",
+        "changed",
+        "ocr_error",
+        "blocked",
+    ],
+)
+def test_click_text_with_unverified_evidence_posts_nothing(monkeypatch, case):
+    posted = []
+    agent, _, reader = make(
+        allowed_windows=["App"], click=lambda *a: posted.append(a), windows=lambda _: None
+    )
+    lines = reader.read(None)["lines"]
+    if case == "missing":
+        lines.clear()
+    elif case == "partial_label":
+        lines[0]["text"] = "Saved drafts"
+    elif case == "duplicate":
+        lines.append(dict(lines[0], bbox_px=[0, 0, 20, 20]))
+    elif case == "uncertain":
+        lines[0]["low_confidence"] = True
+    elif case == "blocked":
+        agent.blocked.add("app")
+    elif case == "moved":
+        areas = iter([(50, 60, 450, 360), (75, 60, 475, 360)])
+        agent.locate_window = lambda _: next(areas)
+    elif case == "changed":
+        monkeypatch.setattr(agent, "grab", lambda _: np.zeros((300, 400, 3), np.uint8))
+
+    def read(_):
+        if case == "ocr_error":
+            raise OSError("reader busy")
+        return {"lines": lines}
+
+    monkeypatch.setattr(reader, "read", read)
+    result = agent.click_text(window_title="App", text="Saved")
+    assert result["execution_state"] == "not_started"
+    assert result["next_step"] and posted == []
+
+
 def test_screenshot_scales_and_reports_mapping():
     agent, _, _ = make()
     info, png = agent.screenshot(region=[0, 0, 400, 300], max_side=200)
@@ -433,6 +520,7 @@ def test_blocked_capture_switches_to_ui_automation():
         ("click_element", {"target": "Add"}),
         ("set_field_text", {"field": "Seats", "text": "7"}),
         ("click_point", {"x": 200, "y": 180}),
+        ("click_text", {"text": "Saved"}),
     ],
 )
 def test_mcp_returns_completed_receipt_if_post_action_ocr_fails(tool, args):
@@ -447,7 +535,11 @@ def test_mcp_returns_completed_receipt_if_post_action_ocr_fails(tool, args):
         act=mutate, click=mutate, windows=lambda _: None, allowed_windows=["App"]
     )
 
-    def fail(*_):
+    original_read = reader.read
+
+    def fail(*args):
+        if not screen.saved:
+            return original_read(*args)
         raise RuntimeError("lost OCR")
 
     reader.read = fail

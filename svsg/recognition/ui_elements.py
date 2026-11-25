@@ -569,6 +569,10 @@ def perform(
     }
 
 
+class ClickTargetChanged(ValueError):
+    """The requested screen target could not be verified before posting input."""
+
+
 def post_click(root: int, x: int, y: int) -> dict:
     """Click at screen point (x, y) inside window `root` by posting mouse messages.
 
@@ -588,7 +592,7 @@ def post_click(root: int, x: int, y: int) -> dict:
     user32.GetWindowRect(root, ctypes.byref(rect))
     if not (rect.left <= x < rect.right and rect.top <= y < rect.bottom):
         bounds = [rect.left, rect.top, rect.right, rect.bottom]
-        raise ValueError(f"point ({x}, {y}) is outside the window {bounds}")
+        raise ClickTargetChanged(f"point ({x}, {y}) is outside the window {bounds}")
     point = wintypes.POINT(x, y)
     target = user32.WindowFromPoint(point)
     owner = wintypes.DWORD()
@@ -596,7 +600,12 @@ def post_click(root: int, x: int, y: int) -> dict:
     user32.GetWindowThreadProcessId(target, ctypes.byref(owner))
     user32.GetWindowThreadProcessId(root, ctypes.byref(mine))
     if not target or owner.value != mine.value:
-        raise ValueError(f"point ({x}, {y}) is covered by another application's window")
+        raise ClickTargetChanged(f"point ({x}, {y}) is covered by another application's window")
+    user32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
+    if user32.GetAncestor(target, 2) != root:  # GA_ROOT; an owned popup is a different window.
+        raise ClickTargetChanged(
+            f"point ({x}, {y}) is covered by another window of the same application"
+        )
     local = wintypes.POINT(x, y)
     if not user32.ScreenToClient(target, ctypes.byref(local)):
         raise OSError("could not map the screen point into the target window")

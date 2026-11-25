@@ -115,6 +115,8 @@ These rules were tuned on video captions and player toolbars. On ordinary applic
 
 `click_point` returns the dispatched physical screen coordinates in `operation_marker.screen_px`. A named UI Automation action labels the control centre as `uia_target_center`. Image-capable clients can request a marked pre-action crop with `marker_image=true`.
 
+For a custom-drawn button with a known label, call `click_text(window_title=…, text=…)`. It locates the label on the current frame and checks the target pixels again before clicking. The receipt includes the recognized text, its box and the dispatched screen point. A missing, ambiguous, low-confidence or changing target returns `execution_state=not_started`. [Keystone desktop comparison](docs/agent-screen-targets-20261125.md)
+
 Actions return a `screen_history.history_id`. Use `read_screen_history` with `compact=true` to recover a transient notification, changed field or dialog in that window. Continue from `after=next_after`. Request `read_text=true` for OCR of pixel evidence. The default recording lasts 20 seconds, sampling pixels at up to 8 Hz and controls at up to 4 Hz. `watch_screen_changes` starts a recording independently and `--history-seconds 0` disables it. [Event cache and token measurements](docs/agent-ui-events-20261123.md)
 
 For HTTP retries, generate a UUID per intended action and reuse it in the `Idempotency-Key` header across reconnects. MCP clients can also send it in `params._meta["visfunc/operationId"]`. Within a negotiated session the same JSON-RPC request ID also identifies a retry. Receipts are retained for 24 hours. A replay reporting `unknown` calls for a read-only check of the window. [Retry and recovery details](docs/agent-ui-events-20261123.md)
