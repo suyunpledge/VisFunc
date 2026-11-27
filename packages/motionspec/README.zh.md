@@ -29,13 +29,7 @@ motionspec analyze 录屏.mp4 -o out/
 motionspec demo -o demo/
 ```
 
-在仓库根目录同时装上 VisFunc-Image，就可以导出函数并查询：
-
-```bash
-python -m pip install -e ".[functions]" -e "./packages/motionspec"
-motionspec analyze clip.mp4 -o out --functions --evidence-every-ms 500
-motionspec query out/functions.json --list
-```
+将原录屏和 `out/summary.md` 一起交给模型。摘要区分可见变化区间和拟合的设计时序，每行背后的测量可在 `out/spec.json` 中核对。
 
 Python 里：
 
@@ -53,6 +47,8 @@ verdict = check(spec, [{"segment": "s1", "field": "easing", "value": "ease-out"}
 | `--start`、`--end` | 只分析这段时间（秒） |
 | `--fps` | 输入是图片目录时必须给；帧按文件名自然排序，`1.png`、`2.png`、`10.png` |
 | `--max-dim` | 分析时的最长边，默认 960 |
+| `--layout-edges` | 可选。追踪面板四条边，分别测量宽高变化和相邻元素的位移。 |
+| `--mark-uncertain` | 在摘要中隐去证据不足的估计并写明原因，默认关闭。[开发集对照](../../bench/results/20261127-uncertainty/report.md) |
 | `--min-area`、`--max-segments` | 忽略更小的变化；最多保留几个片段 |
 | `--ambient-ms` | 连续变化多久算"持续变化的区域"，默认 3000，设 0 关闭 |
 | `--max-frames`、`--max-crop-mb` | 所选区间的帧数上限；裁剪帧缓存上限，默认 150 MB |
@@ -143,7 +139,16 @@ motionspec settle recording.mp4                                  # 也接受录�
 - 可变帧率的视频用解码器给的时间戳；时间戳重复、倒序或非法时，改用帧号和名义帧率重新扫描。
 - 跟踪路径的位移是特征锚点的位移，不一定是元素中心。`transform_reference` 说明参考点是什么。
 
-## 函数与查询
+## 高级用法
+
+### 函数与查询
+
+从仓库根目录安装函数运行库，生成下文示例使用的函数包。
+
+```bash
+python -m pip install -e ".[functions]" -e "./packages/motionspec"
+motionspec analyze clip.mp4 -o out --functions --evidence-every-ms 500
+```
 
 `--functions`（或对已有结果运行 `motionspec functions out/spec.json -o functions`）会生成 `functions.json`，
 格式是 `svsg.video-functions/1`，由 VisFunc-Image 编译。每个保留帧有可还原的像素函数和区域、轮廓描述；相邻保留帧之间有差分统计；
@@ -281,6 +286,8 @@ motionspec check out/spec.json claims.json
 
 ## 模型实测
 
+密集帧、模型编写 OpenCV 和函数查询的留出集对照见[项目首页](../../README.zh.md)。下表是早期开发场景的逐项得分，当时的基线为只给画面。
+
 `bench/` 是对比脚本：同一段动画只给模型视频，或者同时给出测量结果，各自答得多准。密钥从本机 Forge 配置读取，只在进程内使用。
 `bench/canary.py` 先确认模型真的收到了视频。
 
@@ -297,8 +304,7 @@ GPT 两个模型收到的是带时间戳的截图，因为所用密钥的组织�
 - 面向 2D 界面动画。复杂画面可能被标为 `nonrigid`，也可能碰巧符合某个 2D 模型。不分析音频、字幕和物体语义。
 - 一个片段描述一个整体运动。贴在一起同时同向移动的几个元素会合成一个片段。方向不同时走多体路径，只处理平移；
   被完全遮挡的那几帧是插值，那个元素的时长和曲线不可靠。同一位置前后相隔不到约 8 帧的两段动画会被合并。
-- 布局重排测不准。面板展开推动下方几行、侧栏收起拉动内容时，变尺寸的那块和被推动的那块落在同一个窗口里，
-  前者会被测成位移，或者两者合成一个片段。纯色块路径只在那块颜色单独成片、没被窗口边裁到时生效。
+- 改变尺寸的面板和被推动的相邻控件可能被合成一个片段。可以加 `--layout-edges`，在四边可追踪时分别测量。[布局重排配对评测](../../bench/results/20261127-layout-edges/report.md)
 - 图层路径只解平移和等比缩放，不解旋转；元素必须在首尾某一帧里完全不存在；只在不超过 3 秒、180 帧的窗口上尝试。
 - 画在持续变化区域上的动画（动态背景上的半透明面板）分离不出来，会标为低置信。持续超过 `--ambient-ms` 的慢动画（很长的进度条）会归入 `ambient`。
 - 往返运动（抖动、脉冲）只报峰值和峰值时刻，不拟合曲线。
@@ -344,7 +350,6 @@ bench/
 ## 还没做
 
 - 分析过程中边分析边发布结果，目前要等整段分析完才写出规格
-- 布局重排的视觉测量
 - 两份规格的对比，例如参考动画和自己的实现、视觉测量和探针
 
 ## 许可

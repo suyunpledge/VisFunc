@@ -1,78 +1,78 @@
 # VisFunc
 
-**Measure images and UI motion locally, then give AI models numerical evidence they can query and verify.**
-
-[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-
 English · [中文](README.zh.md)
 
-On Windows x64, extract the portable bundle and double-click `Start.cmd` to start the image API and desktop MCP server. [Deployment guide (中文)](deployment/windows/README.zh.md) · [Production hardening (中文)](docs/agent-production-20261123.md)
+**Give a multimodal model the UI recording and its measurement summary.** VisFunc measures changes in source pixels, separates visible motion from estimated design timing, and writes the evidence to `summary.md`. A model can use the recording to identify the control and the summary to quantify what it did.
 
-Multimodal models can say what is in a picture, but they often get questions like "how many pixels did this card move",
-"how long did the animation take" or "do these two regions touch" wrong. VisFunc measures these things locally and stores
-them as functions that can be queried by frame, coordinate and time. The model answers from the numbers, and its answers
-can be checked against the same data, one claim at a time.
+| Input or measurement method | Qt animations (12 held out) | Chrome recordings (12 held out) | Valid answers / 72 |
+| --- | ---: | ---: | ---: |
+| Video or timestamped sparse frames | 48.1% | 52.3% | 60 |
+| Dense timestamped frames | 37.7% | 42.1% | 49 |
+| Model measures the clip with OpenCV in a sandbox | 39.0% | 51.2% | 39 |
+| **Video or sparse frames + VisFunc summary** | **82.7%** | **78.2%** | **69** |
 
-The repository has two modules:
+The three models answered once per condition on the same clips. MiMo and Seed received video, GPT received timestamped frames. Each scene score counts the applicable motion fields and the number of animations. Scenes and models have equal weight. Missing fields earn no credit, and failed answers score zero. Actual input token counts varied between the dense-frame and summary conditions. The Qt clips were rendered and the Chrome clips recorded from local test pages. [Benchmark, confidence intervals and raw answers](bench/results/20261127-strong-baselines/report.md)
 
-| Module | Code | What it does |
-|---|---|---|
-| [VisFunc-Image](svsg/README.md) | `svsg/`, package `svsg` | Compiles images into pixels, regions, contours and spatial relations; answers questions from those parameters and checks the model's claims; multi-view object recognition; the shared function format and query runtime for video |
-| [VisFunc-Motion](packages/motionspec/README.md) | `packages/motionspec/`, package `motionspec` | Measures UI animation from a screen recording or from live properties of a Qt app: which element moved, when, how far, how its size and opacity changed, and which easing curve it followed |
+**MiMo and Seed gained the most from the summary.** GPT already scored 91.7% on Chrome with sparse frames and 95.8% with dense frames. Its OpenCV scripts also produced fully correct answers on all nine Chrome clips for which it returned a valid answer. MiMo hit its output limit on 21 dense-frame tasks. These delivery differences matter when a program consumes the result.
 
-The two modules can be used separately. Functions exported by VisFunc-Motion use VisFunc-Image's format and query runtime.
-
-## An example
-
-A 0.7-second screen recording: a notification in the bottom-right corner moves up 36 pixels and fades in over 250 ms.
-We gave it to six multimodal models and asked how it moves.
-
-| Model | Video only | Video plus VisFunc-Motion's measurements |
-|---|---|---|
-| MiMo v2.6 Flash | does not move | up 36.5 px, starting at 167 ms |
-| MiMo v2.6 Pro | does not move, 400 ms | up 36.5 px, starting at 167 ms |
-| Doubao Seed 2.1 Turbo | does not move, 100 ms | up 36.5 px, starting at 167 ms |
-| Doubao Seed 2.1 Pro | left 30 px; in another run, left 300 px | up 36.5 px, starting at 167 ms |
-| GPT 6.1 Sol / Terra | up 36 / 40 px | up 36.5 px, starting at 167 ms |
-
-The two GPT models received timestamped still frames, because the organisation that owns the key does not have video input enabled.
-
-Across nine scenes that are closer to real interfaces (a modal dialog, an expanding panel, a collapsing sidebar, scrolling,
-a tab indicator, two rows swapping places, an overshoot, a button changing colour, a progress bar), the six models scored
-58% field by field with the video alone, 82% with the visual measurements added, and 100% with widget properties read from
-the Qt app. That is 216 calls; a call that returned no answer scores zero.
+| Model | Qt, visual input alone → with summary | Chrome, visual input alone → with summary |
+| --- | ---: | ---: |
+| MiMo V2.6 Flash | 32.2% → 80.9% | 27.8% → 63.9% |
+| Doubao Seed 2.1 Pro | 39.0% → 71.2% | 37.5% → 72.2% |
+| GPT-6.1 Sol | 73.1% → 95.8% | 91.7% → 98.6% |
 
 ## Quick start
 
-Python 3.11 or later. Everything below runs offline and needs no model keys.
+From the repository root with Python 3.11+, install the motion analyzer. Once installed, measurement runs locally without a model key.
 
 ```bash
-python -m pip install -e ".[functions]" -e "./packages/motionspec"
+python -m pip install -e "./packages/motionspec"
 ```
 
-Generate a sample video of a card sliding to the right, measure it, and export queryable functions:
+Generate the sample recording and measure it. For your own recording, replace `slide.mp4` in the last command.
 
 ```bash
 python -c "from motionspec.synth import slide, write_video; frames, _ = slide(); write_video('slide.mp4', frames)"
+python -m motionspec analyze slide.mp4 -o slide-out
 ```
+
+Open `slide-out/summary.md`. The card's tracked anchor moves **299.4 px right**. The change is visible from **167 to 517 ms (350 ms)**. Fitting an `out-cubic` curve puts the design interval at **167 to 567 ms (400 ms)**. The sample was authored to move 300 px in 400 ms. Near the end it travels less than a pixel per frame.
+
+Give the model the clip (or timestamped frames) and the contents of `summary.md`. A useful question for this sample is “Which element moved, how far, and what supports each duration?” The adjacent `spec.json` contains the underlying measurements, and the evidence images let you inspect the detected region. [Motion guide](packages/motionspec/README.md)
+
+### How reliable are the measurements?
+
+On the original analyzer-only holdout, mean scene scores were **69.8% on 30 Qt scenes** and **72.2% on 12 Chrome recordings**. All scored fields and the animation count were correct in 13/30 and 6/12 scenes. These scores compare the analyzer directly with the recorded ground truth. [Analyzer evaluation](docs/analyzer-evaluation-20261127.md)
+
+For a panel that resizes and pushes a neighbour, add `--layout-edges` to track the four visible edges and the neighbour's displacement separately. On a fresh holdout using the same scene families, switching it on raised the analyzer score from 70.6% to 91.1% on Qt and from 70.8% to 100% on Chrome. All 16 reflow scenes passed. An earlier Chrome recording still produced an extra segment, and some Qt fades lacked opacity endpoints. [Layout measurements and remaining errors](bench/results/20261127-layout-edges/report.md)
+
+### What happens when the summary marks a field as uncertain?
+
+`--mark-uncertain` is an opt-in diagnostic. For example, a pixel blend can come from a colour change or a fade. The marked summary explains why the opacity endpoints are uncertain and keeps the observed change visible. On 27 development clips, the option flagged **5 of 30** wrong or missing object fields. It also flagged 11 fields that were already within tolerance.
+
+| Model | Mean scene score, ordinary → marked summary | True gaps answered correctly, out of the 5 flagged |
+| --- | ---: | ---: |
+| GPT-6.1 Sol | 95.7% → 96.0% | 5/5 → 5/5 |
+| MiMo V2.6 Flash | 85.0% → 72.0% | 4/5 → 3/5 |
+| Doubao Seed 2.1 Pro | 89.0% → 87.2% after transport recovery | 4/5 → 3/5 |
+
+Both groups received identical visual input in independent sessions. GPT already recovered all five gaps with the ordinary summary. On one fade MiMo originally got both opacity endpoints right, then left both blank with the marker. Its format failures rose from 3 to 6. Seed's ordinary-summary score was 81.5% when two network failures counted as zero, and 89.0% after independent retries. The ordinary summary remains the default. [Paired results, both Seed scores and field-level errors](bench/results/20261127-uncertainty/report.md)
+
+## Advanced use
+
+### Query pixels and motion by time
+
+Use a function when you need a reproducible answer at a particular frame, coordinate or timestamp. In the same 24-clip holdout, visual input plus the function catalogue and optional queries scored **46.9% on Qt and 66.0% on Chrome**, compared with **82.7% and 78.2%** for the summary. The query workflow delivered 50/72 valid answers and the summary delivered 69/72. Extra turns and delivery failures contributed to the gap. [Function-query comparison](bench/results/20261127-strong-baselines/report.md)
+
+Install the image runtime from the repository root, then export the measurements and evidence frames from the quick start.
 
 ```bash
-python -m motionspec analyze slide.mp4 -o slide-out --functions --evidence-every-ms 250
+python -m pip install -e ".[functions]"
+python -m motionspec functions slide-out/spec.json -o slide-functions
+python -m motionspec query slide-functions/functions.json --list
 ```
 
-`slide-out/summary.md` reports that the card moved about 299 px to the right, that the change is visible for about 350 ms,
-and that the estimated design, from aligning a named curve, is out-cubic over 400 ms. The sample was generated with 300 px,
-out-cubic, 400 ms. Near the end of an ease-out the card moves less than a pixel per frame, so the visible change is shorter
-than the designed duration.
-
-List the frames and functions that can be queried:
-
-```bash
-python -m motionspec query slide-out/functions.json --list
-```
-
-Save the following as `query.json` to ask for the colour of the top-left pixel in frame 0 and the card's x position at 250 ms:
+Save this as `query.json` to read the top-left pixel in frame 0 and the tracked anchor's x coordinate at 250 ms.
 
 ```json
 [
@@ -82,11 +82,14 @@ Save the following as `query.json` to ask for the colour of the top-left pixel i
 ```
 
 ```bash
-python -m motionspec query slide-out/functions.json query.json
+python -m motionspec query slide-functions/functions.json query.json
 ```
 
-The result is `[41, 45, 49, 255]` with the frame index, timestamp and pixel hash, and `261.0` with unit `source_px` and
-provenance `motion_estimate`.
+The pixel result is `[41, 45, 49, 255]` with a timestamp and pixel hash. The motion result is `261.0 source_px` with provenance `motion_estimate`. The same runtime represents still images as pixels, regions, contours and spatial relations. [Video function protocol](docs/video-functions.md) · [Still-image guide](svsg/README.md)
+
+## Desktop and image tools
+
+On Windows x64, extract the portable bundle and double-click `Start.cmd` to start the image API and desktop MCP server. [Deployment guide (中文)](deployment/windows/README.zh.md) · [Production hardening (中文)](docs/agent-production-20261123.md)
 
 ### Read subtitles and UI icons
 
@@ -99,7 +102,7 @@ The latest recording benchmark measures opening-title false positives, raised ca
 ```bash
 python -m pip install -e ".[overlays]" -e "./packages/motionspec"
 motionspec overlays screenshot.png
-motionspec overlays slide-out/functions.json --player-toolbar
+motionspec overlays slide-functions/functions.json --player-toolbar
 ```
 
 These rules were tuned on video captions and player toolbars. On ordinary application screens they report a forward arrow as a play button and can give several different readings for the same text; use `screen-text` below instead.
@@ -132,34 +135,18 @@ On a real Qt window on the desktop, all 10 controls (6 of them icon-only) were f
 
 Connected to Pledge Keystone (`--http`), GPT-6.1 sol and terra completed four kinds of desktop task: a Qt settings window with a confirmation dialog, retrying a failed sync after fixing the port named in an error dialog, a sign-up form in Chrome, and a custom-drawn window that can only be clicked by coordinates. The latest 16 runs, with no turn limit, all succeeded in 20 to 65 seconds each. The retry task needs 13 to 15 tool calls; Keystone used to stop at 12 by default and now has no step limit unless one is set in its advanced settings. Keystone's own window driver sees no controls in Qt windows. On this machine, ESET's browser screen protection blocks screenshots of browser windows; the server then judges effects through UI Automation instead. [Keystone test](docs/agent-keystone-20261122.md) (Chinese)
 
-## Results
+## Historical results
 
-On a frozen holdout, the analyzer got every scored field right in 13 of 30 Qt scenes and 6 of 12 Chromium recordings. All six browser translations passed. None of the six browser reflows passed every field. [Independent analyzer evaluation and scene-level intervals](docs/analyzer-evaluation-20261127.md)
+Earlier development tests used six model configurations and a visual-input-only baseline. The six basic Qt animations scored 55% with visual input, 92% with added measurements and 94% with live Qt properties. The nine harder Qt scenes scored 58%, 82% and 100%, respectively. These were repeatedly used development scenes with field-by-field scoring. The analyzer alone scored 85% on those nine scenes. An earlier measurement-version comparison on those same scenes scored 68% and 86%. The holdout table at the top uses scene averages and includes dense frames and OpenCV. [Historical runs and scoring](bench/results/README.md) · [Sampling-rate ablation](docs/evidence-ablation-20261116.md)
 
-| Test | Result |
-|---|---|
-| 6 models, 6 basic UI animations (216 calls) | video only 55%, with visual measurements 92%, with Qt properties 94% |
-| 6 models, 9 harder UI animations (216 calls) | video only 58%, with visual measurements 82%, with Qt properties 100% |
-| Same scenes, only the version of the visual measurements changed, two runs each | before the latest changes 68%, current 86% |
-| Parameters only, no images (2 animations, 2 models) | 145/147 items from timing parameters, 147/147 from the text summary |
-| The visual measurements themselves, 9 harder scenes | 85% field by field; Qt properties 100% |
-| Exported functions evaluated per frame against properties recorded by Qt | basic scenes: position error ≤ 1.0 px, size of entering/exiting elements ≤ 1.0 px, opacity error 0 |
-| Object recognition on COCO8 (8 images, 30 objects) | after multi-view review, false positives 9 → 2, misses 10 → 16 |
+In a separate two-animation, two-model test without images, across nine matched runs with valid answers, models got 145/147 items right from parameters and 147/147 from the text summary. In the basic Qt scenes, evaluating exported functions against the recorded properties gave position and entering/exiting size errors of at most 1 px, and zero opacity error. [Parameter-only retest](docs/timing-protocol-retest-20261117.md) · [Function evidence](docs/video-functions.md)
 
-The UI scenes are rendered frame by frame with Qt, so frame timing is perfectly regular; dropped frames and capture delay in
-real screen recordings have had little testing. The nine harder scenes were used repeatedly during development and are not an
-independent validation. Data, scoring rules and raw answers are in the [model benchmark notes](bench/results/README.md),
-the [parameter-only retest](docs/timing-protocol-retest-20261117.md), the [sampling-rate ablation](docs/evidence-ablation-20261116.md)
-and the [recognition evaluation](docs/recognition-evaluation-20261116.md) (all in Chinese).
-On eight new sample times from four MOT20 videos, the local pedestrian detector recovered three
-more heavily occluded people (514 → 517 of 740), with 36 false positives in each version.
-The [paired evaluation](docs/pedestrian-focused-review-20261122.md) includes timing and separate results for small targets.
+On COCO8 (8 images, 30 objects), multi-view review reduced false positives from 9 to 2 and increased misses from 10 to 16. At eight new sample times from four MOT20 videos, the local pedestrian detector recovered three more heavily occluded people (514 → 517 of 740), with 36 false positives in both versions. [Image evaluation](docs/recognition-evaluation-20261116.md) · [Pedestrian evaluation](docs/pedestrian-focused-review-20261122.md)
 
 ## Current limits
 
 - 3D and game footage only gets summary statistics, with no usable motion curves.
-- Layout reflow is measured wrongly. When an expanding panel pushes the rows below it, or a collapsing sidebar pulls the content
-  next to it, the resizing block is reported as moving and positions can be off by more than a hundred pixels.
+- Overlapping elements can still merge into one segment. Four-edge tracking works best when panel boundaries remain visible.
 - Colour transitions in compressed video are smeared by H.264 chroma subsampling.
 - Objects are not tracked across frames. A segment ID refers to a change, not to an object.
 - Object recognition does not guarantee that every object is found.
@@ -167,7 +154,6 @@ The [paired evaluation](docs/pedestrian-focused-review-20261122.md) includes tim
 ## Install and test
 
 ```bash
-python -m pip install -e ".[functions]" -e "./packages/motionspec"   # measurement and function export, offline
 python -m pip install -e ".[api,llm]"                                  # HTTP service and model calls
 python -m pip install -r requirements-dev.txt                          # development and tests
 python -m pytest

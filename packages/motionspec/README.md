@@ -30,13 +30,7 @@ motionspec analyze recording.mp4 -o out/
 motionspec demo -o demo/
 ```
 
-Install VisFunc-Image as well, from the repository root, to export and query functions:
-
-```bash
-python -m pip install -e ".[functions]" -e "./packages/motionspec"
-motionspec analyze clip.mp4 -o out --functions --evidence-every-ms 500
-motionspec query out/functions.json --list
-```
+Give the model the recording and `out/summary.md`. The summary distinguishes the visible change from the fitted design timing. Open `out/spec.json` for the measurements behind each row.
 
 From Python:
 
@@ -55,6 +49,7 @@ Common options:
 | `--fps` | required for a directory of images; files are sorted naturally, `1.png`, `2.png`, `10.png` |
 | `--max-dim` | longest side used for analysis, default 960 |
 | `--layout-edges` | opt in to measuring the four visible edges of filled UI panels and tracking displaced neighbours separately. Width and height samples use source pixels. |
+| `--mark-uncertain` | Hide unsupported estimates in the summary and explain the missing evidence. Off by default. [Development comparison](../../bench/results/20261127-uncertainty/report.md) |
 | `--min-area`, `--max-segments` | ignore smaller changes; keep at most this many segments |
 | `--ambient-ms` | how long a region must keep changing to count as ambient, default 3000; 0 turns it off |
 | `--max-frames`, `--max-crop-mb` | frame limit for the selected range; crop cache limit, default 150 MB |
@@ -155,7 +150,16 @@ When reading the numbers:
 - On the tracking path, movement is that of a feature anchor, not necessarily the element's centre. `transform_reference`
   says what the reference point is.
 
-## Functions and queries
+## Advanced use
+
+### Functions and queries
+
+From the repository root, install the function runtime and generate a bundle for the examples below.
+
+```bash
+python -m pip install -e ".[functions]" -e "./packages/motionspec"
+motionspec analyze clip.mp4 -o out --functions --evidence-every-ms 500
+```
 
 `--functions` (or `motionspec functions out/spec.json -o functions` for existing results) writes `functions.json` in the
 format `svsg.video-functions/1`, compiled by VisFunc-Image. Each kept frame gets a pixel function that restores it exactly,
@@ -311,6 +315,8 @@ validation.
 
 ## Model benchmarks
 
+For the held-out comparison with dense frames, model-written OpenCV and function queries, see the [project results](../../README.md). The table below gives historical field-level scores on the development scenes with a visual-input-only baseline.
+
 `bench/` holds comparison scripts: the same animation is given to a model as video only, or with the measurements attached, and
 both are scored. Keys are read from the local Forge configuration and used only inside the process. `bench/canary.py` first
 confirms that a model actually received the video.
@@ -332,9 +338,7 @@ is an experiment on pedestrian detection in MOT17 street videos and is still in 
   When they move in different directions the multi-body path handles translation only; frames where an element is fully
   covered are interpolated, so its duration and curve are unreliable. Two animations at the same place less than about 8 frames
   apart are merged.
-- Layout reflow is measured wrongly. When an expanding panel pushes rows down or a collapsing sidebar pulls content along, the
-  resizing block and the pushed block fall into one window; the former is reported as moving, or both become one segment.
-  The solid-box path only applies when that colour forms its own region and is not cut by the window edge.
+- A resizing panel and its displaced neighbour can merge into a single segment. The optional `--layout-edges` tracker separates them when their four edges can be followed. [Paired reflow evaluation](../../bench/results/20261127-layout-edges/report.md)
 - The layer path solves translation and uniform scale only, not rotation; the element must be completely absent at one end;
   it is only tried on windows of at most 3 seconds and 180 frames.
 - Animation drawn over a continuously changing area (a translucent panel over an animated background) cannot be separated and
@@ -383,7 +387,6 @@ Tests are in `tests/`; run `python -m pytest` in this directory.
 ## Not done yet
 
 - Publishing results while analysis is still running; the spec is written only after the whole range has been analysed
-- Visual measurement of layout reflow
 - Comparing two specs, for example a reference animation against your implementation, or visual measurement against the probe
 
 ## License
