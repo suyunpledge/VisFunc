@@ -11,7 +11,11 @@ TOOLS = BENCH.parent / "packages/motionspec/tools"
 
 
 def cases(source, split):
-    return json.loads((BENCH / "splits.json").read_text(encoding="utf8"))[source][split]
+    inventory = json.loads((BENCH / "splits.json").read_text(encoding="utf8"))[source]
+    if split == "m1-test":
+        return [{**c, "id": "m1-" + c["id"], "seed": c["seed"] + 30000000}
+                for c in inventory["test"]]
+    return inventory[split]
 
 
 def save(path, obj):
@@ -21,12 +25,12 @@ def save(path, obj):
     )
 
 
-def pack(source, work, output):
+def pack(source, work, output, splits=("dev", "test")):
     # A failed or interrupted capture must not replace a usable frozen corpus.
     output.parent.mkdir(parents=True, exist_ok=True)
     staging = output.with_suffix(".partial")
     with ZipFile(staging, "w", ZIP_DEFLATED) as archive:
-        for split in ("dev", "test"):
+        for split in splits:
             for case in cases(source, split):
                 for name in ("video.mp4", "truth.json", "trace.json"):
                     path = work / case["id"] / name

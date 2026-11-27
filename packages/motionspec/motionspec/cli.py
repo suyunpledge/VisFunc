@@ -46,6 +46,7 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("--max-segments", type=int, default=12)
     a.add_argument("--min-area", type=float, default=120.0, help="ignore changes smaller than this (analysis px^2)")
     a.add_argument("--threshold", type=int, default=12, help="per-pixel change threshold, 0-255")
+    a.add_argument("--layout-edges", action="store_true", help="track resizing panels and pushed neighbours by their edges")
     a.add_argument("--no-sheets", action="store_true")
     a.add_argument("--no-raw-frames", action="store_true", help="omit original-resolution evidence PNGs")
     a.add_argument("--functions", action="store_true", help="also export shared SVSG image/time functions")
@@ -185,6 +186,7 @@ def main(argv: list[str] | None = None) -> int:
                 min_area=args.min_area, threshold=args.threshold, sheets=not args.no_sheets,
                 raw_frames=not args.no_raw_frames, max_frames=args.max_frames, max_crop_bytes=args.max_crop_mb * 1_000_000,
                 ambient_ms=args.ambient_ms,
+                layout_edges=args.layout_edges,
                 functions=args.functions, sequence_id=args.sequence_id,
                 function_max_frames=args.function_max_frames, evidence_every_ms=args.evidence_every_ms,
             )

@@ -1,0 +1,1444 @@
+{
+ "protocol": "motion-analyzer/1",
+ "source": "browser",
+ "split": "test",
+ "corpus_sha256": "361490a43cea4e6a964b15736c34ff04595a224bc05d36dc9b39f36d69030708",
+ "summary": {
+  "scenes": 12,
+  "objects": 18,
+  "missed_objects": 0,
+  "extra_segments": 1,
+  "scene_macro": {
+   "mean": 0.993056,
+   "ci95": [
+    0.979167,
+    1.0
+   ]
+  },
+  "all_fields_correct": {
+   "mean": 0.916667,
+   "ci95": [
+    0.75,
+    1.0
+   ]
+  },
+  "format_fail": 0,
+  "analyzer_error": 0,
+  "fields": {
+   "start_ms": {
+    "correct": 18,
+    "wrong": 0,
+    "missing": 0,
+    "format_fail": 0,
+    "analyzer_error": 0,
+    "signed_median": 4.486,
+    "absolute_p50_p90": [
+     4.486,
+     16.566
+    ]
+   },
+   "duration_ms": {
+    "correct": 18,
+    "wrong": 0,
+    "missing": 0,
+    "format_fail": 0,
+    "analyzer_error": 0,
+    "signed_median": 0.0,
+    "absolute_p50_p90": [
+     2.0,
+     14.1
+    ]
+   },
+   "direction": {
+    "correct": 18,
+    "wrong": 0,
+    "missing": 0,
+    "format_fail": 0,
+    "analyzer_error": 0
+   },
+   "distance_px": {
+    "correct": 18,
+    "wrong": 0,
+    "missing": 0,
+    "format_fail": 0,
+    "analyzer_error": 0,
+    "signed_median": 0.0,
+    "absolute_p50_p90": [
+     0.004,
+     1.0
+    ]
+   },
+   "easing": {
+    "correct": 18,
+    "wrong": 0,
+    "missing": 0,
+    "format_fail": 0,
+    "analyzer_error": 0
+   },
+   "height_px": {
+    "correct": 4,
+    "wrong": 0,
+    "missing": 0,
+    "format_fail": 0,
+    "analyzer_error": 0,
+    "signed_median": -0.5,
+    "absolute_p50_p90": [
+     0.5,
+     1.7
+    ]
+   },
+   "width_px": {
+    "correct": 2,
+    "wrong": 0,
+    "missing": 0,
+    "format_fail": 0,
+    "analyzer_error": 0,
+    "signed_median": 1.5,
+    "absolute_p50_p90": [
+     1.5,
+     2.7
+    ]
+   }
+  }
+ },
+ "scenes": [
+  {
+   "id": "b001",
+   "family": "transition",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      36,
+      65,
+      252,
+      137
+     ],
+     "start_ms": 221.0,
+     "duration_ms": 358.0,
+     "delta": [
+      39.9,
+      0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "actor",
+     "region": [
+      62,
+      81,
+      228,
+      123
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 216.694,
+       "actual": 221.0,
+       "error": 4.306,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 360,
+       "actual": 358.0,
+       "error": -2.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "right",
+       "actual": "right",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 40.0,
+       "actual": 39.9,
+       "error": -0.1,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-out",
+       "actual": "ease-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "798279374525270d493bf8737df2da34eefbab0933b1284536a7b601c4f12327",
+   "truth_sha256": "f95769a639c8f67f33f0be5027b31e9b5fdf3b022ebfc24c8c62b9ce2cf9a28d"
+  },
+  {
+   "id": "b003",
+   "family": "animation",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      52,
+      50,
+      284,
+      121
+     ],
+     "start_ms": 229.0,
+     "duration_ms": 359.0,
+     "delta": [
+      59.0,
+      0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in"
+    }
+   ],
+   "objects": [
+    {
+     "element": "actor",
+     "region": [
+      74,
+      65,
+      259,
+      107
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 216.727,
+       "actual": 229.0,
+       "error": 12.273,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 360,
+       "actual": 359.0,
+       "error": -1.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "right",
+       "actual": "right",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 59.0,
+       "actual": 59.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in",
+       "actual": "ease-in",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "54d3730129830d5a07f6678128634be6e6e15a31359f37d5e92f3945c88dd999",
+   "truth_sha256": "1e1955b5fcd42e899fada3703d8f7654db29a43d129326124ba7408a23ffa99c"
+  },
+  {
+   "id": "b005",
+   "family": "waapi",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      20,
+      34,
+      188,
+      168
+     ],
+     "start_ms": 221.0,
+     "duration_ms": 312.0,
+     "delta": [
+      -0.0,
+      47.6
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "actor",
+     "region": [
+      40,
+      57,
+      166,
+      147
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 216.731,
+       "actual": 221.0,
+       "error": 4.269,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 300,
+       "actual": 312.0,
+       "error": 12.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "down",
+       "actual": "down",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 48.0,
+       "actual": 47.6,
+       "error": -0.4,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in-out",
+       "actual": "ease-in-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "857184aedc2c80e49a3e2ca79db2cb8a352fbfae2bf9686f2af0072f97227d35",
+   "truth_sha256": "136cc1e4a667c872222d1dddb37a289cd4f15c7515e288aeadc13d353aca93e0"
+  },
+  {
+   "id": "b007",
+   "family": "panel",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      52,
+      65,
+      220,
+      184
+     ],
+     "start_ms": null,
+     "duration_ms": null,
+     "delta": null,
+     "resize": null,
+     "opacity": null,
+     "easing": null
+    },
+    {
+     "id": "s2",
+     "region": [
+      70,
+      84,
+      194,
+      202
+     ],
+     "start_ms": 226.0,
+     "duration_ms": 312.0,
+     "delta": null,
+     "resize": [
+      0.0,
+      78.0
+     ],
+     "opacity": null,
+     "easing": "ease-out"
+    },
+    {
+     "id": "s3",
+     "region": [
+      70,
+      124,
+      194,
+      244
+     ],
+     "start_ms": 226.0,
+     "duration_ms": 300.0,
+     "delta": [
+      0.0,
+      77.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "actor",
+     "region": [
+      69,
+      82,
+      195,
+      202
+     ],
+     "match": 1,
+     "fields": {
+      "start_ms": {
+       "expected": 221.728,
+       "actual": 226.0,
+       "error": 4.272,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 300,
+       "actual": 312.0,
+       "error": 12.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": "still",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": 0.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-out",
+       "actual": "ease-out",
+       "error": null,
+       "state": "correct"
+      },
+      "height_px": {
+       "expected": 78,
+       "actual": 78.0,
+       "error": 0.0,
+       "state": "correct"
+      }
+     }
+    },
+    {
+     "element": "follower",
+     "region": [
+      69,
+      124,
+      195,
+      244
+     ],
+     "match": 2,
+     "fields": {
+      "start_ms": {
+       "expected": 221.728,
+       "actual": 226.0,
+       "error": 4.272,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 300,
+       "actual": 300.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "down",
+       "actual": "down",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 78.0,
+       "actual": 77.0,
+       "error": -1.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-out",
+       "actual": "ease-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [
+    0
+   ],
+   "expected_count": 2,
+   "count_correct": false,
+   "missed": 0,
+   "score": 0.9166666666666666,
+   "all_correct": false,
+   "video_sha256": "8b29fc1447dfb2dae00e2a6a653cc3da1b769a233b6411e5bb0d879cd63b5595",
+   "truth_sha256": "15eaac4fcc4f608c1b97157a1c28fbe6d6fe472d5f25f7fb3ff440500329ee78"
+  },
+  {
+   "id": "b009",
+   "family": "sidebar",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      54,
+      64,
+      180,
+      106
+     ],
+     "start_ms": 229.0,
+     "duration_ms": 421.0,
+     "delta": null,
+     "resize": [
+      -44.0,
+      0.0
+     ],
+     "opacity": null,
+     "easing": "ease-out"
+    },
+    {
+     "id": "s2",
+     "region": [
+      136,
+      64,
+      306,
+      106
+     ],
+     "start_ms": 242.0,
+     "duration_ms": 408.0,
+     "delta": [
+      -43.0,
+      0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "actor",
+     "region": [
+      54,
+      64,
+      180,
+      106
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 224.885,
+       "actual": 229.0,
+       "error": 4.115,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 420,
+       "actual": 421.0,
+       "error": 1.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": "still",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": 0.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-out",
+       "actual": "ease-out",
+       "error": null,
+       "state": "correct"
+      },
+      "width_px": {
+       "expected": -44,
+       "actual": -44.0,
+       "error": 0.0,
+       "state": "correct"
+      }
+     }
+    },
+    {
+     "element": "follower",
+     "region": [
+      136,
+      64,
+      306,
+      106
+     ],
+     "match": 1,
+     "fields": {
+      "start_ms": {
+       "expected": 224.885,
+       "actual": 242.0,
+       "error": 17.115,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 420,
+       "actual": 408.0,
+       "error": -12.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "left",
+       "actual": "left",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 44.0,
+       "actual": 43.0,
+       "error": -1.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-out",
+       "actual": "ease-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 2,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "8e0eb8ca7bcc618cb8a97271e9a5b733ae5d7e2680942f1d997833122a0d5285",
+   "truth_sha256": "f4df37ac270d23f6bfe882db72978f6d03b860141741ef5a04567212d2f8f4e0"
+  },
+  {
+   "id": "b011",
+   "family": "insert",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      74,
+      80,
+      200,
+      122
+     ],
+     "start_ms": 229.0,
+     "duration_ms": 300.0,
+     "delta": null,
+     "resize": [
+      0.0,
+      42.0
+     ],
+     "opacity": null,
+     "easing": "ease-out"
+    },
+    {
+     "id": "s2",
+     "region": [
+      74,
+      80,
+      200,
+      162
+     ],
+     "start_ms": 229.0,
+     "duration_ms": 292.0,
+     "delta": [
+      0.0,
+      41.5
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "actor",
+     "region": [
+      74,
+      79,
+      200,
+      122
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 216.625,
+       "actual": 229.0,
+       "error": 12.375,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 300,
+       "actual": 300.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": "still",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": 0.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-out",
+       "actual": "ease-out",
+       "error": null,
+       "state": "correct"
+      },
+      "height_px": {
+       "expected": 43,
+       "actual": 42.0,
+       "error": -1.0,
+       "state": "correct"
+      }
+     }
+    },
+    {
+     "element": "follower",
+     "region": [
+      74,
+      79,
+      200,
+      164
+     ],
+     "match": 1,
+     "fields": {
+      "start_ms": {
+       "expected": 216.625,
+       "actual": 229.0,
+       "error": 12.375,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 300,
+       "actual": 292.0,
+       "error": -8.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "down",
+       "actual": "down",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 43.0,
+       "actual": 41.5,
+       "error": -1.5,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-out",
+       "actual": "ease-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 2,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "21169eb9ba94f214e20a48923159da4d3695c4e01641bf27626780362f2d0bdb",
+   "truth_sha256": "2d95fce22784f9ac737fc02e7eedcd40f912504cbdaed650be5978285e554cc1"
+  },
+  {
+   "id": "b013",
+   "family": "transition",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      20,
+      50,
+      252,
+      121
+     ],
+     "start_ms": 221.0,
+     "duration_ms": 362.0,
+     "delta": [
+      68.1,
+      -0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "linear"
+    }
+   ],
+   "objects": [
+    {
+     "element": "actor",
+     "region": [
+      42,
+      66,
+      236,
+      108
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 216.714,
+       "actual": 221.0,
+       "error": 4.286,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 360,
+       "actual": 362.0,
+       "error": 2.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "right",
+       "actual": "right",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 68.0,
+       "actual": 68.1,
+       "error": 0.1,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "linear",
+       "actual": "linear",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "64b16e869e43351f2fb49abf0681167a28e34bbbb88f753492cc7e68786fae14",
+   "truth_sha256": "52706d18d6a6f76bffd518461a1873ca9ff66bca1595a8f7608ef0138200fd5f"
+  },
+  {
+   "id": "b015",
+   "family": "animation",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      52,
+      65,
+      300,
+      137
+     ],
+     "start_ms": 221.0,
+     "duration_ms": 242.0,
+     "delta": [
+      75.1,
+      0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "actor",
+     "region": [
+      73,
+      79,
+      274,
+      121
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 216.697,
+       "actual": 221.0,
+       "error": 4.303,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 240,
+       "actual": 242.0,
+       "error": 2.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "right",
+       "actual": "right",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 75.0,
+       "actual": 75.1,
+       "error": 0.1,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-out",
+       "actual": "ease-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "eda83bfc5a879fc40a9db73bb0eb6cc73a4cba1a496f3cf67318acb46250d6e2",
+   "truth_sha256": "5315676fea4f5cfee457f271977671e2af58045856b1b0281703f48da1e56413"
+  },
+  {
+   "id": "b017",
+   "family": "waapi",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      68,
+      34,
+      236,
+      184
+     ],
+     "start_ms": 237.0,
+     "duration_ms": 300.0,
+     "delta": [
+      -0.0,
+      72.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "linear"
+    }
+   ],
+   "objects": [
+    {
+     "element": "actor",
+     "region": [
+      87,
+      54,
+      213,
+      168
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 228.672,
+       "actual": 237.0,
+       "error": 8.328,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 300,
+       "actual": 300.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "down",
+       "actual": "down",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 72.0,
+       "actual": 72.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "linear",
+       "actual": "linear",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "699e9174e3ecf91da6bdba2a258f58da10e99698809c6b0687349069c04c7860",
+   "truth_sha256": "a7c91e69cc9300df1ca3d524368e924e0350e0dae71c9cd905754ee34194beb3"
+  },
+  {
+   "id": "b019",
+   "family": "panel",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      46,
+      118,
+      172,
+      240
+     ],
+     "start_ms": 238.0,
+     "duration_ms": 238.0,
+     "delta": [
+      0.0,
+      79.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in-out"
+    },
+    {
+     "id": "s2",
+     "region": [
+      46,
+      76,
+      172,
+      196
+     ],
+     "start_ms": 246.0,
+     "duration_ms": 221.0,
+     "delta": null,
+     "resize": [
+      1.0,
+      78.0
+     ],
+     "opacity": null,
+     "easing": "ease-in-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "actor",
+     "region": [
+      46,
+      76,
+      172,
+      198
+     ],
+     "match": 1,
+     "fields": {
+      "start_ms": {
+       "expected": 229.669,
+       "actual": 246.0,
+       "error": 16.331,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 240,
+       "actual": 221.0,
+       "error": -19.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": "still",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": 0.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in-out",
+       "actual": "ease-in-out",
+       "error": null,
+       "state": "correct"
+      },
+      "height_px": {
+       "expected": 80,
+       "actual": 78.0,
+       "error": -2.0,
+       "state": "correct"
+      }
+     }
+    },
+    {
+     "element": "follower",
+     "region": [
+      46,
+      118,
+      172,
+      240
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 229.669,
+       "actual": 238.0,
+       "error": 8.331,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 240,
+       "actual": 238.0,
+       "error": -2.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "down",
+       "actual": "down",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 80.0,
+       "actual": 79.0,
+       "error": -1.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in-out",
+       "actual": "ease-in-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 2,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "471b9fadd54682b8ab30b6c3ae40a79b1f25b047ef2e740f5946a313bf69a990",
+   "truth_sha256": "329e56358f1055cdaa5c4054738d683c5fee71a99f46b8ef51b7c965c167e784"
+  },
+  {
+   "id": "b021",
+   "family": "sidebar",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      74,
+      82,
+      198,
+      124
+     ],
+     "start_ms": 258.0,
+     "duration_ms": 329.0,
+     "delta": null,
+     "resize": [
+      -60.0,
+      2.0
+     ],
+     "opacity": null,
+     "easing": "ease-in-out"
+    },
+    {
+     "id": "s2",
+     "region": [
+      136,
+      82,
+      324,
+      124
+     ],
+     "start_ms": 237.0,
+     "duration_ms": 371.0,
+     "delta": [
+      -63.0,
+      -1.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "actor",
+     "region": [
+      73,
+      82,
+      199,
+      124
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 232.602,
+       "actual": 258.0,
+       "error": 25.398,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 360,
+       "actual": 329.0,
+       "error": -31.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": "still",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": 0.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in-out",
+       "actual": "ease-in-out",
+       "error": null,
+       "state": "correct"
+      },
+      "width_px": {
+       "expected": -63,
+       "actual": -60.0,
+       "error": 3.0,
+       "state": "correct"
+      }
+     }
+    },
+    {
+     "element": "follower",
+     "region": [
+      136,
+      82,
+      325,
+      124
+     ],
+     "match": 1,
+     "fields": {
+      "start_ms": {
+       "expected": 232.602,
+       "actual": 237.0,
+       "error": 4.398,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 360,
+       "actual": 371.0,
+       "error": 11.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "left",
+       "actual": "left",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 63.0,
+       "actual": 63.00793600809346,
+       "error": 0.007936,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in-out",
+       "actual": "ease-in-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 2,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "2f4c4df33c7212afd8657907188bf4185ecce40a0eedfde819685205354605fe",
+   "truth_sha256": "bccec9dfed0e457b4721582df52b835ebd8c5059d79524bd31276f2348ff0560"
+  },
+  {
+   "id": "b023",
+   "family": "insert",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      74,
+      78,
+      200,
+      196
+     ],
+     "start_ms": 221.0,
+     "duration_ms": 300.0,
+     "delta": [
+      0.0,
+      76.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in"
+    },
+    {
+     "id": "s2",
+     "region": [
+      74,
+      78,
+      200,
+      154
+     ],
+     "start_ms": 221.0,
+     "duration_ms": 300.0,
+     "delta": null,
+     "resize": [
+      0.0,
+      76.0
+     ],
+     "opacity": null,
+     "easing": "ease-in"
+    }
+   ],
+   "objects": [
+    {
+     "element": "actor",
+     "region": [
+      74,
+      78,
+      200,
+      154
+     ],
+     "match": 1,
+     "fields": {
+      "start_ms": {
+       "expected": 216.514,
+       "actual": 221.0,
+       "error": 4.486,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 300,
+       "actual": 300.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": "still",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": 0.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in",
+       "actual": "ease-in",
+       "error": null,
+       "state": "correct"
+      },
+      "height_px": {
+       "expected": 76,
+       "actual": 76.0,
+       "error": 0.0,
+       "state": "correct"
+      }
+     }
+    },
+    {
+     "element": "follower",
+     "region": [
+      74,
+      78,
+      200,
+      196
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 216.514,
+       "actual": 221.0,
+       "error": 4.486,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 300,
+       "actual": 300.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "down",
+       "actual": "down",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 76.0,
+       "actual": 76.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in",
+       "actual": "ease-in",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 2,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "5614661103eb15a2877a8603a0c0656af9b43c8f87b5b9c576fd83e275d6b92b",
+   "truth_sha256": "94eaf41aa72dacedc0402e98715b7b1d85eccad78378d4e42d0a9e5c5c6ba122"
+  }
+ ],
+ "layout_edges": true
+}

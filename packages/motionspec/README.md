@@ -54,6 +54,7 @@ Common options:
 | `--start`, `--end` | analyse only this time range (seconds) |
 | `--fps` | required for a directory of images; files are sorted naturally, `1.png`, `2.png`, `10.png` |
 | `--max-dim` | longest side used for analysis, default 960 |
+| `--layout-edges` | opt in to measuring the four visible edges of filled UI panels and tracking displaced neighbours separately. Width and height samples use source pixels. |
 | `--min-area`, `--max-segments` | ignore smaller changes; keep at most this many segments |
 | `--ambient-ms` | how long a region must keep changing to count as ambient, default 3000; 0 turns it off |
 | `--max-frames`, `--max-crop-mb` | frame limit for the selected range; crop cache limit, default 150 MB |

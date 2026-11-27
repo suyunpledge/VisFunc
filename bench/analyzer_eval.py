@@ -208,7 +208,7 @@ def summarize(rows):
     }
 
 
-def evaluate(source, split, corpus):
+def evaluate(source, split, corpus, *, layout_edges=False):
     rows = []
     cv2.setNumThreads(1)
     cv2.setRNGSeed(61127)
@@ -221,7 +221,7 @@ def evaluate(source, split, corpus):
             video.write_bytes(pixels)
             failure, detail, preds = None, None, []
             try:
-                spec = analyze(video, raw_frames=False, sheets=False)
+                spec = analyze(video, raw_frames=False, sheets=False, layout_edges=layout_edges)
             except Exception as exc:
                 failure = (
                     "format_fail"
@@ -259,13 +259,16 @@ def evaluate(source, split, corpus):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=("qt", "browser"), required=True)
-    parser.add_argument("--split", choices=("dev", "test"), required=True)
+    parser.add_argument("--split", choices=("dev", "test", "m1-test"), required=True)
+    parser.add_argument("--layout-edges", action="store_true")
     parser.add_argument("--corpus", type=Path)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
-    report = evaluate(
-        args.source, args.split, args.corpus or BENCH / "corpus" / (args.source + ".zip")
-    )
+    name = args.source + ("-m1-test.zip" if args.split=="m1-test" else ".zip")
+    report = evaluate(args.source, args.split, args.corpus or BENCH / "corpus" / name,
+                      layout_edges=args.layout_edges)
+    if args.layout_edges:
+        report["layout_edges"] = True
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(

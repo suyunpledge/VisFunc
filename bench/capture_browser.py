@@ -175,18 +175,21 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("work", type=Path)
     parser.add_argument("--chrome")
-    parser.add_argument("--output", type=Path, default=BENCH / "corpus/browser.zip")
+    parser.add_argument("--m1-test", action="store_true")
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     with sync_playwright() as client:
         browser = client.chromium.launch(
             channel=None if args.chrome else "chrome", executable_path=args.chrome, headless=True
         )
-        for split in ("dev", "test"):
+        splits = ("m1-test",) if args.m1_test else ("dev","test")
+        for split in splits:
             for case in cases("browser", split):
                 record(browser, case, args.work / case["id"])
                 print(case["id"], flush=True)
         browser.close()
-    pack("browser", args.work, args.output)
+    name = "browser-m1-test.zip" if args.m1_test else "browser.zip"
+    pack("browser", args.work, args.output or BENCH / "corpus" / name, splits)
 
 
 if __name__ == "__main__":

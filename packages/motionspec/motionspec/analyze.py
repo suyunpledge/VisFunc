@@ -16,6 +16,7 @@ import numpy as np
 from . import annotate
 from .frames import FrameSource, InvalidTimestamps, write_image
 from .motion import analyze_window
+from .reflow import measure_reflow
 from .segment import LAG, Scan, scan
 from .spec import SCHEMA, summarize, validate
 from .timing import with_timing
@@ -32,10 +33,11 @@ class _Window:
     reserved_bytes: int
     truncated: bool
     crops: list[np.ndarray] = field(default_factory=list)
+    context: tuple[int, int, int, int] | None = None
 
 
 def _plan_windows(
-    scanned: Scan, pad: int, max_window: int, budget: int
+    scanned: Scan, pad: int, max_window: int, budget: int, layout_edges: bool = False
 ) -> list[list[_Window]]:
     batches: list[list[_Window]] = []
     width, height = scanned.size
@@ -67,6 +69,18 @@ def _plan_windows(
             (end - start + 1) * stride,
             start > desired_start or end < desired_end,
         )
+        if layout_edges and not window.truncated and 5 <= end - start + 1 <= 180:
+            # Changed pixels often cover only the moving edge of a panel. Include
+            # the stationary edge when the full time window fits the crop budget.
+            margin = min(160, max(roi[2] - roi[0], roi[3] - roi[1]))
+            context = (
+                max(0, roi[0] - margin), max(0, roi[1] - margin),
+                min(width, roi[2] + margin), min(height, roi[3] + margin),
+            )
+            needed = (context[2] - context[0]) * (context[3] - context[1]) * 3 * (end - start + 1)
+            if needed <= budget:
+                window.context = context
+                window.reserved_bytes = needed
         for batch in batches:
             reserved = sum(
                 w.reserved_bytes for w in batch if start <= w.end and w.start <= end
@@ -129,19 +143,28 @@ def _analyze_windows(
             active = [w for w in batch if w.start <= i <= w.end]
             frame = frames.resized(raw)
             for w in active:
-                x1, y1, x2, y2 = w.roi
+                x1, y1, x2, y2 = w.context or w.roi
                 w.crops.append(frame[y1:y2, x1:x2].copy())
                 if i != w.end:
                     continue
                 times = scanned.times[w.start : w.end + 1]
-                results = analyze_window(
-                    w.crops,
-                    times,
-                    origin=(x1, y1),
-                    inv_scale=inv,
-                    threshold=threshold,
-                    allow_layer=not w.truncated and _ambient_share(scanned, w.roi) < 0.5,
-                )
+                results = None
+                if w.context:
+                    focus = (w.roi[0] - x1, w.roi[1] - y1, w.roi[2] - x1, w.roi[3] - y1)
+                    results = measure_reflow(w.crops, times, (x1, y1), inv, focus, threshold)
+                    if results is None:
+                        a, b, c, d = focus
+                        w.crops = [crop[b:d, a:c] for crop in w.crops]
+                        x1, y1, x2, y2 = w.roi
+                if results is None:
+                    results = analyze_window(
+                        w.crops,
+                        times,
+                        origin=(x1, y1),
+                        inv_scale=inv,
+                        threshold=threshold,
+                        allow_layer=not w.truncated and _ambient_share(scanned, w.roi) < 0.5,
+                    )
                 for result in results:
                     # A window can hold several elements; each keeps only the area it sweeps.
                     sx1, sy1, sx2, sy2 = result.pop("_roi", (0, 0, x2 - x1, y2 - y1))
@@ -225,6 +248,7 @@ def analyze(
     sequence_id: str | None = None,
     function_max_frames: int = 64,
     evidence_every_ms: float | None = None,
+    layout_edges: bool = False,
 ) -> dict:
     """Analyse a selected range. Export full-size evidence frames when an output is given."""
     _check_options(
@@ -278,7 +302,7 @@ def analyze(
         warnings.append(
             f"{scanned.dropped} change region(s) were dropped (min_area / max_segments)"
         )
-    batches = _plan_windows(scanned, pad, max_window, max_crop_bytes)
+    batches = _plan_windows(scanned, pad, max_window, max_crop_bytes, layout_edges)
     out = Path(out_dir) if out_dir is not None else None
     if out is not None:
         out.mkdir(parents=True, exist_ok=True)

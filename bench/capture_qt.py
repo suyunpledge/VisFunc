@@ -187,14 +187,18 @@ def legacy(work, group):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("work", type=Path, help="empty staging directory")
-    parser.add_argument("--output", type=Path, default=BENCH / "corpus/qt.zip")
+    parser.add_argument("--m1-test", action="store_true")
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     args.work.mkdir(parents=True, exist_ok=False)
     app = QApplication([])
-    for group in ("basic", "hard"):
-        legacy(args.work, group)
-    for split in ("dev", "test"):
+    splits = ("m1-test",) if args.m1_test else ("dev","test")
+    if not args.m1_test:
+        for group in ("basic", "hard"):
+            legacy(args.work, group)
+    for split in splits:
         for case in cases("qt", split):
             if "legacy" not in case:
                 render(case, args.work / case["id"], app)
-    pack("qt", args.work, args.output)
+    name = "qt-m1-test.zip" if args.m1_test else "qt.zip"
+    pack("qt", args.work, args.output or BENCH / "corpus" / name, splits)
