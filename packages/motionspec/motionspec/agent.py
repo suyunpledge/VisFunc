@@ -84,6 +84,26 @@ def _offset(item: dict, dx: int, dy: int) -> dict:
     return out
 
 
+def _text_frame_border(hwnd: int | None, area: Box) -> int:
+    """Exclude Windows' composited resize border only on an exact single-window capture."""
+    if hwnd is None or sys.platform != "win32":
+        return 0
+    import ctypes
+    from ctypes import wintypes
+
+    get = ctypes.windll.dwmapi.DwmGetWindowAttribute
+    bounds, thickness = wintypes.RECT(), wintypes.UINT()
+    handle = wintypes.HWND(hwnd)
+    if get(handle, 9, ctypes.byref(bounds), ctypes.sizeof(bounds)):
+        return 0
+    if area != (bounds.left, bounds.top, bounds.right, bounds.bottom):
+        return 0
+    # DWMWA_VISIBLE_FRAME_BORDER_THICKNESS is in physical pixels and follows window DPI.
+    if get(handle, 37, ctypes.byref(thickness), ctypes.sizeof(thickness)):
+        return 0
+    return thickness.value
+
+
 def _draw_marker(frame, area, marker):
     x, y = marker["window_px"]
     h, w = frame.shape[:2]
@@ -523,10 +543,12 @@ class ScreenAgent:
                 watcher.update(**waits)
             return watcher, fresh
 
-    def _mark_baseline(self, area: Box | None, ambient_ms: float = 3000.0) -> np.ndarray:
+    def _mark_baseline(
+        self, area: Box | None, sample: tuple[float, np.ndarray] | None = None
+    ) -> np.ndarray:
         """Make the current screen the baseline the next settle compares against."""
-        watcher, _ = self._watcher(area, ambient_ms, {})
-        t_ms, frame = next(self._frames(area))
+        watcher, _ = self._watcher(area, 3000.0, {})
+        t_ms, frame = sample if sample is not None else next(self._frames(area))
         watcher.push(frame, t_ms)
         watcher.rearm()
         with self._state_lock:
@@ -735,26 +757,33 @@ class ScreenAgent:
             window_title, None, text, visible_text=True, marker_image=marker_image
         )
 
-    def _text_point(self, title, label, area, baseline):
+    def _text_point(self, title, label, area, hwnd):
         from svsg.recognition.screen_text import find_text
         from svsg.recognition.ui_elements import ClickTargetChanged
 
-        if baseline is None:
-            raise ClickTargetChanged("Screen capture is unavailable. Inspect the current controls.")
-        hits = find_text(self.reader.read(baseline), label, exact=True)
-        if len(hits) != 1 or hits[0]["low_confidence"]:
-            raise ClickTargetChanged(
-                "A unique confident text match is required. Inspect the visible targets."
-            )
-        hit = hits[0]
-        x, y, right, bottom = hit["bbox_px"]
-        target_pixels = baseline[y:bottom, x:right].copy()
-        fresh = self.grab(area)
-        if fresh.shape != baseline.shape or self.resolve_region(None, title) != area:
-            raise ClickTargetChanged("The window moved during recognition. Inspect it again.")
-        if not np.array_equal(target_pixels, fresh[y:bottom, x:right]):
-            raise ClickTargetChanged("The label changed during recognition. Inspect it again.")
-        return _offset(hit, area[0], area[1])
+        frames = self._frames(area)
+        _, frame = next(frames)
+        border = _text_frame_border(hwnd, area)
+        interior = slice(border, -border) if 0 < 2 * border < min(frame.shape[:2]) else slice(None)
+        offset = interior.start or 0
+        for _ in range(2):
+            view = frame[interior, interior]
+            hits = find_text(self.reader.read(view), label, exact=True)
+            sample = next(frames)
+            fresh = sample[1]
+            if fresh.shape != frame.shape or self.resolve_region(None, title) != area:
+                raise ClickTargetChanged("The window moved during recognition. Inspect it again.")
+            # A duplicate can appear outside the original label's box during OCR.
+            if np.array_equal(view, fresh[interior, interior]):
+                if not hits:
+                    raise ClickTargetChanged("No exact text match. Inspect the visible labels.")
+                if len(hits) > 1:
+                    raise ClickTargetChanged("Multiple text matches. Inspect the visible targets.")
+                if hits[0]["low_confidence"]:
+                    raise ClickTargetChanged("Low-confidence text match. Inspect the target.")
+                return _offset(hits[0], area[0] + offset, area[1] + offset), sample
+            frame = fresh
+        raise ClickTargetChanged("The window kept changing during recognition. Inspect it again.")
 
     def _with_effect(
         self,
@@ -776,8 +805,16 @@ class ScreenAgent:
             if visible_text and expected_hwnd is None and self._click is None:
                 expected_hwnd = ui_elements.find_window(window_title)
             blocked = window_title.casefold() in self.blocked
-            baseline = None if blocked else self._mark_baseline(area)
-            match = self._text_point(window_title, label, area, baseline) if visible_text else None
+            match = None
+            if visible_text:
+                if blocked:
+                    raise ui_elements.ClickTargetChanged(
+                        "Screen capture is unavailable. Inspect the current controls."
+                    )
+                match, sample = self._text_point(window_title, label, area, expected_hwnd)
+                baseline = self._mark_baseline(area, sample)
+            else:
+                baseline = None if blocked else self._mark_baseline(area)
         except Exception as exc:
             if not visible_text:
                 raise

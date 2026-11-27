@@ -1,0 +1,434 @@
+{
+  "baseline_commit": "6d2e8f8f2d2681523ea0f4b88d027177f9348f48",
+  "updated_worktree_sha256_lf": {
+    "packages/motionspec/motionspec/agent.py": "e62916ba2ce19336ca34183203d2df4fc9fe23b95fd2da0983ce3f965d9b9181",
+    "packages/motionspec/bench/agent_canvas_app.py": "cfcafaba0f5645f7674ffb1e886d05e0e42ec86770773466cb8deefc3fdf282b",
+    "packages/motionspec/bench/agent_click_recheck.py": "de19580cc042bf3dc090c0231c6054ffbd608138f35678c91f36fcc338ed5e3f"
+  },
+  "fixture": "Windows Qt canvas; one fresh window, MCP server and receipt store per case",
+  "ocr_version": "1.4.4",
+  "qt_version": "6.12.0",
+  "paid_model_calls": 0,
+  "blocks": [
+    {
+      "build": "updated",
+      "runs": [
+        {
+          "mode": "fixed",
+          "passed": true,
+          "execution_state": "completed",
+          "clicks": [
+            "High"
+          ],
+          "full_ocr_reads": 1,
+          "high_matches_per_read": [
+            1
+          ],
+          "next_step": null,
+          "screen_point": [
+            691,
+            366
+          ],
+          "replayed": true
+        },
+        {
+          "mode": "reflow",
+          "passed": true,
+          "execution_state": "completed",
+          "clicks": [
+            "High"
+          ],
+          "full_ocr_reads": 2,
+          "high_matches_per_read": [
+            1,
+            1
+          ],
+          "next_step": null,
+          "screen_point": [
+            481,
+            365
+          ],
+          "replayed": true
+        },
+        {
+          "mode": "duplicate",
+          "passed": true,
+          "execution_state": "not_started",
+          "clicks": [],
+          "full_ocr_reads": 2,
+          "high_matches_per_read": [
+            1,
+            2
+          ],
+          "next_step": "Multiple text matches. Inspect the visible targets.",
+          "screen_point": null,
+          "replayed": true
+        },
+        {
+          "mode": "fixed",
+          "passed": true,
+          "execution_state": "completed",
+          "clicks": [
+            "High"
+          ],
+          "full_ocr_reads": 1,
+          "high_matches_per_read": [
+            1
+          ],
+          "next_step": null,
+          "screen_point": [
+            691,
+            366
+          ],
+          "replayed": true
+        },
+        {
+          "mode": "reflow",
+          "passed": true,
+          "execution_state": "completed",
+          "clicks": [
+            "High"
+          ],
+          "full_ocr_reads": 2,
+          "high_matches_per_read": [
+            1,
+            1
+          ],
+          "next_step": null,
+          "screen_point": [
+            481,
+            365
+          ],
+          "replayed": true
+        },
+        {
+          "mode": "duplicate",
+          "passed": true,
+          "execution_state": "not_started",
+          "clicks": [],
+          "full_ocr_reads": 2,
+          "high_matches_per_read": [
+            1,
+            2
+          ],
+          "next_step": "Multiple text matches. Inspect the visible targets.",
+          "screen_point": null,
+          "replayed": true
+        }
+      ]
+    },
+    {
+      "build": "baseline",
+      "runs": [
+        {
+          "mode": "fixed",
+          "passed": true,
+          "execution_state": "completed",
+          "clicks": [
+            "High"
+          ],
+          "full_ocr_reads": 1,
+          "high_matches_per_read": [
+            1
+          ],
+          "next_step": null,
+          "screen_point": [
+            690,
+            366
+          ],
+          "replayed": true
+        },
+        {
+          "mode": "reflow",
+          "passed": false,
+          "execution_state": "not_started",
+          "clicks": [],
+          "full_ocr_reads": 1,
+          "high_matches_per_read": [
+            1
+          ],
+          "next_step": "The label changed during recognition. Inspect it again.",
+          "screen_point": null,
+          "replayed": true
+        },
+        {
+          "mode": "duplicate",
+          "passed": false,
+          "execution_state": "completed",
+          "clicks": [
+            "High"
+          ],
+          "full_ocr_reads": 1,
+          "high_matches_per_read": [
+            1
+          ],
+          "next_step": null,
+          "screen_point": [
+            690,
+            366
+          ],
+          "replayed": true
+        },
+        {
+          "mode": "fixed",
+          "passed": true,
+          "execution_state": "completed",
+          "clicks": [
+            "High"
+          ],
+          "full_ocr_reads": 1,
+          "high_matches_per_read": [
+            1
+          ],
+          "next_step": null,
+          "screen_point": [
+            690,
+            366
+          ],
+          "replayed": true
+        },
+        {
+          "mode": "reflow",
+          "passed": false,
+          "execution_state": "not_started",
+          "clicks": [],
+          "full_ocr_reads": 1,
+          "high_matches_per_read": [
+            1
+          ],
+          "next_step": "The label changed during recognition. Inspect it again.",
+          "screen_point": null,
+          "replayed": true
+        },
+        {
+          "mode": "duplicate",
+          "passed": false,
+          "execution_state": "completed",
+          "clicks": [
+            "High"
+          ],
+          "full_ocr_reads": 1,
+          "high_matches_per_read": [
+            1
+          ],
+          "next_step": null,
+          "screen_point": [
+            690,
+            366
+          ],
+          "replayed": true
+        }
+      ]
+    },
+    {
+      "build": "baseline",
+      "runs": [
+        {
+          "mode": "fixed",
+          "passed": true,
+          "execution_state": "completed",
+          "clicks": [
+            "High"
+          ],
+          "full_ocr_reads": 1,
+          "high_matches_per_read": [
+            1
+          ],
+          "next_step": null,
+          "screen_point": [
+            690,
+            366
+          ],
+          "replayed": true
+        },
+        {
+          "mode": "reflow",
+          "passed": false,
+          "execution_state": "not_started",
+          "clicks": [],
+          "full_ocr_reads": 1,
+          "high_matches_per_read": [
+            1
+          ],
+          "next_step": "The label changed during recognition. Inspect it again.",
+          "screen_point": null,
+          "replayed": true
+        },
+        {
+          "mode": "duplicate",
+          "passed": false,
+          "execution_state": "completed",
+          "clicks": [
+            "High"
+          ],
+          "full_ocr_reads": 1,
+          "high_matches_per_read": [
+            1
+          ],
+          "next_step": null,
+          "screen_point": [
+            690,
+            366
+          ],
+          "replayed": true
+        },
+        {
+          "mode": "fixed",
+          "passed": true,
+          "execution_state": "completed",
+          "clicks": [
+            "High"
+          ],
+          "full_ocr_reads": 1,
+          "high_matches_per_read": [
+            1
+          ],
+          "next_step": null,
+          "screen_point": [
+            690,
+            366
+          ],
+          "replayed": true
+        },
+        {
+          "mode": "reflow",
+          "passed": false,
+          "execution_state": "not_started",
+          "clicks": [],
+          "full_ocr_reads": 1,
+          "high_matches_per_read": [
+            1
+          ],
+          "next_step": "The label changed during recognition. Inspect it again.",
+          "screen_point": null,
+          "replayed": true
+        },
+        {
+          "mode": "duplicate",
+          "passed": false,
+          "execution_state": "completed",
+          "clicks": [
+            "High"
+          ],
+          "full_ocr_reads": 1,
+          "high_matches_per_read": [
+            1
+          ],
+          "next_step": null,
+          "screen_point": [
+            690,
+            366
+          ],
+          "replayed": true
+        }
+      ]
+    },
+    {
+      "build": "updated",
+      "runs": [
+        {
+          "mode": "fixed",
+          "passed": true,
+          "execution_state": "completed",
+          "clicks": [
+            "High"
+          ],
+          "full_ocr_reads": 1,
+          "high_matches_per_read": [
+            1
+          ],
+          "next_step": null,
+          "screen_point": [
+            691,
+            366
+          ],
+          "replayed": true
+        },
+        {
+          "mode": "reflow",
+          "passed": true,
+          "execution_state": "completed",
+          "clicks": [
+            "High"
+          ],
+          "full_ocr_reads": 2,
+          "high_matches_per_read": [
+            1,
+            1
+          ],
+          "next_step": null,
+          "screen_point": [
+            481,
+            365
+          ],
+          "replayed": true
+        },
+        {
+          "mode": "duplicate",
+          "passed": true,
+          "execution_state": "not_started",
+          "clicks": [],
+          "full_ocr_reads": 2,
+          "high_matches_per_read": [
+            1,
+            2
+          ],
+          "next_step": "Multiple text matches. Inspect the visible targets.",
+          "screen_point": null,
+          "replayed": true
+        },
+        {
+          "mode": "fixed",
+          "passed": true,
+          "execution_state": "completed",
+          "clicks": [
+            "High"
+          ],
+          "full_ocr_reads": 1,
+          "high_matches_per_read": [
+            1
+          ],
+          "next_step": null,
+          "screen_point": [
+            691,
+            366
+          ],
+          "replayed": true
+        },
+        {
+          "mode": "reflow",
+          "passed": true,
+          "execution_state": "completed",
+          "clicks": [
+            "High"
+          ],
+          "full_ocr_reads": 2,
+          "high_matches_per_read": [
+            1,
+            1
+          ],
+          "next_step": null,
+          "screen_point": [
+            481,
+            365
+          ],
+          "replayed": true
+        },
+        {
+          "mode": "duplicate",
+          "passed": true,
+          "execution_state": "not_started",
+          "clicks": [],
+          "full_ocr_reads": 2,
+          "high_matches_per_read": [
+            1,
+            2
+          ],
+          "next_step": "Multiple text matches. Inspect the visible targets.",
+          "screen_point": null,
+          "replayed": true
+        }
+      ]
+    }
+  ]
+}

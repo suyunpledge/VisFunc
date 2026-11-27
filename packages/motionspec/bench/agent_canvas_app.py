@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -24,7 +25,7 @@ class Canvas(QWidget):
     def __init__(self, path: Path) -> None:
         super().__init__()
         self.path = path
-        self.setWindowTitle(TITLE)
+        self.setWindowTitle(os.environ.get("VISFUNC_CANVAS_TITLE", TITLE))
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setWindowFlag(Qt.WindowDoesNotAcceptFocus)
         self.setWindowFlag(Qt.WindowStaysOnTopHint)
@@ -98,7 +99,8 @@ class Canvas(QWidget):
             p.setPen(QColor("#57606a"))
             p.drawRoundedRect(rect, 22, 22)
             p.setPen(QColor("white") if selected else QColor("#1f2328"))
-            p.drawText(rect, Qt.AlignCenter, name)
+            label = "High" if name == "Low" and self.state.get("duplicate_high") else name
+            p.drawText(rect, Qt.AlignCenter, label)
         p.setPen(QColor("#1f2328"))
         p.drawText(QRectF(40, 280, 400, 48), Qt.AlignVCenter, self.status())
 
@@ -133,22 +135,25 @@ def main() -> None:
     canvas.show()
     stop = path.with_name(path.name + ".stop")
     poll = QTimer()
-    reflow = len(sys.argv) > 3 and sys.argv[3] == "reflow"
+    mode = sys.argv[3] if len(sys.argv) > 3 else ""
 
     def tick():
         if stop.exists():
             app.quit()
-        elif reflow and not canvas.state.get("reflowed") and path.with_suffix(".reflow").exists():
-            canvas.items["High"], canvas.items["Medium"] = (
-                canvas.items["Medium"],
-                canvas.items["High"],
-            )
+        elif mode and not canvas.state.get("reflowed") and path.with_suffix(".reflow").exists():
+            if mode == "duplicate":
+                canvas.state["duplicate_high"] = True
+            elif mode == "reflow":
+                canvas.items["High"], canvas.items["Medium"] = (
+                    canvas.items["Medium"],
+                    canvas.items["High"],
+                )
             canvas.repaint()
             canvas.state["reflowed"] = True
             canvas.write()
 
     poll.timeout.connect(tick)
-    poll.start(40 if reflow else 300)
+    poll.start(40 if mode else 300)
     QTimer.singleShot(int(seconds * 1000), app.quit)
     app.exec()
 

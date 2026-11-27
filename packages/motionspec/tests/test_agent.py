@@ -194,7 +194,7 @@ def test_replayed_visual_refusal_stays_not_started():
 )
 def test_click_text_with_unverified_evidence_posts_nothing(monkeypatch, case):
     posted = []
-    agent, _, reader = make(
+    agent, screen, reader = make(
         allowed_windows=["App"], click=lambda *a: posted.append(a), windows=lambda _: None
     )
     lines = reader.read(None)["lines"]
@@ -212,7 +212,14 @@ def test_click_text_with_unverified_evidence_posts_nothing(monkeypatch, case):
         areas = iter([(50, 60, 450, 360), (75, 60, 475, 360)])
         agent.locate_window = lambda _: next(areas)
     elif case == "changed":
-        monkeypatch.setattr(agent, "grab", lambda _: np.zeros((300, 400, 3), np.uint8))
+        frame = screen.frame
+
+        def repaint():
+            image = frame()
+            image[0, 0] = round(screen.t / STEP) % 256
+            return image
+
+        monkeypatch.setattr(screen, "frame", repaint)
 
     def read(_):
         if case == "ocr_error":
@@ -223,6 +230,96 @@ def test_click_text_with_unverified_evidence_posts_nothing(monkeypatch, case):
     result = agent.click_text(window_title="App", text="Saved")
     assert result["execution_state"] == "not_started"
     assert result["next_step"] and posted == []
+    if case == "changed":
+        assert "kept changing" in result["next_step"]
+
+
+@pytest.mark.parametrize(
+    "initial,final",
+    [
+        ([20], [20]),  # stable
+        ([20], [150]),  # target moves
+        ([20], [20, 150]),  # a second label appears elsewhere
+        ([], [150]),  # newly visible
+        ([20], []),  # disappears
+        ([20, 150], [20]),  # ambiguity resolves before dispatch
+    ],
+)
+def test_click_text_uses_last_verified_layout(monkeypatch, initial, final):
+    posted = []
+
+    def click(title, x, y):
+        posted.append((x, y))
+        return {"performed": "click_at", "window": title, "element": {"name": "Run"}}
+
+    agent, screen, reader = make(allowed_windows=["App"], windows=lambda _: None, click=click)
+    labels = initial
+    ocr_calls = 0
+
+    def frame():
+        image = np.full((screen.h, screen.w, 3), 240, np.uint8)
+        for x in labels:
+            image[100:130, x : x + 60] = 0
+        return image
+
+    def read(image, regions=None):
+        nonlocal labels, ocr_calls
+        # Read from the captured frame; the window redraws while OCR is running.
+        lines = [
+            {"text": "Run", "bbox_px": [x, 100, x + 60, 130], "low_confidence": False, "score": 1}
+            for x in (20, 150)
+            if image[100, x, 0] == 0
+        ]
+        ocr_calls += 1
+        labels = final
+        return {"lines": lines}
+
+    monkeypatch.setattr(screen, "frame", frame)
+    monkeypatch.setattr(reader, "read", read)
+    result = agent.click_text(window_title="App", text="Run")
+    assert ocr_calls == (1 if initial == final else 2)
+    if len(final) == 1:
+        assert posted == [(50 + final[0] + 30, 60 + 115)]
+        assert result["execution_state"] == "completed"
+        # The pre-click repaint must not be reported as an effect of the click.
+        assert result["screen"]["state"] == "unchanged"
+        assert result["operation_marker"]["screen_px"] == list(posted[0])
+    else:
+        assert result["execution_state"] == "not_started" and not posted
+        assert not agent._armed_areas
+
+
+def test_click_text_composited_border_preserves_screen_coordinates(monkeypatch):
+    posted = []
+
+    def click(title, x, y):
+        posted.append((x, y))
+        return {"performed": "click_at", "window": title, "element": {"name": "Saved"}}
+
+    agent, screen, reader = make(allowed_windows=["App"], windows=lambda _: None, click=click)
+    monkeypatch.setattr("motionspec.agent._text_frame_border", lambda hwnd, area: 2)
+    get_frame = screen.frame
+
+    def frame():
+        image = get_frame()
+        image[:, :2] = round(screen.t / STEP) % 256
+        return image
+
+    shapes = []
+    original_read = reader.read
+
+    def read(image, regions=None):
+        if regions is None:
+            shapes.append(image.shape[:2])
+        return original_read(image, regions)
+
+    monkeypatch.setattr(screen, "frame", frame)
+    monkeypatch.setattr(reader, "read", read)
+    result = agent.click_text(window_title="App", text="Saved")
+    assert shapes == [(screen.h - 4, screen.w - 4)]
+    assert posted == [(50 + 2 + 155, 60 + 2 + 120)]
+    assert result["text_match"]["bbox_px"] == [162, 172, 252, 192]
+    assert result["operation_marker"]["window_px"] == [157, 122]
 
 
 def test_screenshot_scales_and_reports_mapping():

@@ -105,7 +105,7 @@ motionspec overlays slide-out/functions.json --player-toolbar
 
 `click_point` 回执的 `operation_marker.screen_px` 是发送鼠标消息的屏幕物理坐标；按名字操作的 `uia_target_center` 标记控件中心。支持图像的 MCP 客户端可以传 `marker_image=true`，取得标记在操作前截图上的位置。
 
-自绘按钮可以直接用 `click_text(window_title=…, text=…)` 操作。工具在当前画面上查找文字，派发前再次核对目标区域。回执包含识别到的文字、边框和点击坐标。文字缺失、重名、置信度过低或位置发生变化时会返回 `execution_state=not_started`。[Keystone 桌面操作实测](docs/agent-screen-targets-20261125.md)
+自绘按钮可以直接用 `click_text(window_title=…, text=…)` 操作。若识别期间界面重排，工具会在新画面再查一次，按最新位置点击。派发前会复核整个识别区域，连同别处新出现的同名标签一起检查。标签缺失、重名、置信度低或画面持续变化时会返回 `execution_state=not_started`。成功回执包含文字、边框和屏幕点击坐标。[Keystone 桌面操作实测](docs/agent-screen-targets-20261125.md) · [识别期间重绘对照](docs/agent-click-recheck-20261126.md)
 
 动作回执会给出 `screen_history.history_id`。用 `read_screen_history` 并设置 `compact=true`，可以查到提示文字、字段状态、对话框和局部画面变化。后续传入 `after=next_after` 增量读取，需要识别裁图时加 `read_text=true`。默认每次记录 20 秒，像素采样最高 8 Hz，控件最高 4 Hz。`watch_screen_changes` 可单独开始记录，`--history-seconds 0` 可关闭。[界面事件缓存与 token 实测](docs/agent-ui-events-20261123.md)
 
