@@ -156,6 +156,13 @@ def media(folder, model, condition, dense_index):
     if condition in ("V3", "V5"):
         file = "summary.txt" if condition == "V3" else "probe.txt"
         parts.append(client.text((folder / file).read_text(encoding="utf8")))
+    if condition in ("M2-base", "M2-marked"):
+        parts.append(client.text((folder / (condition + ".txt")).read_text(encoding="utf8")))
+        parts.append(client.text(
+            "Use the clip for independent estimates when measurements are uncertain or absent. "
+            "Use null when visual evidence is insufficient. "
+            "Do not substitute visible duration for designed duration."
+        ))
     if condition in AUX:
         parts.append(client.text(AUX[condition]))
     return parts, n

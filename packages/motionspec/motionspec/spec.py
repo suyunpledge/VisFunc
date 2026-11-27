@@ -7,6 +7,7 @@ import re
 from itertools import pairwise
 
 from .timing import motion_timing
+from .uncertainty import summary_uncertainties
 
 SCHEMA = "motionspec/0.1"
 KINDS = {"transform", "fade", "nonrigid", "instant"}
@@ -312,8 +313,34 @@ def describe_design(seg: dict, *, timing: dict | None = None) -> str:
     return f"{design['easing']}, {design['t_start_ms']:.0f}-{design['t_end_ms']:.0f} ({design['duration_ms']:.0f} ms)"
 
 
-def summarize(spec: dict) -> str:
+def _marked_cells(seg, timing, flags):
+    """Keep observations while suppressing unsupported numbers in every table cell."""
+    channels = dict(seg["channels"])
+    for channel, field in (("translate", "distance_px"), ("size", "width_px"),
+                           ("opacity", "opacity_from"), ("scale", "scale"), ("rotate", "rotation")):
+        if field in flags:
+            channels.pop(channel, None)
+    timing_unknown = "start_ms" in flags
+    if timing_unknown and "opacity" in channels:
+        channels["opacity"] = {**channels["opacity"], "easing": None}
+    change = describe_change({**seg, "channels": channels})
+    reasons = {}
+    for field, reason in flags.items():
+        if field not in ("start_ms", "duration_ms", "easing", "region"):
+            reasons.setdefault(reason, []).append(field)
+    caveats = [f"{', '.join(fields)} 不确定 (uncertain): {reason}" for reason, fields in reasons.items()]
+    if caveats:
+        change = "; ".join(([change] if change != "-" else []) + caveats)
+    design = (f"不确定 (uncertain): {flags['start_ms']}" if timing_unknown
+              else describe_design(seg, timing=timing))
+    curve = "—" if timing_unknown else describe_easing(seg["easing"])
+    return design, change, curve
+
+
+def summarize(spec: dict, *, mark_uncertain: bool = False) -> str:
     src = spec["source"]
+    marked = summary_uncertainties(spec) if mark_uncertain else {}
+    segment_flags = marked.get("segments", {})
     lines = [
         f"# Motion spec ({spec['schema']})",
         "",
@@ -332,10 +359,14 @@ def summarize(spec: dict) -> str:
         for seg in spec["segments"]:
             timing = motion_timing(seg)
             visible = timing["visible_change"]
+            flags = segment_flags.get(seg["id"], {})
+            design, change, curve = (_marked_cells(seg, timing, flags) if flags else
+                                     (describe_design(seg, timing=timing), describe_change(seg),
+                                      describe_easing(seg["easing"])))
             lines.append(
                 f"| {seg['id']} | {visible['t_start_ms']:.0f}-{visible['t_end_ms']:.0f} ({visible['duration_ms']:.0f} ms) "
-                f"| {describe_design(seg, timing=timing)} | {seg['kind']} "
-                f"| {describe_change(seg)} | {describe_easing(seg['easing'])} | {seg['confidence']} |"
+                f"| {design} | {seg['kind']} "
+                f"| {change} | {curve} | {seg['confidence']} |"
             )
         lines += [
             "",
@@ -346,7 +377,11 @@ def summarize(spec: dict) -> str:
             "",
         ]
         for seg in spec["segments"]:
-            lines.append(f"- {seg['id']}: region {seg['region']}" + (f", sheet `{seg['sheet']}`" if seg.get("sheet") else "")
+            region = f"region {seg['region']}"
+            if reason := segment_flags.get(seg["id"], {}).get("region"):
+                region = (f"observed feature envelope {seg['region']}; element boundary 不确定 (uncertain): "
+                          f"{reason}")
+            lines.append(f"- {seg['id']}: {region}" + (f", sheet `{seg['sheet']}`" if seg.get("sheet") else "")
                          + describe_element(seg.get("element"))
                          + (f" (+{len(seg['members']) - 1} more moving the same way)" if seg.get("members") else ""))
             for note in seg["notes"]:
@@ -361,6 +396,8 @@ def summarize(spec: dict) -> str:
             lines.append(f"- region {region['region']}, {region['t_start_ms']:.0f}-{region['t_end_ms']:.0f} ms")
     for warning in spec.get("warnings", []):
         lines.append(f"\nWarning: {warning}")
+    if "count" in marked:
+        lines.append(f"\nAnimation count 不确定 (uncertain): {marked['count']}.")
     if spec.get("function_evidence"):
         functions = spec["function_evidence"]
         lines.append(f"\nShared SVSG functions: `{functions['manifest']}` "

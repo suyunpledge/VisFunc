@@ -6,6 +6,7 @@ import json
 import pytest
 from motionspec.spec import describe_design, design_timing, summarize
 from motionspec.timing import motion_timing, with_timing
+from motionspec.uncertainty import summary_uncertainties
 
 
 def segment():
@@ -113,3 +114,63 @@ def test_summary_and_json_use_identical_timing_calculation():
     text = summarize(enriched)
     assert "325-775 (450 ms) | in-out-cubic, 250-850 (600 ms)" in text
     assert enriched["segments"][0]["timing"] == motion_timing(spec["segments"][0])
+
+
+def summary_spec(seg):
+    return {"schema": "motionspec/0.1", "source": {"width": 100, "height": 100, "duration_ms": 1000,
+            "frames_analysed": 40}, "time_resolution_ms": 25, "segments": [seg]}
+
+
+def test_partly_invisible_path_keeps_observed_clock_and_hides_all_fitted_copies():
+    seg = segment()
+    seg["channels"]["translate"]["lower_bound"] = True
+    spec = summary_spec(seg)
+    before = copy.deepcopy(spec)
+    baseline = summarize(spec)
+    marked = summarize(spec, mark_uncertain=True)
+    assert "250-850 (600 ms)" in baseline and "(+0, +90)" in baseline
+    assert "不确定" in marked and "part of the path is invisible" in marked
+    assert "325-775 (450 ms)" in marked and "region [0, 0, 50, 50]" in marked
+    assert "600 ms" not in marked and "(+0, +90)" not in marked
+    assert spec == before and baseline == summarize(spec, mark_uncertain=False)
+
+
+@pytest.mark.parametrize("model", ["layout-edges", "qt-probe"])
+def test_supported_edges_or_probe_remain_visible_at_medium_confidence(model):
+    seg = segment()
+    seg.update(model=model, confidence="medium")
+    seg["channels"]["size"] = {"width_from": 30, "width_to": 70,
+                               "height_from": 20, "height_to": 20}
+    spec = summary_spec(seg)
+    assert summary_uncertainties(spec) == {}
+    assert summarize(spec, mark_uncertain=True) == summarize(spec)
+
+
+def test_blend_does_not_imply_opacity_endpoints_and_count_is_independent():
+    seg = segment()
+    seg.update(kind="fade", channels={"blend": {}}, luma={"from": 30, "to": 95})
+    spec = summary_spec(seg)
+    spec["coverage"] = {"dropped_candidates": 2}
+    flags = summary_uncertainties(spec)
+    assert set(flags["segments"]["s1"]) == {"opacity_from", "opacity_to"}
+    assert flags["count"] and "cross-fade, luma 30 -> 95" in summarize(spec, mark_uncertain=True)
+    assert "opacity_from, opacity_to 不确定" in summarize(spec, mark_uncertain=True)
+
+
+def test_overlapping_features_have_uncertain_boundary_without_erasing_reliable_timing():
+    seg = segment()
+    seg.update(model="multibody", confidence="medium")
+    spec = summary_spec(seg)
+    assert set(summary_uncertainties(spec)["segments"]["s1"]) == {"region"}
+    assert "observed feature envelope" in summarize(spec, mark_uncertain=True)
+    assert "250-850 (600 ms)" in summarize(spec, mark_uncertain=True)
+    seg["confidence"] = "low"
+    assert "600 ms" not in summarize(spec, mark_uncertain=True)
+
+
+def test_empty_clip_does_not_invent_an_object_or_a_measured_count():
+    spec = summary_spec(segment())
+    spec["segments"] = []
+    assert set(summary_uncertainties(spec)) == {"count"}
+    text = summarize(spec, mark_uncertain=True)
+    assert "Animation count 不确定" in text and "| s1 |" not in text

@@ -12,9 +12,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bench"))
 from analyzer_eval import fields
 from motion_corpus import cases
 from strong_client import Ledger, metered_usd
-from strong_eval import predictions
+from strong_eval import media, predictions
 from strong_inputs import select
 from strong_report import histories
+from uncertainty_eval import cohort
+from uncertainty_report import field_counts, mask
 
 
 @pytest.mark.parametrize("source", ["qt", "browser"])
@@ -25,6 +27,42 @@ def test_selects_two_distinct_holdouts_per_family(source):
         Counter(c["family"] for c in cases(source, "test") if c["id"] in chosen).values()
     ) == {2}
     assert set(chosen).isdisjoint(c["id"] for c in cases(source, "dev"))
+
+
+def test_m2_only_uses_development_recordings():
+    selected = cohort()
+    assert {k: len(set(v)) for k, v in selected.items()} == {"qt": 21, "browser": 6}
+    for source, scenes in selected.items():
+        assert set(scenes) <= {c["id"] for c in cases(source, "dev")}
+        assert set(scenes).isdisjoint(c["id"] for c in cases(source, "test"))
+
+
+def test_m2_masks_follow_matched_elements_and_keep_failed_answers_in_denominator():
+    result = {"predictions": [{"id": "s2"}, {"id": "s1"}], "objects": [
+        {"match": 1, "fields": {"duration_ms": {}, "easing": {}}},
+        {"match": None, "fields": {"duration_ms": {}}}]}
+    assert mask(result, {"segments": {"s1": {"duration_ms": "truncated"}}, "count": "dropped"}) == {
+        (0, "duration_ms"), ("count",)}
+    pairs = [{"items": [{"base": "format_fail", "after": "correct"},
+                        {"base": "correct", "after": "missing"}]}]
+    counts = field_counts(pairs, lambda i: True)
+    assert [counts[k] for k in ("n", "base", "marked", "gains", "losses")] == [2, 1, 1, 1, 1]
+
+
+@pytest.mark.parametrize("model", ["gpt", "mimo", "seed"])
+def test_m2_arms_only_change_summary_text(tmp_path, model):
+    (tmp_path / "clip.mp4").write_bytes(b"same video")
+    (tmp_path / "frame.png").write_bytes(b"same frame")
+    (tmp_path / "media.json").write_text('{"size":[80,40],"sparse":[["frame.png",120]]}')
+    arms = ("M2-base", "M2-marked")
+    parts = []
+    for arm in arms:
+        (tmp_path / (arm + ".txt")).write_text(arm)
+        content, frame_count = media(tmp_path, model, arm, 0)
+        assert frame_count == (1 if model == "gpt" else None)
+        assert content[-2] == {"type": "text", "text": arm}
+        parts.append(content[:-2] + content[-1:])
+    assert parts[0] == parts[1]
 
 
 def test_model_unknown_is_distinct_from_zero_translation_and_format_failure():

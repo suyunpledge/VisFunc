@@ -249,6 +249,7 @@ def analyze(
     function_max_frames: int = 64,
     evidence_every_ms: float | None = None,
     layout_edges: bool = False,
+    mark_uncertain: bool = False,
 ) -> dict:
     """Analyse a selected range. Export full-size evidence frames when an output is given."""
     _check_options(
@@ -429,7 +430,7 @@ def analyze(
                 json.dumps(spec, ensure_ascii=False, indent=2, allow_nan=False),
                 encoding="utf-8",
             )
-            (stage / "summary.md").write_text(summarize(spec), encoding="utf-8")
+            (stage / "summary.md").write_text(summarize(spec, mark_uncertain=mark_uncertain), encoding="utf-8")
             for path in sorted(stage.iterdir(), key=lambda p: p.name == "spec.json"):
                 path.replace(out / path.name)
     return spec
