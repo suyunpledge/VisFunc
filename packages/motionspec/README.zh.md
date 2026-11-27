@@ -290,7 +290,7 @@ motionspec check out/spec.json claims.json
 | 9 个较难场景，6 个模型 | 58% | 82% | 100% |
 
 GPT 两个模型收到的是带时间戳的截图，因为所用密钥的组织没有开通视频输入。完整结果、判分规则和原始回答见
-[实测记录](bench/results/README.md)。`bench/pedestrian_*.py` 是在 MOT17 街景视频上做行人检测的实验，还在进行中。
+[实测记录](../../bench/results/README.md)。`bench/pedestrian_*.py` 是在 MOT17 街景视频上做行人检测的实验，还在进行中。
 
 ## 已知限制
 

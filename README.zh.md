@@ -135,7 +135,7 @@ motionspec agent-mcp
 | COCO8 物体识别（8 张图，30 个目标） | 多视图复核后误报 9 → 2，漏检 10 → 16 |
 
 这些界面场景是用 Qt 逐帧渲染的，帧间隔严格均匀，真实录屏的丢帧和录制延迟验证得很少。较难的 9 个场景在开发中反复使用过，
-不算独立验证。测试数据、判分规则和原始回答见 [模型实测记录](packages/motionspec/bench/results/README.md)、
+不算独立验证。测试数据、判分规则和原始回答见 [模型实测记录](bench/results/README.md)、
 [纯参数复测](docs/timing-protocol-retest-20261117.md)、[采样率消融](docs/evidence-ablation-20261116.md)、
 [识别评测](docs/recognition-evaluation-20261116.md)。
 在四段 MOT20 实拍录像的八个新取样时刻，本地行人检测多找回了 3 个重遮挡行人（514 → 517，共 740 个标注），

@@ -1,6 +1,6 @@
 # 字幕与播放器图标的录屏复测
 
-在 Chrome 中实际运行 DPlayer 1.27.1、ArtPlayer 5.2.2、MediaElement.js 7.0.7，每款录制 6 段 WebM。每段固定取最后一张解码帧，基线 `af973f4` 与本轮代码读取相同像素。前两款用于发现问题和调参，MediaElement.js 的识别结果用于留出验证。下面的计数按画面或标注实例汇总。[逐帧转写、检测框、真值与哈希](../packages/motionspec/bench/results/player-recordings-20261122.jsonl)
+在 Chrome 中实际运行 DPlayer 1.27.1、ArtPlayer 5.2.2、MediaElement.js 7.0.7，每款录制 6 段 WebM。每段固定取最后一张解码帧，基线 `af973f4` 与本轮代码读取相同像素。前两款用于发现问题和调参，MediaElement.js 的识别结果用于留出验证。下面的计数按画面或标注实例汇总。[逐帧转写、检测框、真值与哈希](../bench/results/20261122-player-recordings/player-recordings-20261122.jsonl)
 
 ## 字幕与片头
 
@@ -15,9 +15,9 @@
 
 新录屏中的 `RX 318`、`Line R 42`、`Deck Q 7` 都补回了空格，紧排对照 `RX318` 与 `N24` 保持原样。剩余两个逐字错误是 `EXIT NOW` 和 `TURN BACK` 的纯字母词间空格。有字幕的 12 帧共 96 个参考字符，字符编辑距离从 143 降到 2。旧版把播放器计时和背景读数拼入转写，插入错误可使编辑距离大于参考字数。
 
-另对同一 `DEEP BLUE` 片头的两次录屏分别取末尾 0.8 秒，每隔 200 ms 读取一帧。旧版共 10/10 帧把片头列入字幕，新版为 **3/10**。主评分录屏中 5/5 帧都成功分流，另一次录屏中后 3 帧误收。相同分辨率下，末帧 OCR 框高度从 20 像素变到 17 像素，跨过了字号阈值。这个补测包含主表的一帧，单独报告，不与主表相加。[跨帧转写与位置](../packages/motionspec/bench/results/player-title-repeat-20261122.jsonl)
+另对同一 `DEEP BLUE` 片头的两次录屏分别取末尾 0.8 秒，每隔 200 ms 读取一帧。旧版共 10/10 帧把片头列入字幕，新版为 **3/10**。主评分录屏中 5/5 帧都成功分流，另一次录屏中后 3 帧误收。相同分辨率下，末帧 OCR 框高度从 20 像素变到 17 像素，跨过了字号阈值。这个补测包含主表的一帧，单独报告，不与主表相加。[跨帧转写与位置](../bench/results/20261122-player-title-repeat/player-title-repeat-20261122.jsonl)
 
-历史 54 张截图也按原像素哈希回放，其中含 3 张早期开发样例。整帧字幕完全一致从 45/54 升至 47/54，唯一改变的两张是单独的片头 `PRESENTS` 与字幕 `AB 204`。紧排的 `GateB12` 和 `AB12345` 都保留。该组通用底栏图标从 76/159 升至 111/159，两版误报均为 0。历史回放和新录屏分别计数。[历史画面索引](../packages/motionspec/bench/results/subtitle-icons-cross-player-20261122.jsonl)
+历史 54 张截图也按原像素哈希回放，其中含 3 张早期开发样例。整帧字幕完全一致从 45/54 升至 47/54，唯一改变的两张是单独的片头 `PRESENTS` 与字幕 `AB 204`。紧排的 `GateB12` 和 `AB12345` 都保留。该组通用底栏图标从 76/159 升至 111/159，两版误报均为 0。历史回放和新录屏分别计数。[历史画面索引](../bench/results/20261122-subtitle-icons-cross-player/subtitle-icons-cross-player-20261122.jsonl)
 
 ## 陌生图标样式
 

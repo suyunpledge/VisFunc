@@ -1,7 +1,7 @@
 """模型实测：同一段界面动效视频，接入 motionspec 前后，模型测得准不准。
 
     python tools/qt_scenes.py out/qt          （先生成素材，需要 PySide6）
-    python bench/run.py out/qt bench/results/run1
+    python bench/run.py out/qt ../../bench/results/YYYYMMDD-run
 
 三种条件：
     video            只给视频（各家用其最高抽帧率）

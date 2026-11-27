@@ -7,7 +7,7 @@
 
 下文保留历史实验结果，百分比表示预设容差内的逐项判分，不代表零误差，也不代表
 函数表达本身的独立因果收益。更新协议后的纯参数复测见
-[统一时间协议复测](../../../../docs/timing-protocol-retest-20261117.md)。
+[统一时间协议复测](../../docs/timing-protocol-retest-20261117.md)。
 
 另一次 Gemini 四片段盲测只能作为演示，不能并入下表或宣称“100% 精确还原”：
 
@@ -155,14 +155,14 @@ GPT 这组的说明：对话接口拒绝 `video_url`；Responses 接口有 `inpu
 `bench/providers-hard.json`，记录在每轮的 `protocol.json`。"改之前"的视觉摘要由今天开始前的
 提交（`79bef03`）对同一个 mp4 生成。
 
-**第一轮**（`hard1/`，四个条件，每个组合一遍，216 次）：
+**第一轮**（`20261118-hard1/`，四个条件，每个组合一遍，216 次）：
 
 | | 只给视频 | + 视觉分析（改之前） | + 视觉分析（改之后） | + Qt 探针 |
 |---|---|---|---|---|
 | 全部调用，没回答按 0 分 | 58% | 72% | 82% | 100% |
 | 只比四个条件都拿到回答的 | 65% | 81% | 85% | 100% |
 
-**第二轮**（`hard2/`，只比新旧视觉摘要，每个组合两遍，216 次；视觉摘要用修好压缩问题之后的代码）：
+**第二轮**（`20261118-hard2/`，只比新旧视觉摘要，每个组合两遍，216 次；视觉摘要用修好压缩问题之后的代码）：
 
 | 模型 | 改之前 | 改之后 |
 |---|---|---|
@@ -199,8 +199,8 @@ GPT 这组的说明：对话接口拒绝 `video_url`；Responses 接口有 `inpu
 
 ## 文件
 
-- `run1/raw.jsonl`、`run2/raw.jsonl`：每次调用的原始回答、解析结果、判分和用量（不含密钥）
-- `run1/report.md`、`run2/report.md`：`bench/report.py` 生成的汇总表
-- `run1/truth.json`：判分用的真值
-- `hard1/`、`hard2/`：第二批场景的 `raw.jsonl`、`failed.jsonl`（补跑前的失败记录）、`protocol.json`、`report.md`
-  （`bench/report_hard.py` 生成）。`data/` 是生成的视频和摘要，不入库
+- `20261117-run1/raw.jsonl`、`20261117-run2/raw.jsonl`：每次调用的原始回答、解析结果、判分和用量（不含密钥）
+- `20261117-run1/report.md`、`20261117-run2/report.md`：`packages/motionspec/bench/report.py` 生成的汇总表
+- `20261117-run1/truth.json`：判分用的真值
+- `20261118-hard1/`、`20261118-hard2/`：第二批场景的 `raw.jsonl`、`failed.jsonl`（补跑前的失败记录）、`protocol.json`、`report.md`
+  （`packages/motionspec/bench/report_hard.py` 生成）。`data/` 是生成的视频和摘要，不入库

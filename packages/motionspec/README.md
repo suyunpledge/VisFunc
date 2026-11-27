@@ -320,7 +320,7 @@ confirms that a model actually received the video.
 | 9 harder scenes, 6 models | 58% | 82% | 100% |
 
 The two GPT models received timestamped still frames, because the organisation behind the key does not have video input enabled.
-Full results, scoring rules and raw answers are in the [benchmark notes](bench/results/README.md) (Chinese). `bench/pedestrian_*.py`
+Full results, scoring rules and raw answers are in the [benchmark notes](../../bench/results/README.md) (Chinese). `bench/pedestrian_*.py`
 is an experiment on pedestrian detection in MOT17 street videos and is still in progress.
 
 ## Known limits

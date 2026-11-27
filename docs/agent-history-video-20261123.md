@@ -28,7 +28,7 @@
 
 三次均收到位于屏幕 `[689,637]` 的点击。基线尝试的两次显式等待中，一次传入了不合法的等待参数；工具描述现已声明数值边界。表中是单次会话耗时，包含模型端时延。另有两次早期测试因驱动错误校验工具名称而在第一步中止，均未执行桌面操作，未计入表中。
 
-另一次通过真实 HTTP MCP 手动将点击点移出控件中心，目标窗口收到 `[666,640]`，回执标记也是 `[666,640]`。准星图原点 `[578,580]` 加上图内位置 `[88,60]` 可独立复算。普通截屏 OCR 在等待后只能读到 Waiting，缓存保留了提示出现及恢复的两个事件。[操作前标记图](../packages/motionspec/bench/results/agent-history-20261123/click-marker.png) · [历史提示裁图](../packages/motionspec/bench/results/agent-history-20261123/transient-crop.jpg)
+另一次通过真实 HTTP MCP 手动将点击点移出控件中心，目标窗口收到 `[666,640]`，回执标记也是 `[666,640]`。准星图原点 `[578,580]` 加上图内位置 `[88,60]` 可独立复算。普通截屏 OCR 在等待后只能读到 Waiting，缓存保留了提示出现及恢复的两个事件。[操作前标记图](../bench/results/20261123-agent-history/click-marker.png) · [历史提示裁图](../bench/results/20261123-agent-history/transient-crop.jpg)
 
 ## 播放器持续运动时的缓存
 
@@ -51,4 +51,4 @@ python packages/motionspec/bench/replay_screen_history.py bunny.mp4 oceans.mp4 s
 | Chrome 播放器录屏 | 50 | 83.76 ms | 72.59 ms | 13.3% |
 | Fluid 变帧率派生样本 | 22 | 52.59 ms | 48.19 ms | 8.4% |
 
-三个原始录屏和一个由 Fluid 不等间隔抽帧得到的样本，共 168 个区间帧，与 FFprobe 按首个显示帧对齐后的帧号全部一致，最大时间差低于 0.001 ms。四组前后输出的哈希均相同。含导出函数的端到端单次耗时分别为 2959→2915、2426→2193、2066→2103、1713→1571 ms；Chrome 这一组略慢。读取提速没有改变这批样本的测量结果。[逐次耗时、图像与函数哈希、工具调用和应用终态](../packages/motionspec/bench/results/agent-history-20261123/measurements.json)
+三个原始录屏和一个由 Fluid 不等间隔抽帧得到的样本，共 168 个区间帧，与 FFprobe 按首个显示帧对齐后的帧号全部一致，最大时间差低于 0.001 ms。四组前后输出的哈希均相同。含导出函数的端到端单次耗时分别为 2959→2915、2426→2193、2066→2103、1713→1571 ms；Chrome 这一组略慢。读取提速没有改变这批样本的测量结果。[逐次耗时、图像与函数哈希、工具调用和应用终态](../bench/results/20261123-agent-history/measurements.json)

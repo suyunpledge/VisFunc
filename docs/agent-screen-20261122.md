@@ -51,7 +51,7 @@ motionspec agent-mcp
 
 ## 测试
 
-机器为 32 个逻辑核心的 Windows 11，显示器 2560×1600、缩放 150%，Python 3.12，rapidocr-onnxruntime 1.4.4，Chrome 157。原始数据见 [结果文件](../packages/motionspec/bench/results/agent-screen-20261122.json)。
+机器为 32 个逻辑核心的 Windows 11，显示器 2560×1600、缩放 150%，Python 3.12，rapidocr-onnxruntime 1.4.4，Chrome 157。原始数据见 [结果文件](../bench/results/20261122-agent-screen/agent-screen-20261122.json)。
 
 ### 真实桌面上的 MCP 调用
 

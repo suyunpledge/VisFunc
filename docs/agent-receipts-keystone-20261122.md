@@ -10,10 +10,10 @@
 
 三个场景各运行一次，用于验证故障路径能否走通。重复操作发生率、跨应用兼容性和识别准确率需要另行采样。原始证据包括工具调用顺序、MCP 返回值和 Qt 窗口状态。仓库回归用例位于 `packages/motionspec/tests/test_agent.py` 和 `tests/test_ui_elements.py`，涵盖真实动作后的观察异常、同名项与陈旧引用，以及 UIA 等待参数、窗口丢失和同名状态差异。运行 `python -m pytest`，本轮 492 项通过，1 条依赖弃用警告。
 
-复测提示明确要求只点一次、通过名称工具操作右侧字段（必要时提供引用）、以及显式调用等待并开启读文本。每个会话只能调用当前窗口的 MCP 工具。表中结果衡量受控条件下的执行与复核能力。[各会话的工具调用、回执及窗口终态](agent-receipts-keystone-20261122.json)
+复测提示明确要求只点一次、通过名称工具操作右侧字段（必要时提供引用）、以及显式调用等待并开启读文本。每个会话只能调用当前窗口的 MCP 工具。表中结果衡量受控条件下的执行与复核能力。[各会话的工具调用、回执及窗口终态](../bench/results/20261122-agent-receipts-keystone/agent-receipts-keystone-20261122.json)
 
 ## Windows 便携包验收
 
-解压后又开了第四个独立 Keystone 会话，使用包内运行时复测点击后的 OCR 异常。Agent 先读取控件，点击一次，再读取控件确认 `Count 1`。窗口记录的点击次数为 1，整个会话耗时 12.5 秒。[成品校验值、工具调用顺序和故障回执](agent-release-verification-20261122.json)
+解压后又开了第四个独立 Keystone 会话，使用包内运行时复测点击后的 OCR 异常。Agent 先读取控件，点击一次，再读取控件确认 `Count 1`。窗口记录的点击次数为 1，整个会话耗时 12.5 秒。[成品校验值、工具调用顺序和故障回执](../bench/results/20261122-agent-release-verification/agent-release-verification-20261122.json)
 
 在同一台 Windows x64 机器将 ZIP 解压到另一个含空格和中文的目录，移除测试进程继承的 Python 搜索路径，并将 PATH 限定为包内工具和 Windows 系统目录。启动器连续两次通过 API 健康检查和带 token 的 MCP 初始化与工具发现，第二次保留已有配置。通过只读 MCP 从实际 Qt 窗口枚举到两个同名控件的不同引用。HTTP OCR 在 1920 × 1080 设置页上读出 18 行。包内 FFmpeg 生成的 1 秒样片经 CLI 导出 spec.json、summary.md 和 functions.json；YOLO11n 和 CrowdHuman 均执行了一次本地 CPU 推理。模型自检使用空白输入，只验证模型能加载并完成推理。

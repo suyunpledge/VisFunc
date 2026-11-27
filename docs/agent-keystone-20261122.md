@@ -116,4 +116,4 @@ motionspec agent-mcp --http 127.0.0.1:8765 --no-images --allow-window "要操作
 python packages/motionspec/bench/agent_keystone_live.py <Keystone 仓库> <装了 PySide6 的 python> out.json gpt-6.1-sol gpt-6.1-terra
 ```
 
-脚本从 `~/.forge/secrets.json` 读 OpenAI 密钥，只通过环境变量交给网关子进程；网关使用临时 home。运行时桌面上会出现任务窗口。原始记录见第 1～3 轮的 [结果文件](../packages/motionspec/bench/results/agent-keystone-live-20261122.json) 和第 4、5 轮的 [结果文件](../packages/motionspec/bench/results/agent-keystone-rounds45-20261122.json)。第 4、5 轮用 `--tasks settings recovery web canvas` 运行。
+脚本从 `~/.forge/secrets.json` 读 OpenAI 密钥，只通过环境变量交给网关子进程；网关使用临时 home。运行时桌面上会出现任务窗口。原始记录见第 1～3 轮的 [结果文件](../bench/results/20261122-agent-keystone-live/agent-keystone-live-20261122.json) 和第 4、5 轮的 [结果文件](../bench/results/20261122-agent-keystone-rounds45/agent-keystone-rounds45-20261122.json)。第 4、5 轮用 `--tasks settings recovery web canvas` 运行。

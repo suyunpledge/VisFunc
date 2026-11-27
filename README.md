@@ -146,7 +146,7 @@ Connected to Pledge Keystone (`--http`), GPT-6.1 sol and terra completed four ki
 
 The UI scenes are rendered frame by frame with Qt, so frame timing is perfectly regular; dropped frames and capture delay in
 real screen recordings have had little testing. The nine harder scenes were used repeatedly during development and are not an
-independent validation. Data, scoring rules and raw answers are in the [model benchmark notes](packages/motionspec/bench/results/README.md),
+independent validation. Data, scoring rules and raw answers are in the [model benchmark notes](bench/results/README.md),
 the [parameter-only retest](docs/timing-protocol-retest-20261117.md), the [sampling-rate ablation](docs/evidence-ablation-20261116.md)
 and the [recognition evaluation](docs/recognition-evaluation-20261116.md) (all in Chinese).
 On eight new sample times from four MOT20 videos, the local pedestrian detector recovered three

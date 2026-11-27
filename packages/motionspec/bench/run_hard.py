@@ -1,7 +1,7 @@
 """第二批场景（tools/qt_hard_scenes.py）上的模型实测：位移、尺寸变化、颜色变化、回弹都要问到。
 
     python tools/qt_hard_scenes.py out/qt-hard
-    python bench/run_hard.py out/qt-hard bench/results/hard1 [--old-code 某个旧版本的 motionspec 包目录]
+    python bench/run_hard.py out/qt-hard ../../bench/results/YYYYMMDD-hard [--old-code 旧版包目录]
 
 四种条件：
     video              只给视频（GPT 两个模型拿不到视频，改传带时间戳的静帧）

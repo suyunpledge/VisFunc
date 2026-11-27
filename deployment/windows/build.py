@@ -134,7 +134,7 @@ def build(args):
     paths.update(extra_paths)
     for name in sorted(paths):
         if name.startswith("archive/") or (
-            name.startswith("packages/motionspec/bench/results/")
+            name.startswith(("bench/results/", "packages/motionspec/bench/results/"))
             and not name.endswith(".md")
             and name not in extra_paths
         ):
