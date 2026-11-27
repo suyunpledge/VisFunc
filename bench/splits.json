@@ -1,0 +1,495 @@
+{
+  "version": 1,
+  "qt": {
+    "dev": [
+      {
+        "id": "card-slide",
+        "legacy": "basic"
+      },
+      {
+        "id": "toast-enter",
+        "legacy": "basic"
+      },
+      {
+        "id": "toast-exit",
+        "legacy": "basic"
+      },
+      {
+        "id": "toast-fade",
+        "legacy": "basic"
+      },
+      {
+        "id": "list-stagger",
+        "legacy": "basic"
+      },
+      {
+        "id": "two-at-once",
+        "legacy": "basic"
+      },
+      {
+        "id": "modal-open",
+        "legacy": "hard"
+      },
+      {
+        "id": "accordion",
+        "legacy": "hard"
+      },
+      {
+        "id": "sidebar-collapse",
+        "legacy": "hard"
+      },
+      {
+        "id": "scroll",
+        "legacy": "hard"
+      },
+      {
+        "id": "tab-indicator",
+        "legacy": "hard"
+      },
+      {
+        "id": "reorder-swap",
+        "legacy": "hard"
+      },
+      {
+        "id": "overshoot",
+        "legacy": "hard"
+      },
+      {
+        "id": "button-color",
+        "legacy": "hard"
+      },
+      {
+        "id": "progress",
+        "legacy": "hard"
+      },
+      {
+        "id": "q000",
+        "family": "horizontal",
+        "seed": 6112700
+      },
+      {
+        "id": "q002",
+        "family": "vertical",
+        "seed": 6112702
+      },
+      {
+        "id": "q004",
+        "family": "overlap",
+        "seed": 6112704
+      },
+      {
+        "id": "q006",
+        "family": "panel",
+        "seed": 6112706
+      },
+      {
+        "id": "q008",
+        "family": "sidebar",
+        "seed": 6112708
+      },
+      {
+        "id": "q010",
+        "family": "fade",
+        "seed": 6112710
+      },
+      {
+        "id": "q012",
+        "family": "horizontal",
+        "seed": 6112712
+      },
+      {
+        "id": "q014",
+        "family": "vertical",
+        "seed": 6112714
+      },
+      {
+        "id": "q016",
+        "family": "overlap",
+        "seed": 6112716
+      },
+      {
+        "id": "q018",
+        "family": "panel",
+        "seed": 6112718
+      },
+      {
+        "id": "q020",
+        "family": "sidebar",
+        "seed": 6112720
+      },
+      {
+        "id": "q022",
+        "family": "fade",
+        "seed": 6112722
+      },
+      {
+        "id": "q024",
+        "family": "horizontal",
+        "seed": 6112724
+      },
+      {
+        "id": "q026",
+        "family": "vertical",
+        "seed": 6112726
+      },
+      {
+        "id": "q028",
+        "family": "overlap",
+        "seed": 6112728
+      },
+      {
+        "id": "q030",
+        "family": "panel",
+        "seed": 6112730
+      },
+      {
+        "id": "q032",
+        "family": "sidebar",
+        "seed": 6112732
+      },
+      {
+        "id": "q034",
+        "family": "fade",
+        "seed": 6112734
+      },
+      {
+        "id": "q036",
+        "family": "horizontal",
+        "seed": 6112736
+      },
+      {
+        "id": "q038",
+        "family": "vertical",
+        "seed": 6112738
+      },
+      {
+        "id": "q040",
+        "family": "overlap",
+        "seed": 6112740
+      },
+      {
+        "id": "q042",
+        "family": "panel",
+        "seed": 6112742
+      },
+      {
+        "id": "q044",
+        "family": "sidebar",
+        "seed": 6112744
+      },
+      {
+        "id": "q046",
+        "family": "fade",
+        "seed": 6112746
+      },
+      {
+        "id": "q048",
+        "family": "horizontal",
+        "seed": 6112748
+      },
+      {
+        "id": "q050",
+        "family": "vertical",
+        "seed": 6112750
+      },
+      {
+        "id": "q052",
+        "family": "overlap",
+        "seed": 6112752
+      },
+      {
+        "id": "q054",
+        "family": "panel",
+        "seed": 6112754
+      },
+      {
+        "id": "q056",
+        "family": "sidebar",
+        "seed": 6112756
+      },
+      {
+        "id": "q058",
+        "family": "fade",
+        "seed": 6112758
+      }
+    ],
+    "test": [
+      {
+        "id": "q001",
+        "family": "horizontal",
+        "seed": 6112701
+      },
+      {
+        "id": "q003",
+        "family": "vertical",
+        "seed": 6112703
+      },
+      {
+        "id": "q005",
+        "family": "overlap",
+        "seed": 6112705
+      },
+      {
+        "id": "q007",
+        "family": "panel",
+        "seed": 6112707
+      },
+      {
+        "id": "q009",
+        "family": "sidebar",
+        "seed": 6112709
+      },
+      {
+        "id": "q011",
+        "family": "fade",
+        "seed": 6112711
+      },
+      {
+        "id": "q013",
+        "family": "horizontal",
+        "seed": 6112713
+      },
+      {
+        "id": "q015",
+        "family": "vertical",
+        "seed": 6112715
+      },
+      {
+        "id": "q017",
+        "family": "overlap",
+        "seed": 6112717
+      },
+      {
+        "id": "q019",
+        "family": "panel",
+        "seed": 6112719
+      },
+      {
+        "id": "q021",
+        "family": "sidebar",
+        "seed": 6112721
+      },
+      {
+        "id": "q023",
+        "family": "fade",
+        "seed": 6112723
+      },
+      {
+        "id": "q025",
+        "family": "horizontal",
+        "seed": 6112725
+      },
+      {
+        "id": "q027",
+        "family": "vertical",
+        "seed": 6112727
+      },
+      {
+        "id": "q029",
+        "family": "overlap",
+        "seed": 6112729
+      },
+      {
+        "id": "q031",
+        "family": "panel",
+        "seed": 6112731
+      },
+      {
+        "id": "q033",
+        "family": "sidebar",
+        "seed": 6112733
+      },
+      {
+        "id": "q035",
+        "family": "fade",
+        "seed": 6112735
+      },
+      {
+        "id": "q037",
+        "family": "horizontal",
+        "seed": 6112737
+      },
+      {
+        "id": "q039",
+        "family": "vertical",
+        "seed": 6112739
+      },
+      {
+        "id": "q041",
+        "family": "overlap",
+        "seed": 6112741
+      },
+      {
+        "id": "q043",
+        "family": "panel",
+        "seed": 6112743
+      },
+      {
+        "id": "q045",
+        "family": "sidebar",
+        "seed": 6112745
+      },
+      {
+        "id": "q047",
+        "family": "fade",
+        "seed": 6112747
+      },
+      {
+        "id": "q049",
+        "family": "horizontal",
+        "seed": 6112749
+      },
+      {
+        "id": "q051",
+        "family": "vertical",
+        "seed": 6112751
+      },
+      {
+        "id": "q053",
+        "family": "overlap",
+        "seed": 6112753
+      },
+      {
+        "id": "q055",
+        "family": "panel",
+        "seed": 6112755
+      },
+      {
+        "id": "q057",
+        "family": "sidebar",
+        "seed": 6112757
+      },
+      {
+        "id": "q059",
+        "family": "fade",
+        "seed": 6112759
+      }
+    ]
+  },
+  "browser": {
+    "dev": [
+      {
+        "id": "b000",
+        "family": "transition",
+        "seed": 7112700
+      },
+      {
+        "id": "b002",
+        "family": "animation",
+        "seed": 7112702
+      },
+      {
+        "id": "b004",
+        "family": "waapi",
+        "seed": 7112704
+      },
+      {
+        "id": "b006",
+        "family": "panel",
+        "seed": 7112706
+      },
+      {
+        "id": "b008",
+        "family": "sidebar",
+        "seed": 7112708
+      },
+      {
+        "id": "b010",
+        "family": "insert",
+        "seed": 7112710
+      },
+      {
+        "id": "b012",
+        "family": "transition",
+        "seed": 7112712
+      },
+      {
+        "id": "b014",
+        "family": "animation",
+        "seed": 7112714
+      },
+      {
+        "id": "b016",
+        "family": "waapi",
+        "seed": 7112716
+      },
+      {
+        "id": "b018",
+        "family": "panel",
+        "seed": 7112718
+      },
+      {
+        "id": "b020",
+        "family": "sidebar",
+        "seed": 7112720
+      },
+      {
+        "id": "b022",
+        "family": "insert",
+        "seed": 7112722
+      }
+    ],
+    "test": [
+      {
+        "id": "b001",
+        "family": "transition",
+        "seed": 7112701
+      },
+      {
+        "id": "b003",
+        "family": "animation",
+        "seed": 7112703
+      },
+      {
+        "id": "b005",
+        "family": "waapi",
+        "seed": 7112705
+      },
+      {
+        "id": "b007",
+        "family": "panel",
+        "seed": 7112707
+      },
+      {
+        "id": "b009",
+        "family": "sidebar",
+        "seed": 7112709
+      },
+      {
+        "id": "b011",
+        "family": "insert",
+        "seed": 7112711
+      },
+      {
+        "id": "b013",
+        "family": "transition",
+        "seed": 7112713
+      },
+      {
+        "id": "b015",
+        "family": "animation",
+        "seed": 7112715
+      },
+      {
+        "id": "b017",
+        "family": "waapi",
+        "seed": 7112717
+      },
+      {
+        "id": "b019",
+        "family": "panel",
+        "seed": 7112719
+      },
+      {
+        "id": "b021",
+        "family": "sidebar",
+        "seed": 7112721
+      },
+      {
+        "id": "b023",
+        "family": "insert",
+        "seed": 7112723
+      }
+    ]
+  }
+}

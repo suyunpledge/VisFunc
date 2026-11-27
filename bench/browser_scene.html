@@ -1,0 +1,83 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>VisFunc local motion measurement</title>
+<style>
+* { box-sizing: border-box }
+body { margin: 0; background: #19202c; color: #eff5ff; font: bold 16px Arial }
+h1 { margin: 12px 22px; font-size: 18px }
+#layout { position: absolute }
+.item { width: 126px; height: 42px; background: #355c85; overflow: hidden;
+        border-radius: 4px; line-height: 42px; text-indent: 10px }
+#follower { background: #744555 }
+#pulse { position: absolute; right: 2px; bottom: 2px; width: 2px; height: 2px }
+@keyframes travel { from { transform: translateX(0) } to { transform: translateX(var(--travel)) } }
+</style>
+<h1>Workspace</h1><div id="layout"></div><div id="pulse"></div>
+<script>
+window.prepare = (c) => {
+  const layout = document.querySelector('#layout');
+  const actor = document.createElement('div'), follower = document.createElement('div');
+  actor.className = follower.className = 'item';
+  actor.id = 'actor'; follower.id = 'follower';
+  actor.textContent = 'Details'; follower.textContent = 'Activity';
+  layout.style.cssText = 'left:' + c.x + 'px;top:' + c.y + 'px';
+  const flow = ['panel', 'sidebar', 'insert'].includes(c.family);
+  if (c.family === 'sidebar') layout.style.display = 'flex';
+  if (c.family === 'insert') actor.style.height = '0px';
+  else layout.append(actor);
+  if (flow) layout.append(follower);
+  document.documentElement.style.setProperty('--travel', c.span + 'px');
+  const states = [], animations = new Map();
+  let active = true, frame = 0;
+  function read(node) {
+    const r = node.getBoundingClientRect(), style = getComputedStyle(node);
+    return {rect: [r.x, r.y, r.right, r.bottom], opacity: Number(style.opacity),
+            transform: style.transform, background: style.backgroundColor};
+  }
+  function sample(t) {
+    if (!active) return;
+    // Tiny compositor pulse supplies timestamps on the still lead and tail as well.
+    document.querySelector('#pulse').style.backgroundColor = (++frame % 2) ? '#404040' : '#303030';
+    const entries = {};
+    if (actor.isConnected) entries.actor = read(actor);
+    if (flow) entries.follower = read(follower);
+    states.push({t, entries});
+    for (const a of actor.getAnimations()) {
+      if (a.startTime !== null) animations.set(a, {
+        start: a.startTime, duration: a.effect.getComputedTiming().duration,
+        timing: a.effect.getTiming(), keyframes: a.effect.getKeyframes()
+      });
+    }
+    requestAnimationFrame(sample);
+  }
+  requestAnimationFrame(sample);
+  window.trigger = () => {
+    const timing = c.duration + 'ms ' + c.css;
+    switch(c.family) {
+      case 'transition':
+        actor.style.transition = 'transform ' + timing;
+        actor.style.transform = 'translateX(' + c.span + 'px)'; break;
+      case 'animation':
+        actor.style.animation = 'travel ' + timing + ' forwards'; break;
+      case 'waapi':
+        actor.animate([{transform:'translateY(0)'},{transform:'translateY(' + c.span + 'px)'}],
+                      {duration:c.duration,easing:c.css,fill:'forwards'}); break;
+      case 'insert':
+        layout.insertBefore(actor, follower);
+        actor.getBoundingClientRect();
+        actor.style.transition = 'height ' + timing;
+        actor.style.height = c.span + 'px'; break;
+      case 'panel':
+        actor.style.transition = 'height ' + timing;
+        actor.style.height = (42 + c.span) + 'px'; break;
+      case 'sidebar':
+        actor.style.transition = 'width ' + timing;
+        actor.style.width = (126 - c.span) + 'px'; break;
+    }
+  };
+  window.finish = () => {
+    active = false;
+    return {origin: performance.timeOrigin, states, animations: Array.from(animations.values())};
+  };
+};
+</script>

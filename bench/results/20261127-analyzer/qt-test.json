@@ -1,0 +1,3248 @@
+{
+ "protocol": "motion-analyzer/1",
+ "source": "qt",
+ "split": "test",
+ "corpus_sha256": "22b64fc33de6186bca36b3109cb2a4e2cc0647f0d7006345abb624ee18ecd784",
+ "summary": {
+  "scenes": 30,
+  "objects": 45,
+  "missed_objects": 10,
+  "extra_segments": 0,
+  "scene_macro": {
+   "mean": 0.697727,
+   "ci95": [
+    0.590404,
+    0.803794
+   ]
+  },
+  "all_fields_correct": {
+   "mean": 0.433333,
+   "ci95": [
+    0.266667,
+    0.6
+   ]
+  },
+  "format_fail": 0,
+  "analyzer_error": 0,
+  "fields": {
+   "start_ms": {
+    "correct": 31,
+    "wrong": 2,
+    "missing": 12,
+    "format_fail": 0,
+    "analyzer_error": 0,
+    "signed_median": -0.0,
+    "absolute_p50_p90": [
+     0.0,
+     0.034
+    ]
+   },
+   "duration_ms": {
+    "correct": 31,
+    "wrong": 2,
+    "missing": 12,
+    "format_fail": 0,
+    "analyzer_error": 0,
+    "signed_median": 0.0,
+    "absolute_p50_p90": [
+     0.033,
+     0.033
+    ]
+   },
+   "direction": {
+    "correct": 30,
+    "wrong": 4,
+    "missing": 11,
+    "format_fail": 0,
+    "analyzer_error": 0
+   },
+   "distance_px": {
+    "correct": 29,
+    "wrong": 5,
+    "missing": 11,
+    "format_fail": 0,
+    "analyzer_error": 0,
+    "signed_median": 0.0,
+    "absolute_p50_p90": [
+     0.0,
+     55.6
+    ]
+   },
+   "easing": {
+    "correct": 33,
+    "wrong": 0,
+    "missing": 12,
+    "format_fail": 0,
+    "analyzer_error": 0
+   },
+   "height_px": {
+    "correct": 0,
+    "wrong": 0,
+    "missing": 5,
+    "format_fail": 0,
+    "analyzer_error": 0
+   },
+   "width_px": {
+    "correct": 0,
+    "wrong": 0,
+    "missing": 5,
+    "format_fail": 0,
+    "analyzer_error": 0
+   },
+   "opacity_from": {
+    "correct": 0,
+    "wrong": 0,
+    "missing": 5,
+    "format_fail": 0,
+    "analyzer_error": 0
+   },
+   "opacity_to": {
+    "correct": 0,
+    "wrong": 0,
+    "missing": 5,
+    "format_fail": 0,
+    "analyzer_error": 0
+   }
+  }
+ },
+ "scenes": [
+  {
+   "id": "q001",
+   "family": "horizontal",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      20,
+      19,
+      268,
+      106
+     ],
+     "start_ms": 150.0,
+     "duration_ms": 466.7,
+     "delta": [
+      -90.0,
+      -0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Account",
+     "region": [
+      45,
+      41,
+      247,
+      91
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 150.0,
+       "actual": 150.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 466.6666666666667,
+       "actual": 466.7,
+       "error": 0.033333,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "left",
+       "actual": "left",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 90.0,
+       "actual": 90.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-out",
+       "actual": "ease-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "aa5d024b851ebb4149c3cf834dbc7e93ced9b8c79c91a2d8ca21907e32047361",
+   "truth_sha256": "931c01f88b76b6ef4942a381673792ed01b862ed9eba36fba775853bc697ff2b"
+  },
+  {
+   "id": "q003",
+   "family": "vertical",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      100,
+      19,
+      268,
+      184
+     ],
+     "start_ms": 149.967,
+     "duration_ms": 433.3,
+     "delta": [
+      0.0,
+      -67.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Tools",
+     "region": [
+      123,
+      46,
+      247,
+      155
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 150.0,
+       "actual": 149.967,
+       "error": -0.033,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 433.3333333333333,
+       "actual": 433.3,
+       "error": -0.033333,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "up",
+       "actual": "up",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 67.0,
+       "actual": 67.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in-out",
+       "actual": "ease-in-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "dd55e1af63ece23db5f6fb4f62f157c83ab77421acb452ffe2a5ce5e36efdec8",
+   "truth_sha256": "fee005f5a140aa36788dc886e1de87cbbb16b187b48108274be776544f52f750"
+  },
+  {
+   "id": "q005",
+   "family": "overlap",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      84,
+      34,
+      300,
+      106
+     ],
+     "start_ms": null,
+     "duration_ms": null,
+     "delta": null,
+     "resize": null,
+     "opacity": [
+      1.0,
+      0.0
+     ],
+     "easing": null
+    },
+    {
+     "id": "s2",
+     "region": [
+      36,
+      128,
+      284,
+      215
+     ],
+     "start_ms": 333.3,
+     "duration_ms": 333.3,
+     "delta": [
+      -87.0,
+      0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Sync",
+     "region": [
+      100,
+      47,
+      279,
+      87
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 266.6666666666667,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "duration_ms": {
+       "expected": 333.3333333333333,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "direction": {
+       "expected": "right",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "distance_px": {
+       "expected": 87.0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "easing": {
+       "expected": "ease-in-out",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    },
+    {
+     "element": "Queued",
+     "region": [
+      63,
+      147,
+      260,
+      189
+     ],
+     "match": 1,
+     "fields": {
+      "start_ms": {
+       "expected": 333.33333333333337,
+       "actual": 333.3,
+       "error": -0.033333,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 333.3333333333333,
+       "actual": 333.3,
+       "error": -0.033333,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "left",
+       "actual": "left",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 87.0,
+       "actual": 87.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in-out",
+       "actual": "ease-in-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 2,
+   "count_correct": true,
+   "missed": 0,
+   "score": 0.5454545454545454,
+   "all_correct": false,
+   "video_sha256": "4216d39ef136fd8676790d77495bfe690314b8380cc8ccf0f445f1e3aafaa92e",
+   "truth_sha256": "b6e0668e10e5d9d26a17732a7c8a35a93f44b87b5315d7675abcd0ea89d27f0c"
+  },
+  {
+   "id": "q007",
+   "family": "panel",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      100,
+      65,
+      284,
+      215
+     ],
+     "start_ms": 183.333,
+     "duration_ms": 333.3,
+     "delta": [
+      -0.0,
+      77.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Details",
+     "region": [
+      121,
+      58,
+      257,
+      155
+     ],
+     "match": null,
+     "fields": {
+      "start_ms": {
+       "expected": 183.33333333333334,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "duration_ms": {
+       "expected": 333.3333333333333,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "easing": {
+       "expected": "ease-out",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "height_px": {
+       "expected": 77,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    },
+    {
+     "element": "Next",
+     "region": [
+      121,
+      87,
+      257,
+      200
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 183.33333333333334,
+       "actual": 183.333,
+       "error": -0.000333,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 333.3333333333333,
+       "actual": 333.3,
+       "error": -0.033333,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "down",
+       "actual": "down",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 77.0,
+       "actual": 77.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-out",
+       "actual": "ease-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 2,
+   "count_correct": false,
+   "missed": 1,
+   "score": 0.4166666666666667,
+   "all_correct": false,
+   "video_sha256": "a9cc46f4a5ee831582459356ddba366def6395e374e69c88b7610026076b4c01",
+   "truth_sha256": "3db0618a3711dcece09265a6f9af27400c163a9a0cd8ae0996aaf80999db87a1"
+  },
+  {
+   "id": "q009",
+   "family": "sidebar",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      100,
+      19,
+      316,
+      215
+     ],
+     "start_ms": 199.967,
+     "duration_ms": 350.0,
+     "delta": [
+      -38.0,
+      0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Menu",
+     "region": [
+      20,
+      37,
+      160,
+      187
+     ],
+     "match": null,
+     "fields": {
+      "start_ms": {
+       "expected": 200.0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "duration_ms": {
+       "expected": 350.0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "easing": {
+       "expected": "ease-in",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "width_px": {
+       "expected": -38,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    },
+    {
+     "element": "Content",
+     "region": [
+      132,
+      67,
+      290,
+      115
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 200.0,
+       "actual": 199.967,
+       "error": -0.033,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 350.0,
+       "actual": 350.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "left",
+       "actual": "left",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 38.0,
+       "actual": 38.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in",
+       "actual": "ease-in",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 2,
+   "count_correct": false,
+   "missed": 1,
+   "score": 0.4166666666666667,
+   "all_correct": false,
+   "video_sha256": "b3c8d3367e5530f36ef6287f93fce719073a31a8eb6c9162887181d679fa36eb",
+   "truth_sha256": "79663b89be195d4524ef18ae7c38bb83ae1b07240c8ab9e4776179979fcd5ccf"
+  },
+  {
+   "id": "q011",
+   "family": "fade",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      132,
+      34,
+      284,
+      121
+     ],
+     "start_ms": 350.0,
+     "duration_ms": 316.7,
+     "delta": null,
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Saved",
+     "region": [
+      144,
+      55,
+      264,
+      105
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 233.33333333333334,
+       "actual": 350.0,
+       "error": 116.666667,
+       "state": "wrong"
+      },
+      "duration_ms": {
+       "expected": 433.3333333333333,
+       "actual": 316.7,
+       "error": -116.633333,
+       "state": "wrong"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": "still",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": 0.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in",
+       "actual": "ease-in",
+       "error": null,
+       "state": "correct"
+      },
+      "opacity_from": {
+       "expected": 0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "opacity_to": {
+       "expected": 1,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 0.5,
+   "all_correct": false,
+   "video_sha256": "1b1119ca5074e96f5f857a536a84c0837ae65e7b70eadbdddeefe6b214f0c97f",
+   "truth_sha256": "290c0c4f088b1e343844dd52b2728b9afebce6c6314a4dbd314bfcaed2fac38a"
+  },
+  {
+   "id": "q013",
+   "family": "horizontal",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      84,
+      19,
+      268,
+      106
+     ],
+     "start_ms": 233.333,
+     "duration_ms": 416.7,
+     "delta": [
+      -33.0,
+      0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Account",
+     "region": [
+      98,
+      35,
+      243,
+      85
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 233.33333333333334,
+       "actual": 233.333,
+       "error": -0.000333,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 416.6666666666667,
+       "actual": 416.7,
+       "error": 0.033333,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "left",
+       "actual": "left",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 33.0,
+       "actual": 33.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in",
+       "actual": "ease-in",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "9a16706d0827f0e2749d7947d5acdcdb317bd508e4ac3bc9bfb154e85a3f7131",
+   "truth_sha256": "35441d3a2fcf24150e71a329ce9a82a1761e23ffa1b21de919371a8a13d9812c"
+  },
+  {
+   "id": "q015",
+   "family": "vertical",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      100,
+      50,
+      268,
+      199
+     ],
+     "start_ms": 133.3,
+     "duration_ms": 350.0,
+     "delta": [
+      0.0,
+      -60.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Tools",
+     "region": [
+      126,
+      77,
+      250,
+      179
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 133.33333333333334,
+       "actual": 133.3,
+       "error": -0.033333,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 350.0,
+       "actual": 350.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "up",
+       "actual": "up",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 60.0,
+       "actual": 60.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in",
+       "actual": "ease-in",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "e1afd8bff555339b9127b31e5567f43e8b6e0a55ff1b1e52bcfff361bdf5ecb4",
+   "truth_sha256": "14803909f2e344a482c732cf1e2965b53333f5d32b2adfa53fea414f7dbc70f6"
+  },
+  {
+   "id": "q017",
+   "family": "overlap",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      84,
+      19,
+      300,
+      106
+     ],
+     "start_ms": null,
+     "duration_ms": null,
+     "delta": [
+      14.2,
+      0.0
+     ],
+     "resize": null,
+     "opacity": [
+      1.0,
+      0.0
+     ],
+     "easing": null
+    },
+    {
+     "id": "s2",
+     "region": [
+      52,
+      128,
+      284,
+      199
+     ],
+     "start_ms": 200.0,
+     "duration_ms": 316.7,
+     "delta": [
+      -82.0,
+      0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Sync",
+     "region": [
+      109,
+      41,
+      283,
+      81
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 166.66666666666666,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "duration_ms": {
+       "expected": 316.6666666666667,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "direction": {
+       "expected": "right",
+       "actual": "right",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 82.0,
+       "actual": 14.2,
+       "error": -67.8,
+       "state": "wrong"
+      },
+      "easing": {
+       "expected": "ease-in",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    },
+    {
+     "element": "Queued",
+     "region": [
+      77,
+      141,
+      269,
+      183
+     ],
+     "match": 1,
+     "fields": {
+      "start_ms": {
+       "expected": 200.0,
+       "actual": 200.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 316.6666666666667,
+       "actual": 316.7,
+       "error": 0.033333,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "left",
+       "actual": "left",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 82.0,
+       "actual": 82.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in",
+       "actual": "ease-in",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 2,
+   "count_correct": true,
+   "missed": 0,
+   "score": 0.6363636363636364,
+   "all_correct": false,
+   "video_sha256": "a716f75b37d2ec7385def4c2945a5d5c775a29f6b976d351f49955e59a4a2e26",
+   "truth_sha256": "76c4fde7cb9b5b4753b5ebca18b2efe208f4c4aaaecd5907c6386810631bf4fd"
+  },
+  {
+   "id": "q019",
+   "family": "panel",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      100,
+      34,
+      284,
+      184
+     ],
+     "start_ms": 200.0,
+     "duration_ms": 283.3,
+     "delta": [
+      0.0,
+      54.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "linear"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Details",
+     "region": [
+      124,
+      41,
+      260,
+      115
+     ],
+     "match": null,
+     "fields": {
+      "start_ms": {
+       "expected": 200.0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "duration_ms": {
+       "expected": 283.3333333333333,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "easing": {
+       "expected": "linear",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "height_px": {
+       "expected": 54,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    },
+    {
+     "element": "Next",
+     "region": [
+      124,
+      70,
+      260,
+      160
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 200.0,
+       "actual": 200.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 283.3333333333333,
+       "actual": 283.3,
+       "error": -0.033333,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "down",
+       "actual": "down",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 54.0,
+       "actual": 54.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "linear",
+       "actual": "linear",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 2,
+   "count_correct": false,
+   "missed": 1,
+   "score": 0.4166666666666667,
+   "all_correct": false,
+   "video_sha256": "745c66292e879c753fadb94a25c9944f8c05f5e12b276438ae70688faf47fb93",
+   "truth_sha256": "7af464e8059820a8c13cef54d4bcf3b2854a7dd63ee78ef4f4984b7338297de9"
+  },
+  {
+   "id": "q021",
+   "family": "sidebar",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      68,
+      19,
+      316,
+      215
+     ],
+     "start_ms": 266.633,
+     "duration_ms": 400.0,
+     "delta": [
+      -76.0,
+      -0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Menu",
+     "region": [
+      20,
+      44,
+      160,
+      194
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 266.6666666666667,
+       "actual": 266.633,
+       "error": -0.033667,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 400.0,
+       "actual": 400.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": "left",
+       "error": null,
+       "state": "wrong"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": 76.0,
+       "error": 76.0,
+       "state": "wrong"
+      },
+      "easing": {
+       "expected": "ease-in",
+       "actual": "ease-in",
+       "error": null,
+       "state": "correct"
+      },
+      "width_px": {
+       "expected": -76,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    },
+    {
+     "element": "Content",
+     "region": [
+      94,
+      74,
+      290,
+      122
+     ],
+     "match": null,
+     "fields": {
+      "start_ms": {
+       "expected": 266.6666666666667,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "duration_ms": {
+       "expected": 400.0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "direction": {
+       "expected": "left",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "distance_px": {
+       "expected": 76.0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "easing": {
+       "expected": "ease-in",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 2,
+   "count_correct": false,
+   "missed": 1,
+   "score": 0.25,
+   "all_correct": false,
+   "video_sha256": "d7ab70d8769f866a3dd903c94733842d1ab2c16904d42c4027a3b1adfaeed5aa",
+   "truth_sha256": "fc0534c396471e8a1d75ba55d8bf4d9c137d166ad5adb81ed873122a91b93e62"
+  },
+  {
+   "id": "q023",
+   "family": "fade",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      100,
+      34,
+      252,
+      121
+     ],
+     "start_ms": 266.667,
+     "duration_ms": 366.7,
+     "delta": null,
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Saved",
+     "region": [
+      115,
+      56,
+      235,
+      106
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 166.66666666666666,
+       "actual": 266.667,
+       "error": 100.000333,
+       "state": "wrong"
+      },
+      "duration_ms": {
+       "expected": 450.0,
+       "actual": 366.7,
+       "error": -83.3,
+       "state": "wrong"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": "still",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": 0.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in",
+       "actual": "ease-in",
+       "error": null,
+       "state": "correct"
+      },
+      "opacity_from": {
+       "expected": 0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "opacity_to": {
+       "expected": 1,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 0.5,
+   "all_correct": false,
+   "video_sha256": "7a4f79a58c6bced45793c002606e6fa64ba505bdb5e9c2b77bb9eee7a686e6b6",
+   "truth_sha256": "fbc24705c5f7d2bcdbb1e4f49693152d750ccde08053bad773f3a68fd058824a"
+  },
+  {
+   "id": "q025",
+   "family": "horizontal",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      52,
+      34,
+      284,
+      137
+     ],
+     "start_ms": 200.0,
+     "duration_ms": 266.7,
+     "delta": [
+      -81.0,
+      0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "linear"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Account",
+     "region": [
+      64,
+      59,
+      257,
+      109
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 200.0,
+       "actual": 200.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 266.6666666666667,
+       "actual": 266.7,
+       "error": 0.033333,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "left",
+       "actual": "left",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 81.0,
+       "actual": 81.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "linear",
+       "actual": "linear",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "c5676a9ec37ba2db7530ed759d07b5c53a801d56ffda27236c086c7e8eab259f",
+   "truth_sha256": "63bf09a766f279ee2948dd9514e6e71a06b220f2855651fcc7c7712558e9454d"
+  },
+  {
+   "id": "q027",
+   "family": "vertical",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      116,
+      50,
+      284,
+      199
+     ],
+     "start_ms": 183.333,
+     "duration_ms": 400.0,
+     "delta": [
+      0.0,
+      -72.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Tools",
+     "region": [
+      139,
+      67,
+      263,
+      181
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 183.33333333333334,
+       "actual": 183.333,
+       "error": -0.000333,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 400.0,
+       "actual": 400.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "up",
+       "actual": "up",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 72.0,
+       "actual": 72.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-out",
+       "actual": "ease-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "62f5aa6ea5ef29771d0e95c72f6e1e1661f6b3da0b7a867e8c9962293eb8bf80",
+   "truth_sha256": "524e7af419740ab9adee4dc93b568c34c27ed82b9ffdcf90095e1beb84fec6a8"
+  },
+  {
+   "id": "q029",
+   "family": "overlap",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      100,
+      19,
+      300,
+      106
+     ],
+     "start_ms": 216.667,
+     "duration_ms": 300.0,
+     "delta": [
+      79.0,
+      0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-out"
+    },
+    {
+     "id": "s2",
+     "region": [
+      68,
+      128,
+      284,
+      199
+     ],
+     "start_ms": 250.0,
+     "duration_ms": 300.0,
+     "delta": [
+      -79.0,
+      0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Sync",
+     "region": [
+      112,
+      44,
+      283,
+      84
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 216.66666666666666,
+       "actual": 216.667,
+       "error": 0.000333,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 300.0,
+       "actual": 300.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "right",
+       "actual": "right",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 79.0,
+       "actual": 79.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-out",
+       "actual": "ease-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    },
+    {
+     "element": "Queued",
+     "region": [
+      83,
+      144,
+      272,
+      186
+     ],
+     "match": 1,
+     "fields": {
+      "start_ms": {
+       "expected": 250.0,
+       "actual": 250.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 300.0,
+       "actual": 300.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "left",
+       "actual": "left",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 79.0,
+       "actual": 79.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-out",
+       "actual": "ease-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 2,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "08f4397a3b1706eb16969be6105e599a6f8d4755ea5eb9dc8f2a2ea3df8832f9",
+   "truth_sha256": "bb5cc64282e402d9ffb7868f37fc9b90a6f28761cf043777b827b62d50ec195a"
+  },
+  {
+   "id": "q031",
+   "family": "panel",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      132,
+      65,
+      316,
+      215
+     ],
+     "start_ms": 266.667,
+     "duration_ms": 266.7,
+     "delta": [
+      -0.0,
+      63.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "linear"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Details",
+     "region": [
+      155,
+      63,
+      291,
+      146
+     ],
+     "match": null,
+     "fields": {
+      "start_ms": {
+       "expected": 266.6666666666667,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "duration_ms": {
+       "expected": 266.6666666666667,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "easing": {
+       "expected": "linear",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "height_px": {
+       "expected": 63,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    },
+    {
+     "element": "Next",
+     "region": [
+      155,
+      92,
+      291,
+      191
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 266.6666666666667,
+       "actual": 266.667,
+       "error": 0.000333,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 266.6666666666667,
+       "actual": 266.7,
+       "error": 0.033333,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "down",
+       "actual": "down",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 63.0,
+       "actual": 63.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "linear",
+       "actual": "linear",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 2,
+   "count_correct": false,
+   "missed": 1,
+   "score": 0.4166666666666667,
+   "all_correct": false,
+   "video_sha256": "2a63c57a2fc65e777bb6d990eb91196bd643fb0916ce546c9e980cd0c0dd8bb8",
+   "truth_sha256": "1f06904ea45a04b3ff29cea51641a4e875dcb27eb716511f5dd276bf94f504d9"
+  },
+  {
+   "id": "q033",
+   "family": "sidebar",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      52,
+      34,
+      316,
+      230
+     ],
+     "start_ms": 200.0,
+     "duration_ms": 266.7,
+     "delta": [
+      -82.0,
+      -0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "linear"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Menu",
+     "region": [
+      20,
+      57,
+      160,
+      207
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 200.0,
+       "actual": 200.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 266.6666666666667,
+       "actual": 266.7,
+       "error": 0.033333,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": "left",
+       "error": null,
+       "state": "wrong"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": 82.0,
+       "error": 82.0,
+       "state": "wrong"
+      },
+      "easing": {
+       "expected": "linear",
+       "actual": "linear",
+       "error": null,
+       "state": "correct"
+      },
+      "width_px": {
+       "expected": -82,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    },
+    {
+     "element": "Content",
+     "region": [
+      88,
+      87,
+      290,
+      135
+     ],
+     "match": null,
+     "fields": {
+      "start_ms": {
+       "expected": 200.0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "duration_ms": {
+       "expected": 266.6666666666667,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "direction": {
+       "expected": "left",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "distance_px": {
+       "expected": 82.0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "easing": {
+       "expected": "linear",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 2,
+   "count_correct": false,
+   "missed": 1,
+   "score": 0.25,
+   "all_correct": false,
+   "video_sha256": "1145db11b09ddfb1d42e81fdb5833c720bd237f220ae1168ee17a681420f3145",
+   "truth_sha256": "b43947da4c42302660282e04ca659137c7ac0636b7f2661dd07c6901204dbb4f"
+  },
+  {
+   "id": "q035",
+   "family": "fade",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      100,
+      19,
+      268,
+      106
+     ],
+     "start_ms": 266.667,
+     "duration_ms": 383.3,
+     "delta": null,
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Saved",
+     "region": [
+      125,
+      42,
+      245,
+      92
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 266.6666666666667,
+       "actual": 266.667,
+       "error": 0.000333,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 383.3333333333333,
+       "actual": 383.3,
+       "error": -0.033333,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": "still",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": 0.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-out",
+       "actual": "ease-out",
+       "error": null,
+       "state": "correct"
+      },
+      "opacity_from": {
+       "expected": 0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "opacity_to": {
+       "expected": 1,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 0.75,
+   "all_correct": false,
+   "video_sha256": "1eee298b07163149aae2207067a700d76ae864164bbe0760858b8d1b39a99ace",
+   "truth_sha256": "343bfaec03419ae3b4109037a3aa24bd830781fd57ca6e667bc0153d59089fc6"
+  },
+  {
+   "id": "q037",
+   "family": "horizontal",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      116,
+      34,
+      332,
+      121
+     ],
+     "start_ms": 166.633,
+     "duration_ms": 383.3,
+     "delta": [
+      63.0,
+      -0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Account",
+     "region": [
+      139,
+      52,
+      314,
+      102
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 166.66666666666666,
+       "actual": 166.633,
+       "error": -0.033667,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 383.3333333333333,
+       "actual": 383.3,
+       "error": -0.033333,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "right",
+       "actual": "right",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 63.0,
+       "actual": 63.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in-out",
+       "actual": "ease-in-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "2d38b4b03aa1389107c2363c9b7d035d6d1c15faabb51cafd7711c4a833dfddf",
+   "truth_sha256": "5d2b22f358f5f34140d9b00496ac16693bd493c7713652be25765c4dfd5fd1cf"
+  },
+  {
+   "id": "q039",
+   "family": "vertical",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      100,
+      34,
+      268,
+      184
+     ],
+     "start_ms": 166.667,
+     "duration_ms": 450.0,
+     "delta": [
+      -0.0,
+      -63.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "linear"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Tools",
+     "region": [
+      117,
+      55,
+      241,
+      160
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 166.66666666666666,
+       "actual": 166.667,
+       "error": 0.000333,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 450.0,
+       "actual": 450.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "up",
+       "actual": "up",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 63.0,
+       "actual": 63.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "linear",
+       "actual": "linear",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "7602fef1184b05eaba0d75c78f602dd6f1511db1959ecebc16da0ea03bf22565",
+   "truth_sha256": "e35cbf7e70ef943df7848d3cd9c5af073f2627b371d845d3977bc7a8ddd21e4b"
+  },
+  {
+   "id": "q041",
+   "family": "overlap",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      100,
+      19,
+      332,
+      106
+     ],
+     "start_ms": 133.3,
+     "duration_ms": 416.7,
+     "delta": [
+      89.0,
+      0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in-out"
+    },
+    {
+     "id": "s2",
+     "region": [
+      68,
+      128,
+      300,
+      199
+     ],
+     "start_ms": 183.3,
+     "duration_ms": 416.7,
+     "delta": [
+      -89.0,
+      0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Sync",
+     "region": [
+      124,
+      42,
+      305,
+      82
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 133.33333333333334,
+       "actual": 133.3,
+       "error": -0.033333,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 416.6666666666667,
+       "actual": 416.7,
+       "error": 0.033333,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "right",
+       "actual": "right",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 89.0,
+       "actual": 89.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in-out",
+       "actual": "ease-in-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    },
+    {
+     "element": "Queued",
+     "region": [
+      85,
+      142,
+      284,
+      184
+     ],
+     "match": 1,
+     "fields": {
+      "start_ms": {
+       "expected": 183.33333333333334,
+       "actual": 183.3,
+       "error": -0.033333,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 416.6666666666667,
+       "actual": 416.7,
+       "error": 0.033333,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "left",
+       "actual": "left",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 89.0,
+       "actual": 89.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in-out",
+       "actual": "ease-in-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 2,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "4f9855329dbd755b997e3aa49488e7396ef874ad165b19a9ff572a5d55577c15",
+   "truth_sha256": "4e2badcec369addf5c2d8c7c87d734383dc18b1c51761b0881067992ebd81ed3"
+  },
+  {
+   "id": "q043",
+   "family": "panel",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      116,
+      34,
+      284,
+      199
+     ],
+     "start_ms": 150.0,
+     "duration_ms": 450.0,
+     "delta": [
+      0.0,
+      71.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "linear"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Details",
+     "region": [
+      136,
+      49,
+      272,
+      140
+     ],
+     "match": null,
+     "fields": {
+      "start_ms": {
+       "expected": 150.0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "duration_ms": {
+       "expected": 450.0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "easing": {
+       "expected": "linear",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "height_px": {
+       "expected": 71,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    },
+    {
+     "element": "Next",
+     "region": [
+      136,
+      78,
+      272,
+      185
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 150.0,
+       "actual": 150.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 450.0,
+       "actual": 450.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "down",
+       "actual": "down",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 71.0,
+       "actual": 71.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "linear",
+       "actual": "linear",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 2,
+   "count_correct": false,
+   "missed": 1,
+   "score": 0.4166666666666667,
+   "all_correct": false,
+   "video_sha256": "df46e900b93c546fe835108c84b94cdc38407d351fc9efc00672296c9df1d427",
+   "truth_sha256": "df7d9e8cbcf1f74d002c2991be4a9d6fe818d4876a6885a6240901af26afc98c"
+  },
+  {
+   "id": "q045",
+   "family": "sidebar",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      84,
+      19,
+      316,
+      215
+     ],
+     "start_ms": 216.633,
+     "duration_ms": 416.7,
+     "delta": [
+      -50.0,
+      0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Menu",
+     "region": [
+      20,
+      37,
+      160,
+      187
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 216.66666666666666,
+       "actual": 216.633,
+       "error": -0.033667,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 416.6666666666667,
+       "actual": 416.7,
+       "error": 0.033333,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": "left",
+       "error": null,
+       "state": "wrong"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": 50.0,
+       "error": 50.0,
+       "state": "wrong"
+      },
+      "easing": {
+       "expected": "ease-in-out",
+       "actual": "ease-in-out",
+       "error": null,
+       "state": "correct"
+      },
+      "width_px": {
+       "expected": -50,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    },
+    {
+     "element": "Content",
+     "region": [
+      120,
+      67,
+      290,
+      115
+     ],
+     "match": null,
+     "fields": {
+      "start_ms": {
+       "expected": 216.66666666666666,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "duration_ms": {
+       "expected": 416.6666666666667,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "direction": {
+       "expected": "left",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "distance_px": {
+       "expected": 50.0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "easing": {
+       "expected": "ease-in-out",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 2,
+   "count_correct": false,
+   "missed": 1,
+   "score": 0.25,
+   "all_correct": false,
+   "video_sha256": "184702b674e8b1ce69ee5f9de730811b30716ac12217df2b6c84fb2e1ce07703",
+   "truth_sha256": "e58d0c1b99414e5de5d95b38790727b6a445fb20e2f2ddf318f8d9ebea82823e"
+  },
+  {
+   "id": "q047",
+   "family": "fade",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      116,
+      50,
+      268,
+      137
+     ],
+     "start_ms": 216.633,
+     "duration_ms": 300.0,
+     "delta": null,
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Saved",
+     "region": [
+      132,
+      63,
+      252,
+      113
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 216.66666666666666,
+       "actual": 216.633,
+       "error": -0.033667,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 300.0,
+       "actual": 300.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": "still",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": 0.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in",
+       "actual": "ease-in",
+       "error": null,
+       "state": "correct"
+      },
+      "opacity_from": {
+       "expected": 0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "opacity_to": {
+       "expected": 1,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 0.75,
+   "all_correct": false,
+   "video_sha256": "67ad41914f9187e73663cec745a29e15f260d7b0fc5b712d52edadf69b0d9bd5",
+   "truth_sha256": "319cafe125e18357800d81de0d286eaa6e0b41b207f61394a490ea38641b203a"
+  },
+  {
+   "id": "q049",
+   "family": "horizontal",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      100,
+      34,
+      284,
+      121
+     ],
+     "start_ms": 166.633,
+     "duration_ms": 316.7,
+     "delta": [
+      32.0,
+      0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Account",
+     "region": [
+      117,
+      51,
+      261,
+      101
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 166.66666666666666,
+       "actual": 166.633,
+       "error": -0.033667,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 316.6666666666667,
+       "actual": 316.7,
+       "error": 0.033333,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "right",
+       "actual": "right",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 32.0,
+       "actual": 32.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in-out",
+       "actual": "ease-in-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "a37b5cf7551aa0d7971b9b8d82d96b5517fbfa417d26c3abf916e1b1d353068c",
+   "truth_sha256": "185a128cda882a994c25421c6c52cbbefcc7cf25059901252b6f7ddc3d013ff1"
+  },
+  {
+   "id": "q051",
+   "family": "vertical",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      116,
+      34,
+      284,
+      184
+     ],
+     "start_ms": 200.0,
+     "duration_ms": 300.0,
+     "delta": [
+      0.0,
+      -70.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "linear"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Tools",
+     "region": [
+      140,
+      57,
+      264,
+      169
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 200.0,
+       "actual": 200.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 300.0,
+       "actual": 300.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "up",
+       "actual": "up",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 70.0,
+       "actual": 70.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "linear",
+       "actual": "linear",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "f5aaa17f36569789a477000d709967dba5e97cc786df59ca2b8746b8fd273f59",
+   "truth_sha256": "9b439e5b91e92de4ed56431bae84d57fb5c8da6c5d6de12af461ff54e7830fd9"
+  },
+  {
+   "id": "q053",
+   "family": "overlap",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      116,
+      19,
+      300,
+      90
+     ],
+     "start_ms": 266.633,
+     "duration_ms": 283.3,
+     "delta": [
+      52.0,
+      -0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in-out"
+    },
+    {
+     "id": "s2",
+     "region": [
+      116,
+      112,
+      316,
+      199
+     ],
+     "start_ms": 316.633,
+     "duration_ms": 283.3,
+     "delta": [
+      -52.0,
+      0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Sync",
+     "region": [
+      136,
+      36,
+      280,
+      76
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 266.6666666666667,
+       "actual": 266.633,
+       "error": -0.033667,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 283.3333333333333,
+       "actual": 283.3,
+       "error": -0.033333,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "right",
+       "actual": "right",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 52.0,
+       "actual": 52.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in-out",
+       "actual": "ease-in-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    },
+    {
+     "element": "Queued",
+     "region": [
+      134,
+      136,
+      296,
+      178
+     ],
+     "match": 1,
+     "fields": {
+      "start_ms": {
+       "expected": 316.6666666666667,
+       "actual": 316.633,
+       "error": -0.033667,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 283.3333333333333,
+       "actual": 283.3,
+       "error": -0.033333,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "left",
+       "actual": "left",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 52.0,
+       "actual": 52.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in-out",
+       "actual": "ease-in-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 2,
+   "count_correct": true,
+   "missed": 0,
+   "score": 1.0,
+   "all_correct": true,
+   "video_sha256": "7d74bdee248b17f9d182bafccf2eb81e167a697be997971f24ed373dfdffe053",
+   "truth_sha256": "2a685cde49c8c5b2aef3f4ca651a2a2681bf15776123651615e48f10f3fb1173"
+  },
+  {
+   "id": "q055",
+   "family": "panel",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      116,
+      50,
+      300,
+      184
+     ],
+     "start_ms": 216.633,
+     "duration_ms": 450.0,
+     "delta": [
+      0.0,
+      53.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-in-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Details",
+     "region": [
+      137,
+      47,
+      273,
+      120
+     ],
+     "match": null,
+     "fields": {
+      "start_ms": {
+       "expected": 216.66666666666666,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "duration_ms": {
+       "expected": 450.0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "easing": {
+       "expected": "ease-in-out",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "height_px": {
+       "expected": 53,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    },
+    {
+     "element": "Next",
+     "region": [
+      137,
+      76,
+      273,
+      165
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 216.66666666666666,
+       "actual": 216.633,
+       "error": -0.033667,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 450.0,
+       "actual": 450.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "down",
+       "actual": "down",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 53.0,
+       "actual": 53.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-in-out",
+       "actual": "ease-in-out",
+       "error": null,
+       "state": "correct"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 2,
+   "count_correct": false,
+   "missed": 1,
+   "score": 0.4166666666666667,
+   "all_correct": false,
+   "video_sha256": "b522782ee54ba3fdf1193bd14e02d8ab84993a3d594fcd466c6db3455569129e",
+   "truth_sha256": "e5df4209636b96d908a3df5bd5ff24e5bb15dd4c035bb28fdc0562d1e5cfac23"
+  },
+  {
+   "id": "q057",
+   "family": "sidebar",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      84,
+      19,
+      316,
+      215
+     ],
+     "start_ms": 133.333,
+     "duration_ms": 350.0,
+     "delta": [
+      -58.0,
+      0.0
+     ],
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Menu",
+     "region": [
+      20,
+      37,
+      160,
+      187
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 133.33333333333334,
+       "actual": 133.333,
+       "error": -0.000333,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 350.0,
+       "actual": 350.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": "left",
+       "error": null,
+       "state": "wrong"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": 58.0,
+       "error": 58.0,
+       "state": "wrong"
+      },
+      "easing": {
+       "expected": "ease-out",
+       "actual": "ease-out",
+       "error": null,
+       "state": "correct"
+      },
+      "width_px": {
+       "expected": -58,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    },
+    {
+     "element": "Content",
+     "region": [
+      112,
+      67,
+      290,
+      115
+     ],
+     "match": null,
+     "fields": {
+      "start_ms": {
+       "expected": 133.33333333333334,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "duration_ms": {
+       "expected": 350.0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "direction": {
+       "expected": "left",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "distance_px": {
+       "expected": 58.0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "easing": {
+       "expected": "ease-out",
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 2,
+   "count_correct": false,
+   "missed": 1,
+   "score": 0.25,
+   "all_correct": false,
+   "video_sha256": "622b8468972a79591339823d2ce745b8f5c5a6b94474a050da9e94a854b70c37",
+   "truth_sha256": "b0a1cb643f23df67e158571485f039b73968bbb668d8c025f7ebdfa46796d3bb"
+  },
+  {
+   "id": "q059",
+   "family": "fade",
+   "failure": null,
+   "predictions": [
+    {
+     "id": "s1",
+     "region": [
+      100,
+      19,
+      252,
+      106
+     ],
+     "start_ms": 166.667,
+     "duration_ms": 450.0,
+     "delta": null,
+     "resize": null,
+     "opacity": null,
+     "easing": "ease-out"
+    }
+   ],
+   "objects": [
+    {
+     "element": "Saved",
+     "region": [
+      116,
+      35,
+      236,
+      85
+     ],
+     "match": 0,
+     "fields": {
+      "start_ms": {
+       "expected": 166.66666666666666,
+       "actual": 166.667,
+       "error": 0.000333,
+       "state": "correct"
+      },
+      "duration_ms": {
+       "expected": 450.0,
+       "actual": 450.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "direction": {
+       "expected": "still",
+       "actual": "still",
+       "error": null,
+       "state": "correct"
+      },
+      "distance_px": {
+       "expected": 0.0,
+       "actual": 0.0,
+       "error": 0.0,
+       "state": "correct"
+      },
+      "easing": {
+       "expected": "ease-out",
+       "actual": "ease-out",
+       "error": null,
+       "state": "correct"
+      },
+      "opacity_from": {
+       "expected": 0,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      },
+      "opacity_to": {
+       "expected": 1,
+       "actual": null,
+       "error": null,
+       "state": "missing"
+      }
+     }
+    }
+   ],
+   "extra": [],
+   "expected_count": 1,
+   "count_correct": true,
+   "missed": 0,
+   "score": 0.75,
+   "all_correct": false,
+   "video_sha256": "6239879fba8edd0d4df6988e1ebaa747c94c0f618c04a0bb6a175fc480f95d19",
+   "truth_sha256": "a24c2598faa0ab20adf083ffaf86c27aa2ecc645b3b969c58a302fcd36a0d1be"
+  }
+ ]
+}

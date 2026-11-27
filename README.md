@@ -134,6 +134,8 @@ Connected to Pledge Keystone (`--http`), GPT-6.1 sol and terra completed four ki
 
 ## Results
 
+On a frozen holdout, the analyzer got every scored field right in 13 of 30 Qt scenes and 6 of 12 Chromium recordings. All six browser translations passed. None of the six browser reflows passed every field. [Independent analyzer evaluation and scene-level intervals](docs/analyzer-evaluation-20261127.md)
+
 | Test | Result |
 |---|---|
 | 6 models, 6 basic UI animations (216 calls) | video only 55%, with visual measurements 92%, with Qt properties 94% |
