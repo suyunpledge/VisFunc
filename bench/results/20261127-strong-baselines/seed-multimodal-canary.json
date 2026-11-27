@@ -1,0 +1,62 @@
+{
+ "model": "seed",
+ "requested_model": "doubao-seed-2-1-pro-260915",
+ "condition": "V3",
+ "scene": "q000",
+ "media_sha256": "5b6710e9942f3ec89cce6629e33acd87853d32e30c4dbaeec1b23c5936af9735",
+ "payload_sha256": "35d802e81a1827909ca4d42a895ab468918ace57af0431f390a3745ef3a8a8fa",
+ "frame_count_supplied": null,
+ "dense_variant": null,
+ "attempts": [
+  {
+   "status": 200,
+   "served_model": "doubao-seed-2-1-pro-260915",
+   "response_id": "0217957902049183e1d45c2e42a445361f900407e7e03ea9cdeb5",
+   "provider_endpoint": "https://ark.cn-beijing.volces.com/api/plan/v3/chat/completions",
+   "counted_input": null,
+   "input_tokens": 2383,
+   "output_tokens": 59,
+   "usage": {
+    "completion_tokens": 59,
+    "prompt_tokens": 2383,
+    "total_tokens": 2442,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0
+    }
+   },
+   "seconds": 6.038,
+   "budget_usd": 0.0,
+   "usage_known": true,
+   "answer": "{\"segments\":[{\"region\":[4,34,236,121],\"start_ms\":150,\"duration_ms\":233,\"delta\":[-80,0],\"resize\":[0,0],\"opacity\":null,\"easing\":\"ease-in\"}]}"
+  }
+ ],
+ "tool_results": [],
+ "predictions": [
+  {
+   "id": "0",
+   "region": [
+    4,
+    34,
+    236,
+    121
+   ],
+   "start_ms": 150,
+   "duration_ms": 233,
+   "delta": [
+    -80,
+    0
+   ],
+   "resize": [
+    0,
+    0
+   ],
+   "opacity": null,
+   "easing": "ease-in"
+  }
+ ],
+ "bare_array": false,
+ "seconds": 6.063
+}

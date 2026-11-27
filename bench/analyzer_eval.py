@@ -80,7 +80,7 @@ def measured(seg):
     }
 
 
-def fields(want, pred):
+def fields(want, pred, *, implicit_stationary=True):
     dx, dy = want["delta"]
     distance = math.hypot(dx, dy)
     target = {
@@ -99,7 +99,7 @@ def fields(want, pred):
     if pred:
         got = {k: pred[k] for k in ("start_ms", "duration_ms", "easing")}
         shift = pred["delta"]
-        if shift is not None or distance == 0:
+        if shift is not None or (implicit_stationary and distance == 0):
             got["direction"] = direction(*(shift or (0, 0)))
             got["distance_px"] = math.hypot(*(shift or (0, 0)))
     for i, axis in enumerate(("width_px", "height_px")):
@@ -129,11 +129,13 @@ def fields(want, pred):
     return result
 
 
-def score(case, truth, preds, failure=None):
+def score(case, truth, preds, failure=None, *, implicit_stationary=True):
     pairs = match(truth, preds)
     rows = []
     for want, j in zip(truth, pairs, strict=True):
-        row = fields(want, preds[j] if j is not None else None)
+        row = fields(
+            want, preds[j] if j is not None else None, implicit_stationary=implicit_stationary
+        )
         if failure:
             for item in row.values():
                 item["state"] = failure
